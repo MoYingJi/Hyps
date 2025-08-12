@@ -54,6 +54,8 @@ fi
 
 export "${PREFIX_VAR_NAME?}"
 
+
+
 # 准备启动
 
 [ "$WINESERVER_KILL" == "y" ] && $WINESERVER -k
@@ -106,6 +108,7 @@ EOF
 
         elif [ "$NETWORK_TABLES" == "nftables" ]; then
             echo "nftables 暂不支持"
+            echo "需要使用 iptables-nft 然后使用 iptables 规则"
         fi
 
         echo "启用网络丢包需要 root 权限"

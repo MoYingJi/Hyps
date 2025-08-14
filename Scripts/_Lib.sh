@@ -32,22 +32,28 @@ source "$RUNNER_CONF"
 [ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
+if [ -n "$PREFIX" ]; then
+    mkdir -p "$PREFIX"
+elif [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
+    mkdir -p "${!PREFIX_VAR_NAME}"
+fi
+
 # 在 PREFIX 创建由 pfx 到 . 的软链接
 # 和一些判断的逻辑
 if [ "$PROTON_TO_WINE_LINK" == "y" ]; then
     # 判断是否原有 pfx
-    if [ -d "$STEAM_COMPAT_DATA_PATH/pfx" ]; then
+    if [ -d "$PREFIX/pfx" ]; then
         # 判断是否原有 wineprefix
-        if [ -d "$STEAM_COMPAT_DATA_PATH/dosdevices" ]; then
+        if [ -d "$PREFIX/dosdevices" ]; then
             # 使用原有 wineprefix 而删除 pfx
-            rm -rf "$STEAM_COMPAT_DATA_PATH/pfx"
+            rm -rf "$PREFIX/pfx"
         else
             # 将原有的 pfx 移动到 原目录
-            mv "$STEAM_COMPAT_DATA_PATH/pfx" "$STEAM_COMPAT_DATA_PATH"
+            mv "$PREFIX/pfx" "$PREFIX"
         fi
     fi
     # 创建链接
-    ln -s . "$STEAM_COMPAT_DATA_PATH/pfx"
+    ln -s . "$PREFIX/pfx"
 fi
 
 [ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
@@ -71,7 +77,13 @@ EOF
     )"
 fi
 
-
+# Jadeite Patch
+if [ -n "$JADEITE_PATH" ]; then
+    GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
+elif [ "$FORCE_JADEITE" = "y" ]; then
+    echo "本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
+    exit 1
+fi
 
 start_game() {
     # 创建临时的 bat 文件用于启动
@@ -80,22 +92,21 @@ start_game() {
 Z:
 $BEFORE_GAME
 
-cd \"$GAME_PATH\"
-start $GAME_NAME %*
+cd "$GAME_PATH"
+start "" $GAME_EXE_PREFIX "Z:\\$GAME"
 
 $AFTER_GAME
 EOF
     )"
     echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"
 
-    # cd 到指定目录 准备启动
     cd "$GAME_PATH"
 
     if [ "$NETWORK_DROP" = "y" ]; then
         [ -z "$NETWORK_DROP_DURATION" ] && NETWORK_DROP_DURATION="5"
         [ -z "$NETWORK_DROP_UID" ] && NETWORK_DROP_UID="$(id -u)"
-        [ -z "$NETWORK_DROP_SLICE" ] && NETWORK_DROP_SLICE="game-$GAME_NAME"
-        [ -z "$NETWORK_DROP_UNIT" ] && NETWORK_DROP_UNIT="game-$GAME_NAME"
+        [ -z "$NETWORK_DROP_SLICE" ] && NETWORK_DROP_SLICE="game_$GAME_NAME"
+        [ -z "$NETWORK_DROP_UNIT" ] && NETWORK_DROP_UNIT="game_$GAME_NAME"
         [ -z "$NETWORK_DROP_TABLE" ] && NETWORK_DROP_TABLE="iptables"
 
         if [ "$NETWORK_TABLES" == "iptables" ]; then

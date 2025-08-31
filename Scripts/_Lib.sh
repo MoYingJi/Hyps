@@ -32,15 +32,15 @@ source "$RUNNER_CONF"
 [ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
-if [ -n "$PREFIX" ]; then
-    mkdir -p "$PREFIX"
-elif [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
-    mkdir -p "${!PREFIX_VAR_NAME}"
+if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
+    PREFIX="${!PREFIX_VAR_NAME}"
 fi
+
+mkdir -p "$PREFIX"
 
 # 在 PREFIX 创建由 pfx 到 . 的软链接
 # 和一些判断的逻辑
-if [ "$PROTON_TO_WINE_LINK" == "y" ]; then
+if [ "$PROTON_TO_WINE_LINK" == "y" ] && [ ! -L "$PREFIX/pfx" ]; then
     # 判断是否原有 pfx
     if [ -d "$PREFIX/pfx" ]; then
         # 判断是否原有 wineprefix

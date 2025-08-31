@@ -109,17 +109,27 @@ EOF
         [ -z "$NETWORK_DROP_UNIT" ] && NETWORK_DROP_UNIT="game_$GAME_NAME"
         [ -z "$NETWORK_DROP_TABLE" ] && NETWORK_DROP_TABLE="iptables"
 
-        if [ "$NETWORK_TABLES" == "iptables" ]; then
+        NETWORK_DROP_SLICE_PATH="user.slice/user-$NETWORK_DROP_UID.slice/user@$NETWORK_DROP_UID.service/$NETWORK_DROP_SLICE.slice"
 
-            NETWORK_DROP_SLICE_PATH="/user.slice/user-$NETWORK_DROP_UID.slice/user@$NETWORK_DROP_UID.service/$NETWORK_DROP_SLICE.slice"
-            NETWORK_DROP_RULE="OUTPUT -p all -m cgroup --path $NETWORK_DROP_SLICE_PATH -j DROP"
+        if [ "$NETWORK_DROP_TABLE" == "iptables" ]; then
+
+            NETWORK_DROP_RULE="OUTPUT -p all -m cgroup --path /$NETWORK_DROP_SLICE_PATH -j DROP"
 
             NETWORK_DROP_RULE_ADD="iptables -A $NETWORK_DROP_RULE"
             NETWORK_DROP_RULE_DEL="iptables -D $NETWORK_DROP_RULE"
 
-        elif [ "$NETWORK_TABLES" == "nftables" ]; then
-            echo "nftables 暂不支持"
-            echo "需要使用 iptables-nft 然后使用 iptables 规则"
+        elif [ "$NETWORK_DROP_TABLE" == "nftables" ]; then
+
+            NETWORK_DROP_RULE_ADD="""
+                nft -f - <<NFT
+table inet $NETWORK_DROP_SLICE {
+  chain output {
+    type filter hook output priority 0;
+    socket cgroupv2 level 4 \"$NETWORK_DROP_SLICE_PATH\" counter drop
+  }
+}
+NFT"""
+            NETWORK_DROP_RULE_DEL="nft destroy table inet $NETWORK_DROP_SLICE"
         fi
 
         echo "启用网络丢包需要 root 权限"

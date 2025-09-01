@@ -1,5 +1,11 @@
 #!/hint/bash
 #shellcheck disable=1090,1091,2086,2164
+# ↑ shellcheck: 我不如烂这算了
+
+# 神秘小脚本
+
+# 神秘小脚本内所使用的都是全局变量，且对于 conf 文件都是直接 source
+# 所以在 conf 文件中添加其他变量可能会造成奇奇怪怪的效果
 
 [ -z "$GAME_NAME" ] && exit 1
 
@@ -32,6 +38,10 @@ source "$RUNNER_CONF"
 [ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
+# 如果 $PREFIX 为空，就找 名为 $PREFIX_VAR_NAME 的值的变量，赋值过来做些操作
+# $PREFIX_VAR_NAME 就是 Runner 中定义的 存储 PREFIX 路径 的变量名
+# Wine 中 PREFIX_VAR_NAME=WINEPREFIX
+# Proton 中 PREFIX_VAR_NAME=STEAM_COMPAT_DATA_PATH
 if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
     PREFIX="${!PREFIX_VAR_NAME}"
 fi
@@ -56,6 +66,8 @@ if [ "$PROTON_TO_WINE_LINK" == "y" ] && [ ! -L "$PREFIX/pfx" ]; then
     ln -s . "$PREFIX/pfx"
 fi
 
+# 将 $PREFIX 的值 赋值给 名为 $PREFIX_VAR_NAME 的值的变量
+# 我怎么感觉没这句注释更好理解呢?
 [ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
 
 export "${PREFIX_VAR_NAME?}"
@@ -135,16 +147,18 @@ EOF
 
         elif [ "$NETWORK_DROP_TABLE" == "nftables" ]; then
 
+            NETWORK_DROP_NAME="$NETWORK_DROP_SLICE"
+
             NETWORK_DROP_RULE_ADD="""
-                nft -f - <<NFT
-table inet $NETWORK_DROP_SLICE {
-  chain output {
-    type filter hook output priority 0;
-    socket cgroupv2 level 4 \"$NETWORK_DROP_SLICE_PATH\" counter drop
-  }
+                nft -f - << NFT
+table inet $NETWORK_DROP_NAME {
+    chain output {
+        type filter hook output priority 0;
+        socket cgroupv2 level 4 \"$NETWORK_DROP_SLICE_PATH\" counter drop
+    }
 }
 NFT"""
-            NETWORK_DROP_RULE_DEL="nft destroy table inet $NETWORK_DROP_SLICE"
+            NETWORK_DROP_RULE_DEL="nft destroy table inet $NETWORK_DROP_NAME"
         fi
 
         echo "启用网络丢包需要 root 权限"
@@ -155,6 +169,7 @@ NFT"""
             $NETWORK_DROP_RULE_DEL
         """
     else
+        # 正常启动 不启用网络丢包
         $WRAPPER_CMD $WINE "$TEMP_SCRIPT"
     fi
 

@@ -77,6 +77,19 @@ EOF
     )"
 fi
 
+# Systemd Inhibit
+if [ "$SYSTEMD_INHIBIT" = "y" ]; then
+    INHIBIT_WRAPPER="systemd-inhibit"
+
+    [ -z "$SYSTEMD_INHIBIT_WHY" ] && SYSTEMD_INHIBIT_WHY="Game-Hyps $GAME_NAME"
+    [ -z "$SYSTEMD_INHIBIT_WHAT" ] && SYSTEMD_INHIBIT_WHAT="idle:sleep"
+
+    INHIBIT_WRAPPER="$INHIBIT_WRAPPER --why=$SYSTEMD_INHIBIT_WHY"
+    INHIBIT_WRAPPER="$INHIBIT_WRAPPER --what=$SYSTEMD_INHIBIT_WHAT"
+
+    WRAPPER_CMD="$INHIBIT_WRAPPER $WRAPPER_CMD"
+fi
+
 # Jadeite Patch
 if [ -n "$JADEITE_PATH" ]; then
     GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
@@ -84,6 +97,8 @@ elif [ "$FORCE_JADEITE" = "y" ]; then
     echo "本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
     exit 1
 fi
+
+
 
 start_game() {
     # 创建临时的 bat 文件用于启动
@@ -134,13 +149,13 @@ NFT"""
 
         echo "启用网络丢包需要 root 权限"
         sudo -v
-        systemd-run --user --scope --slice="$NETWORK_DROP_SLICE" --unit="$NETWORK_DROP_UNIT" $WINE "$TEMP_SCRIPT" & sudo sh -c """
+        $WRAPPER_CMD systemd-run --user --scope --slice="$NETWORK_DROP_SLICE" --unit="$NETWORK_DROP_UNIT" $WINE "$TEMP_SCRIPT" & sudo sh -c """
             $NETWORK_DROP_RULE_ADD
             sleep $NETWORK_DROP_DURATION
             $NETWORK_DROP_RULE_DEL
         """
     else
-        $WINE "$TEMP_SCRIPT"
+        $WRAPPER_CMD $WINE "$TEMP_SCRIPT"
     fi
 
     wait

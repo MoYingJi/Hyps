@@ -81,15 +81,18 @@ export "${PREFIX_VAR_NAME?}"
 
 # 伪装 Hostname 为 STEAMDESK
 if [ "$HOSTNAME_STEAMDECK" = "y" ]; then
+    [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDESK"
+
     BEFORE_GAME="$(cat << EOF
 $BEFORE_GAME
-reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName /v ComputerName /t REG_SZ /d STEAMDECK /f
-reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ComputerName /v ComputerName /t REG_SZ /d STEAMDECK /f
+reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName /v ComputerName /t REG_SZ /d $HOSTNAME_STEAMDECK_NAME /f
+reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ComputerName /v ComputerName /t REG_SZ /d $HOSTNAME_STEAMDECK_NAME /f
 EOF
     )"
 fi
 
 # Systemd Inhibit
+# 隐藏的小功能 能用就用吧（
 if [ "$SYSTEMD_INHIBIT" = "y" ]; then
     INHIBIT_WRAPPER="systemd-inhibit"
 

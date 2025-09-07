@@ -46,6 +46,8 @@ if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]
     PREFIX="${!PREFIX_VAR_NAME}"
 fi
 
+PREFIX="$(realpath "$PREFIX")"
+
 mkdir -p "$PREFIX"
 
 # 在 PREFIX 创建由 pfx 到 . 的软链接
@@ -78,6 +80,15 @@ export "${PREFIX_VAR_NAME?}"
 
 [ "$WINESERVER_KILL" == "y" ] && $WINESERVER -k
 [ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
+
+# __GL_SHADER_DISK_CACHE
+if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
+    export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
+    if [ -n "$GL_SHADER_DISK_CACHE_PATH" ]; then
+        GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
+        export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
+    fi
+fi
 
 # 伪装 Hostname 为 STEAMDESK
 if [ "$HOSTNAME_STEAMDECK" = "y" ]; then

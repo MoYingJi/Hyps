@@ -75,7 +75,7 @@ fi
 
 export "${PREFIX_VAR_NAME?}"
 
-# 导出设置
+# 导出环境变量
 
 # umu-launcher
 export PROTONPATH

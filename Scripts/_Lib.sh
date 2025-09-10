@@ -7,7 +7,7 @@
 # 神秘小脚本内所使用的都是全局变量，且对于 conf 文件都是直接 source
 # 所以在 conf 文件中添加其他变量可能会造成奇奇怪怪的效果
 
-set -euo pipefail
+set -eo pipefail
 
 [ -z "$GAME_NAME" ] && exit 1
 

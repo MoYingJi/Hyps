@@ -7,6 +7,8 @@
 # 神秘小脚本内所使用的都是全局变量，且对于 conf 文件都是直接 source
 # 所以在 conf 文件中添加其他变量可能会造成奇奇怪怪的效果
 
+set -euo pipefail
+
 [ -z "$GAME_NAME" ] && exit 1
 
 cd "$(dirname "$(realpath "$0")")/.."
@@ -30,7 +32,6 @@ RUNNER_CONF="$CONFIG_DIR/Runners/$RUNNER.conf"
 source "$RUNNER_CONF"
 
 [ -z "$WINE" ] && exit 1
-[ -z "$WINESERVER" ] && exit 1
 [ -z "$PREFIX_VAR_NAME" ] && PREFIX_VAR_NAME="WINEPREFIX"
 
 # 配置 WINE
@@ -74,11 +75,17 @@ fi
 
 export "${PREFIX_VAR_NAME?}"
 
+# 导出设置
+
+# umu-launcher
+export PROTONPATH
+export GAMEID
+
 
 
 # 准备启动
 
-[ "$WINESERVER_KILL" == "y" ] && $WINESERVER -k
+[ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
 [ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
 
 # __GL_SHADER_DISK_CACHE

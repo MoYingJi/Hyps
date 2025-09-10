@@ -93,6 +93,7 @@ if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
     export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
     if [ -n "$GL_SHADER_DISK_CACHE_PATH" ]; then
         GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
+        mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
         export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
     fi
 fi

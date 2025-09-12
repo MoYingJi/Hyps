@@ -16,7 +16,7 @@ HoYo-Game (Linux) Playing Scripts
 - [ ] 崩坏：因缘精灵 (如果可能的话)
 
 其他
-- [ ] 鸣潮
+- [x] 鸣潮
 - [ ] 明日方舟：终末地 (如果可能的话)
 
 目前支持或准备支持的功能：
@@ -25,8 +25,9 @@ HoYo-Game (Linux) Playing Scripts
 - [x] 使用 Gamemode 或 MangoHud 启动游戏
 - [x] 使用 taskset 关联 CPU 核心
 - [x] 【部分游戏】通过注册表伪装 Hostname
-- [x] 【部分游戏】一键通过 systemd-run + iptables / nftables 断网启动
-- [ ] 【部分游戏】一键通过临时修改 Hosts 断网启动
+- [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables
+- [ ] 【部分游戏】【断网启动】通过临时修改 Hosts
+- [ ] 【部分游戏】【断网启动】通过 nmcli
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
 - [ ] 【崩坏：星穹铁道】注册表解锁帧率
 

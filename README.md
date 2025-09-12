@@ -12,7 +12,7 @@ HoYo-Game (Linux) Playing Scripts
 - [ ] 崩坏三
 - [x] 原神
 - [x] 崩坏：星穹铁道
-- [ ] 绝区零
+- [x] 绝区零
 - [ ] 崩坏：因缘精灵 (如果可能的话)
 
 其他
@@ -23,11 +23,14 @@ HoYo-Game (Linux) Playing Scripts
 
 - [x] 启动游戏
 - [x] 使用 Gamemode 或 MangoHud 启动游戏
-- [x] 通过注册表伪装 Hostname
-- [x] 【部分游戏】一键断网启动
-- [x] 【原神】使用 FPS Unlocker
+- [x] 使用 taskset 关联 CPU 核心
+- [x] 【部分游戏】通过注册表伪装 Hostname
+- [x] 【部分游戏】一键通过 systemd-run + iptables / nftables 断网启动
+- [ ] 【部分游戏】一键通过临时修改 Hosts 断网启动
+- [x] 【原神】使用 FPS Unlocker 解锁帧率
 - [ ] 【崩坏：星穹铁道】注册表解锁帧率
 
 目前 **不支持** 的功能：
 
 - 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK 等
+- 新增永久性的 Hosts 条目以禁止日志上传等

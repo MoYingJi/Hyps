@@ -13,6 +13,12 @@ cd "$(dirname "$(realpath "$0")")/.."
 source config.conf
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config/hypsc}"
+[ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_DIR:-$HOME/.cache/hypsc}"
+
+# 读取通用配置
+
+COMMON_GAME_CONF="$CONFIG_DIR/Games/_common.conf"
+[ -f "$COMMON_GAME_CONF" ] && source "$COMMON_GAME_CONF"
 
 # 读取游戏配置
 
@@ -33,9 +39,6 @@ source "$RUNNER_CONF"
 [ -z "$PREFIX_VAR_NAME" ] && PREFIX_VAR_NAME="WINEPREFIX"
 
 # 配置 WINE
-
-[ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
-[ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
 # 如果 $PREFIX 为空，就找 名为 $PREFIX_VAR_NAME 的值的变量，赋值过来做些操作
 # $PREFIX_VAR_NAME 就是 Runner 中定义的 存储 PREFIX 路径 的变量名
@@ -88,12 +91,21 @@ export GAMEID
 
 # __GL_SHADER_DISK_CACHE
 if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
+    [ -z "$GL_SHADER_DISK_CACHE_PATH" ] && GL_SHADER_DISK_CACHE_PATH="$CACHE_DIR/GLShaderCache/$GAME_NAME"
+    mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
+    GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
+
     export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
-    if [ -n "$GL_SHADER_DISK_CACHE_PATH" ]; then
-        GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
-        mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
-        export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
-    fi
+    export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
+fi
+
+# DXVK_STATE_CACHE
+if [ "$DXVK_STATE_CACHE" = "y" ]; then
+    [ -z "$DXVK_STATE_CACHE_PATH" ] && DXVK_STATE_CACHE_PATH="$CACHE_DIR/DXVKStateCache/$GAME_NAME"
+    mkdir -p "$DXVK_STATE_CACHE_PATH"
+    DXVK_STATE_CACHE_PATH="$(realpath "$DXVK_STATE_CACHE_PATH")"
+
+    export DXVK_STATE_CACHE_PATH
 fi
 
 # 伪装 Hostname 为 STEAMDESK
@@ -121,6 +133,11 @@ if [ "$SYSTEMD_INHIBIT" = "y" ]; then
 
     WRAPPER_CMD="$INHIBIT_WRAPPER $WRAPPER_CMD"
 fi
+
+# MangoHUD / Gamemode
+[ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
+[ -n "$TASKSET" ] && WINE="$TASKSET $WINE"
+[ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
 # Jadeite Patch
 if [ -n "$JADEITE_PATH" ]; then

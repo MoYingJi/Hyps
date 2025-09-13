@@ -89,7 +89,7 @@ export GAMEID
 [ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
 [ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
 
-# __GL_SHADER_DISK_CACHE
+# GL_SHADER_DISK_CACHE
 if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
     [ -z "$GL_SHADER_DISK_CACHE_PATH" ] && GL_SHADER_DISK_CACHE_PATH="$CACHE_DIR/GLShaderCache/$GAME_NAME"
     mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
@@ -99,14 +99,16 @@ if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
     export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
 fi
 
-# DXVK_STATE_CACHE
-if [ "$DXVK_STATE_CACHE" = "y" ]; then
-    [ -z "$DXVK_STATE_CACHE_PATH" ] && DXVK_STATE_CACHE_PATH="$CACHE_DIR/DXVKStateCache/$GAME_NAME"
-    mkdir -p "$DXVK_STATE_CACHE_PATH"
-    DXVK_STATE_CACHE_PATH="$(realpath "$DXVK_STATE_CACHE_PATH")"
+# DX_CACHE
+if [ "$DX_CACHE" = "y" ]; then
+    [ -z "$DX_CACHE_PATH" ] && DX_CACHE_PATH="$CACHE_DIR/DXCache/$GAME_NAME"
+    mkdir -p "$DX_CACHE_PATH"
+    DX_CACHE_PATH="$(realpath "$DX_CACHE_PATH")"
 
-    export DXVK_STATE_CACHE_PATH
+    export DXVK_STATE_CACHE_PATH="$DX_CACHE_PATH"
+    export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
 fi
+
 
 # 伪装 Hostname 为 STEAMDESK
 if [ "$HOSTNAME_STEAMDECK" = "y" ]; then

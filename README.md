@@ -1,7 +1,5 @@
 # Hyps
 
-HoYo-Game (Linux) Playing Scripts
-
 (目前自用) 在 Linux 上运行运行部分游戏的脚本
 
 目前，这仅仅是个**启动脚本**和一些便捷工具，远远达不到启动器的要求！
@@ -23,7 +21,9 @@ HoYo-Game (Linux) Playing Scripts
 
 - [x] 启动游戏
 - [x] 使用 Gamemode 或 MangoHud 启动游戏
-- [x] 使用 taskset 关联 CPU 核心
+- [x] 使用 Taskset 关联 CPU 核心
+- [x] 自定义 DXVK/VKD3D 缓存路径
+- [x] 自定义 NVIDIA 着色器缓存路径
 - [x] 【部分游戏】通过注册表伪装 Hostname
 - [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables
 - [ ] 【部分游戏】【断网启动】通过临时修改 Hosts

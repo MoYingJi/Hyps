@@ -82,6 +82,9 @@ export "${PREFIX_VAR_NAME?}"
 export PROTONPATH
 export GAMEID
 
+# MangoHud
+export MANGOHUD_CONFIGFILE
+
 
 
 # 准备启动

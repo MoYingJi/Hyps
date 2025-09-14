@@ -86,11 +86,9 @@ export GAMEID
 export MANGOHUD_CONFIGFILE
 
 
-
-# 准备启动
-
-[ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
-[ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
+# NVIDIA Smooth Motion
+[ "$NVIDIA_SMOOTH_MOTION" = "y" ] && NVPRESENT_ENABLE_SMOOTH_MOTION=1
+export NVPRESENT_ENABLE_SMOOTH_MOTION
 
 # GL_SHADER_DISK_CACHE
 if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
@@ -111,6 +109,11 @@ if [ "$DX_CACHE" = "y" ]; then
     export DXVK_STATE_CACHE_PATH="$DX_CACHE_PATH"
     export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
 fi
+
+# 准备启动
+
+[ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+[ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
 
 
 # 伪装 Hostname 为 STEAMDESK

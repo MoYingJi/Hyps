@@ -166,13 +166,6 @@ elif [ "$FORCE_JADEITE" = "y" ]; then
 fi
 
 
-delay_vbs() {
-    local file
-    file="$(mktemp --suffix=.vbs)"
-    echo "WScript.Sleep $1" > $file
-    echo "Z:$file" | sed 's/\//\\/g'
-}
-
 
 start_game() {
     # 创建临时的 bat 文件用于启动
@@ -185,8 +178,6 @@ cd "$GAME_PATH"
 start "" $GAME_EXE_PREFIX "Z:\\$GAME"
 
 $AFTER_GAME
-
-del "%~f0" && exit
 EOF
     )"
     echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"

@@ -178,6 +178,8 @@ cd "$GAME_PATH"
 start "" $GAME_EXE_PREFIX "Z:\\$GAME"
 
 $AFTER_GAME
+
+del "%~f0" && exit
 EOF
     )"
     echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"

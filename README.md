@@ -24,6 +24,7 @@
 - [x] 使用 Taskset 关联 CPU 核心
 - [x] 自定义 DXVK/VKD3D 缓存路径
 - [x] 自定义 NVIDIA 着色器缓存路径
+- [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
 - [x] 【部分游戏】通过注册表伪装 Hostname
 - [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables
 - [ ] 【部分游戏】【断网启动】通过临时修改 Hosts
@@ -34,4 +35,4 @@
 目前 **不支持** 的功能：
 
 - 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK 等
-- 新增永久性的 Hosts 条目以禁止日志上传等
+- 新增永久性的 Hosts 条目以禁止日志上传、分析等

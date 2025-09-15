@@ -110,6 +110,16 @@ if [ "$DX_CACHE" = "y" ]; then
     export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
 fi
 
+# MangoHud Intel CPU Power
+if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
+    INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl\:0/energy_uj"
+
+    if [ -f "$INTEL_CPU_POWER_FILE" ] && [ ! -r "$INTEL_CPU_POWER_FILE" ]; then
+        echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
+        sudo chmod a+r "$INTEL_CPU_POWER_FILE"
+    fi
+fi
+
 # 准备启动
 
 [ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
@@ -142,8 +152,8 @@ if [ "$SYSTEMD_INHIBIT" = "y" ]; then
     WRAPPER_CMD="$INHIBIT_WRAPPER $WRAPPER_CMD"
 fi
 
-# MangoHUD / Gamemode
-[ -n "$MANGO_HUD" ] && WINE="$MANGO_HUD $WINE"
+# MangoHud / Gamemode
+[ -n "$MANGOHUD" ] && WINE="$MANGOHUD $WINE"
 [ -n "$TASKSET" ] && WINE="$TASKSET $WINE"
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 
@@ -206,7 +216,7 @@ NFT"""
             NETWORK_DROP_RULE_DEL="nft destroy table inet $NETWORK_DROP_NAME"
         fi
 
-        echo "启用网络丢包需要 root 权限"
+        echo "[sudo 请求] 启用网络丢包 需要 root 权限"
         sudo -v
         $WRAPPER_CMD systemd-run --user --scope --slice="$NETWORK_DROP_SLICE" --unit="$NETWORK_DROP_UNIT" $WINE "$TEMP_SCRIPT" & sudo sh -c """
             $NETWORK_DROP_RULE_ADD

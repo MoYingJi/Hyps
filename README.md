@@ -24,6 +24,7 @@
 - [x] 使用 Taskset 关联 CPU 核心
 - [x] 自定义 DXVK/VKD3D 缓存路径
 - [x] 自定义 NVIDIA 着色器缓存路径
+- [x] 启用 NVIDIA Smooth Motion
 - [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
 - [x] 【部分游戏】通过注册表伪装 Hostname
 - [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables

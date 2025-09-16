@@ -10,7 +10,7 @@
 [ -z "$GAME_NAME" ] && exit 1
 
 cd "$(dirname "$(realpath "$0")")/.."
-source config.conf
+[ -f "config.conf" ] && source config.conf
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config}/hypsc"
 [ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_DIR:-$HOME/.cache}/hypsc"

@@ -29,7 +29,7 @@
 - [x] 【部分游戏】通过注册表伪装 Hostname
 - [x] 【部分游戏】【断网启动】通过临时修改 Hosts【最推荐】
 - [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables
-- [ ] 【部分游戏】【断网启动】通过 nmcli
+- [x] 【部分游戏】【断网启动】通过 nmcli
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
 - [ ] 【崩坏：星穹铁道】注册表解锁帧率
 

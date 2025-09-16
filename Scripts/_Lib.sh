@@ -60,6 +60,9 @@
 # NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool t>
 # NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
 
+# NETWORK_NMCLI            Network Manager 断网启动      选填   <game>.conf   <bool n>
+# NETWORK_NMCLI_DURATION   NETWORK_NMCLI 断网时长 (秒)   选填   <game>.conf   5
+
 
 [ -z "$GAME_NAME" ] && exit 1
 
@@ -281,6 +284,16 @@ $flagEnd
                 fi
             ) &
         fi
+    fi
+
+    # nmcli 断网
+    if [ "$NETWORK_NMCLI" = "y" ]; then
+        [ -z "$NETWORK_NMCLI_DURATION" ] && NETWORK_NMCLI_DURATION="5"
+        nmcli n off
+        (
+            sleep "$NETWORK_NMCLI_DURATION"
+            nmcli n on
+        ) &
     fi
 
     # Systemd-run 断网

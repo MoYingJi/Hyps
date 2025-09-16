@@ -113,7 +113,7 @@ mkdir -p "$PREFIX"
 
 # 在 PREFIX 创建由 pfx 到 . 的软链接
 # 和一些判断的逻辑
-if [ "$PROTON_TO_WINE_LINK" == "y" ] && [ ! -L "$PREFIX/pfx" ]; then
+if [ "$PROTON_TO_WINE_LINK" = "y" ] && [ ! -L "$PREFIX/pfx" ]; then
     # 判断是否原有 pfx
     if [ -d "$PREFIX/pfx" ]; then
         # 判断是否原有 wineprefix
@@ -181,8 +181,8 @@ fi
 
 # 准备启动
 
-[ "$WINESERVER_KILL" == "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
-[ "$EXE_KILL" == "y" ] && pkill -f "\.exe"
+[ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+[ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
 
 
 # 伪装 Hostname 为 STEAMDESK
@@ -254,7 +254,7 @@ EOF
 
         if [ -f "$NETWORK_HOSTS_FILE" ]; then
             if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
-                [ "$NETWORK_HOSTS_REC_PREM" == "y" ] && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
+                [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
 
                 echo "[sudo 请求] 使 hosts 文件可被写入 需要 root 权限"
                 sudo chmod a+w "$NETWORK_HOSTS_FILE"
@@ -278,7 +278,7 @@ $flagEnd
                 tempHosts="$(sed "/^$flagStart/,/^$flagEnd/d" "$NETWORK_HOSTS_FILE")"
                 echo -n "$tempHosts" > "$NETWORK_HOSTS_FILE"
 
-                if [ "$NETWORK_HOSTS_REC_PREM" == "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+                if [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
                     echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
                     sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
                 fi
@@ -306,14 +306,14 @@ $flagEnd
 
         NETWORK_DROP_SLICE_PATH="user.slice/user-$NETWORK_DROP_UID.slice/user@$NETWORK_DROP_UID.service/$NETWORK_DROP_SLICE.slice"
 
-        if [ "$NETWORK_DROP_TABLE" == "iptables" ]; then
+        if [ "$NETWORK_DROP_TABLE" = "iptables" ]; then
 
             NETWORK_DROP_RULE="OUTPUT -p all -m cgroup --path /$NETWORK_DROP_SLICE_PATH -j DROP"
 
             NETWORK_DROP_RULE_ADD="iptables -A $NETWORK_DROP_RULE"
             NETWORK_DROP_RULE_DEL="iptables -D $NETWORK_DROP_RULE"
 
-        elif [ "$NETWORK_DROP_TABLE" == "nftables" ]; then
+        elif [ "$NETWORK_DROP_TABLE" = "nftables" ]; then
 
             [ -z "$NETWORK_DROP_NAME" ] && NETWORK_DROP_NAME="$NETWORK_DROP_SLICE"
 

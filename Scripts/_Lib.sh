@@ -46,12 +46,19 @@
 
 # HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
 # HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
+
 # NETWORK_DROP             基于 systemd-run 的断网启动   选填   <game>.conf   <bool n>
 # NETWORK_DROP_DURATION    NETWORK_DROP 断网时长 (秒)    选填   <game>.conf   5
 # NETWORK_DROP_TABLE       NETWORK_DROP 断网管理类型     选填   <game>.conf   iptables「可选 iptables / nftables」
 # NETWORK_DROP_SLICE       NETWORK_DROP 游戏所在 slice   选填   <game>.conf   game_$GAME_NAME
 # NETWORK_DROP_NAME        NETWORK_DROP nft 表名称       选填   <game>.conf   $NETWORK_DROP_SLICE
 
+# NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
+# NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
+# NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   5
+# NETWOKR_HOSTS_CONTENT    NETWORK_HOSTS 断网规则        选必   <game>.conf
+# NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool t>
+# NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
 
 
 [ -z "$GAME_NAME" ] && exit 1
@@ -235,6 +242,48 @@ EOF
 
     cd "$GAME_PATH"
 
+    # Hosts 断网
+    if [ "$NETWORK_HOSTS" = "y" ] && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
+        [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
+        [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="5"
+        [ -z "$NETWORK_HOSTS_REC_PREM" ] && NETWORK_HOSTS_REC_PREM="y"
+        NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
+
+        if [ -f "$NETWORK_HOSTS_FILE" ]; then
+            if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
+                [ "$NETWORK_HOSTS_REC_PREM" == "y" ] && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
+
+                echo "[sudo 请求] 使 hosts 文件可被写入 需要 root 权限"
+                sudo chmod a+w "$NETWORK_HOSTS_FILE"
+            fi
+
+            [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
+            local flagStart="# $NETWORK_HOSTS_FLAG $GAME_NAME Start"
+            local flagEnd="# $NETWORK_HOSTS_FLAG $GAME_NAME End"
+
+            NETWORK_HOSTS_CONTENT="""
+$flagStart
+$NETWORK_HOSTS_CONTENT
+$flagEnd
+"""
+            echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
+
+            ( # 后台运行部分 指定时间后删除内容
+                sleep "$NETWORK_HOSTS_DURATION"
+
+                local tempHosts
+                tempHosts="$(sed "/^$flagStart/,/^$flagEnd/d" "$NETWORK_HOSTS_FILE")"
+                echo -n "$tempHosts" > "$NETWORK_HOSTS_FILE"
+
+                if [ "$NETWORK_HOSTS_REC_PREM" == "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+                    echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
+                    sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
+                fi
+            ) &
+        fi
+    fi
+
+    # Systemd-run 断网
     if [ "$NETWORK_DROP" = "y" ]; then
         [ -z "$NETWORK_DROP_DURATION" ] && NETWORK_DROP_DURATION="5"
         [ -z "$NETWORK_DROP_UID" ] && NETWORK_DROP_UID="$(id -u)"

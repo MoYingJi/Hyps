@@ -7,6 +7,53 @@
 # 神秘小脚本内所使用的都是全局变量，且对于 conf 文件都是直接 source
 # 所以在 conf 文件中添加其他变量可能会造成奇奇怪怪的效果
 
+# 脚本所使用的部分环境变量
+# 推荐填写处的 <runner>.conf 是指运行器配置文件，<game>.conf 填写的是游戏配置文件，<g/c>.conf 是指游戏通用配置文件或游戏配置文件均可
+# 默认值的 <bool y/n> 是指该值只会被以 bool 类型被用到，且这些值要填只能为 y 或 n，<empty> 是指空值
+# 要求的 选必 是指如果启用了某功能就必填
+
+# 环境变量              简略描述                   要求   推荐填写处      默认值
+
+# GAME_NAME             游戏名                     必填   「由脚本提供」
+# CONFIG_DIR            配置目录                   选填   config.conf     $XDG_CONFIG_DIR/hypsc
+# CACHE_DIR             缓存目录                   选填   config.conf     $XDG_CACHE_DIR/hypsc
+# COMMON_GAME_CONF      游戏通用配置文件位置       选填   config.conf     $CONFIG_DIR/Games/_common.conf
+
+# WINE                  游戏运行器位置             必填   <runner>.conf
+# PREFIX_VAR_NAME       PREFIX 存储变量名          选填   <runner>.conf   WINEPREFIX
+# WINESERVER_KILL_CMD   WineServer 退出命令        选填   <runner>.conf   「命令不执行」
+# PROTONPATH            umu 使用的 proton 位置     选填   <runner>.conf   「由 umu 决定，非 umu-run 启动则不适用」
+# GAMEID                umu 的 umu-id              选填   <runner>.conf   umu-default「由 umu 决定，非 umu-run 启动则不适用」
+
+# RUNNER                游戏的运行器               必填   <game>.conf
+# GAME                  游戏本体位置               必填   <game>.conf
+# GAME_PATH             游戏运行路径               选填   <game>.conf     $(dirname "$GAME")
+# PREFIX                游戏运行的 PREIFX          选填   <game>.conf     「由 runner 决定」
+# MANGOHUD_CONFIGFILE   MangoHud 配置文件位置      选填   <game>.conf     「由 MangoHud 决定，未启用 MangoHud 则不适用」
+
+# PROTON_TO_WINE_LINK         创建 Proton 前缀的软链接   选填   <g/c>.conf   <bool n>
+# WINESERVER_KILL             游戏启动前运行杀死命令     选填   <g/c>.conf   <bool n>
+# EXE_KILL                    游戏启动前杀死所有 exe     选填   <g/c>.conf   <bool n>
+# MANGOHUD                    Wine 的包装 (mangohud)     选填   <g/c>.conf   <empty>
+# GAMEMODE                    Wine 的包装 (gamemoderun)  选填   <g/c>.conf   <empty>
+# TASKSET                     Wine 的包装 (taskset)      选填   <g/c>.conf   <empty>
+# INTEL_CPU_POWER_READ        Intel CPU 能耗文件均可读   选填   <g/c>.conf   <bool n>
+# GL_SHADER_DISK_CACHE        NVIDIA 缓存 是否启用       选填   <g/c>.conf   <bool n>
+# GL_SHADER_DISK_CACHE_PATH   NVIDIA 缓存 路径           选填   <g/c>.conf   $CACHE_DIR/GLShaderCache/$GAME_NAME
+# DX_CACHE                    DXVK/VKD3D 缓存 是否启用   选填   <g/c>.conf   <bool n>
+# DX_CACHE_PATH               DXVK/VKD3D 缓存 路径       选填   <g/c>.conf   $CACHE_DIR/DXCache/$GAME_NAME
+# NVIDIA_SMOOTH_MOTION        NVIDIA Smooth Motion       选填   <g/c>.conf   <bool n>
+
+# HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
+# HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
+# NETWORK_DROP             基于 systemd-run 的断网启动   选填   <game>.conf   <bool n>
+# NETWORK_DROP_DURATION    NETWORK_DROP 断网时长 (秒)    选填   <game>.conf   5
+# NETWORK_DROP_TABLE       NETWORK_DROP 断网管理类型     选填   <game>.conf   iptables「可选 iptables / nftables」
+# NETWORK_DROP_SLICE       NETWORK_DROP 游戏所在 slice   选填   <game>.conf   game_$GAME_NAME
+# NETWORK_DROP_NAME        NETWORK_DROP nft 表名称       选填   <game>.conf   $NETWORK_DROP_SLICE
+
+
+
 [ -z "$GAME_NAME" ] && exit 1
 
 cd "$(dirname "$(realpath "$0")")/.."
@@ -17,7 +64,9 @@ cd "$(dirname "$(realpath "$0")")/.."
 
 # 读取通用配置
 
-COMMON_GAME_CONF="$CONFIG_DIR/Games/_common.conf"
+[ -f "$CONFIG_DIR/config.conf" ] && source "$CONFIG_DIR/config.conf"
+
+[ -z "$COMMON_GAME_CONF" ] && COMMON_GAME_CONF="$CONFIG_DIR/Games/_common.conf"
 [ -f "$COMMON_GAME_CONF" ] && source "$COMMON_GAME_CONF"
 
 # 读取游戏配置
@@ -112,7 +161,7 @@ fi
 
 # MangoHud Intel CPU Power
 if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
-    INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl\:0/energy_uj"
+    [ -z "$INTEL_CPU_POWER_FILE" ] && INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl\:0/energy_uj"
 
     if [ -f "$INTEL_CPU_POWER_FILE" ] && [ ! -r "$INTEL_CPU_POWER_FILE" ]; then
         echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
@@ -204,7 +253,7 @@ EOF
 
         elif [ "$NETWORK_DROP_TABLE" == "nftables" ]; then
 
-            NETWORK_DROP_NAME="$NETWORK_DROP_SLICE"
+            [ -z "$NETWORK_DROP_NAME" ] && NETWORK_DROP_NAME="$NETWORK_DROP_SLICE"
 
             NETWORK_DROP_RULE_ADD="""
                 nft -f - << NFT

@@ -185,7 +185,7 @@ fi
 [ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
 
 
-# 伪装 Hostname 为 STEAMDESK
+# 伪装 Hostname 为 STEAMDECK
 if [ "$HOSTNAME_STEAMDECK" = "y" ]; then
     [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDECK"
 

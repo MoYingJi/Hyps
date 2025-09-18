@@ -54,11 +54,16 @@ int main(int argc, char *argv[]) {
 
     int founded = 0;
 
+    Display *display = XOpenDisplay(NULL);
+    if (!display) {
+        fprintf(stderr, "无法打开 X Display\n");
+        exit(EXIT_FAILURE);
+    }
+
     while (1) {
         sleep(sleep_seconds);
 
         // 检查窗口
-        Display *display = XOpenDisplay(NULL);
         int found = 0;
 
         if (display) {
@@ -96,7 +101,6 @@ int main(int argc, char *argv[]) {
                 }
                 XFree(data);
             }
-            XCloseDisplay(display);
         }
 
         // 输出状态并处理
@@ -113,6 +117,7 @@ int main(int argc, char *argv[]) {
                 char command[256];
                 snprintf(command, sizeof(command), "killall %s", process_name);
                 system(command);
+                XCloseDisplay(display);
                 return 0;
             }
         } else {
@@ -125,5 +130,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    XCloseDisplay(display);
     return 0;
 }

@@ -233,16 +233,47 @@ fi
 # Kill Target
 if [ "$KILL_TARGET" = "y" ]; then
     [ -z "$KILL_TARGET_BIN" ] && KILL_TARGET_BIN="./Tools/kill-target/kill-target"
+    [ -z "$KILL_TARGET_SRC" ] && KILL_TARGET_SRC="./Tools/kill-target/kill-target.c"
+    [ -z "$KILL_TARGET_SRC_SHA256_FILE" ] && KILL_TARGET_SRC_SHA256_FILE="$CACHE_DIR/kill-target.c.sha256"
     KILL_TARGET_BIN="$(realpath "$KILL_TARGET_BIN")"
+    KILL_TARGET_SRC="$(realpath "$KILL_TARGET_SRC")"
+    KILL_TARGET_SRC_SHA256_FILE="$(realpath "$KILL_TARGET_SRC_SHA256_FILE")"
 
-    if [ ! -f "$KILL_TARGET_BIN" ]; then
-        [ -z "$KILL_TARGET_SRC" ] && KILL_TARGET_SRC="./Tools/kill-target/kill-target.c"
-        KILL_TARGET_SRC="$(realpath "$KILL_TARGET_SRC")"
+    # 如果源文件存在 则判断需不需要重新编译
+    if [ -f "$KILL_TARGET_SRC" ]; then
+        # 读取先前的 sha256
+        if [ -f "$KILL_TARGET_SRC_SHA256_FILE" ]; then
+            KILL_TARGET_SRC_SHA256="$(cat "$KILL_TARGET_SRC_SHA256_FILE")"
+        else
+            KILL_TARGET_SRC_SHA256=""
+        fi
 
+        # 计算 KILL_TARGET_SRC 的 sha256 并比较
+        KILL_TARGET_SHA256_CAL="$(sha256sum "$KILL_TARGET_SRC" | awk '{print $1}')"
+
+        # 如果不一致 则删除文件 重新编译 并保存新的 sha256
+        if [ "$KILL_TARGET_SHA256_CAL" != "$KILL_TARGET_SRC_SHA256" ]; then
+            [ -f "$KILL_TARGET_BIN" ] && rm "$KILL_TARGET_BIN"
+            echo "$KILL_TARGET_SHA256_CAL" > "$KILL_TARGET_SRC_SHA256_FILE"
+        fi
+    fi
+
+    # 如果程序不存在 但源文件存在 则尝试编译
+    if [ ! -f "$KILL_TARGET_BIN" ] && [ -f "$KILL_TARGET_SRC" ]; then
+        echo "编译 $KILL_TARGET_SRC"
         gcc "$KILL_TARGET_SRC" -o "$KILL_TARGET_BIN" -lX11
     fi
+
+    # 编译失败 源文件仍不存在
+    if [ ! -f "$KILL_TARGET_BIN" ]; then
+        echo "kill-target 编译失败或源文件不存在"
+        exit 1
+    fi
+
+    # 设置可执行权限
     [ -x "$KILL_TARGET_BIN" ] || chmod a+x "$KILL_TARGET_BIN"
 
+    # 设置游戏运行后执行程序
     if [ -n "$KILL_TARGET_PROCESS" ] && [ -n "$KILL_TARGET_WINDOW" ]; then
         [ -z "$KILL_TARGET_INTERVAL" ] && KILL_TARGET_INTERVAL="5"
         WITH_CMD+=("$KILL_TARGET_BIN -p $KILL_TARGET_PROCESS -w $KILL_TARGET_WINDOW -s $KILL_TARGET_INTERVAL")

@@ -66,41 +66,38 @@ int main(int argc, char *argv[]) {
         // 检查窗口
         int found = 0;
 
-        if (display) {
-            Window root = DefaultRootWindow(display);
-            Atom net_client_list = XInternAtom(display, "_NET_CLIENT_LIST", False);
+        Window root = DefaultRootWindow(display);
+        Atom net_client_list = XInternAtom(display, "_NET_CLIENT_LIST", False);
 
-            Atom type;
-            int format;
-            unsigned long nitems, bytes_after;
-            unsigned char *data = NULL;
+        Atom type;
+        int format;
+        unsigned long nitems, bytes_after;
+        unsigned char *data = NULL;
 
-            if (XGetWindowProperty(display, root, net_client_list, 0, 1024, False, XA_WINDOW,
-                                  &type, &format, &nitems, &bytes_after, &data) == Success) {
+        if (XGetWindowProperty(display, root, net_client_list, 0, 1024, False, XA_WINDOW,
+                               &type, &format, &nitems, &bytes_after, &data) == Success) {
+             if (data && nitems > 0) {
+                Window *windows = (Window *) data;
 
-                if (data && nitems > 0) {
-                    Window *windows = (Window *)data;
-                    
-                    for (unsigned long i = 0; i < nitems; i++) {
-                        XTextProperty text_prop;
-                        if (XGetWMName(display, windows[i], &text_prop)) {
-                            if (text_prop.value) {
-                                char **list = NULL;
-                                int count = 0;
-                                if (Xutf8TextPropertyToTextList(display, &text_prop, &list, &count) == Success) {
-                                    if (count > 0 && list[0] && strstr(list[0], target_window)) {
-                                        found = 1;
-                                    }
-                                    XFreeStringList(list);
+                for (unsigned long i = 0; i < nitems; i++) {
+                    XTextProperty text_prop;
+                    if (XGetWMName(display, windows[i], &text_prop)) {
+                        if (text_prop.value) {
+                            char **list = NULL;
+                            int count = 0;
+                            if (Xutf8TextPropertyToTextList(display, &text_prop, &list, &count) == Success) {
+                                if (count > 0 && list[0] && strstr(list[0], target_window)) {
+                                    found = 1;
                                 }
+                                XFreeStringList(list);
                             }
-                            XFree(text_prop.value);
                         }
-                        if (found) break;
+                        XFree(text_prop.value);
                     }
+                    if (found) break;
                 }
-                XFree(data);
             }
+            XFree(data);
         }
 
         // 输出状态并处理

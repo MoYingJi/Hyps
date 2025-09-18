@@ -66,7 +66,8 @@
 
 [ -z "$GAME_NAME" ] && exit 1
 
-cd "$(dirname "$(realpath "$0")")/.."
+PROJECT_ROOT="$(dirname "$(realpath "$0")")/.."
+cd "$PROJECT_ROOT"
 [ -f "config.conf" ] && source config.conf
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config}/hypsc"

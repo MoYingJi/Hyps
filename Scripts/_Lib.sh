@@ -47,6 +47,11 @@
 # HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
 # HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
 
+# KILL_TARGET              游戏窗口关闭时杀死进程        选填   <game>.conf   <bool n>
+# KILL_TARGET_PROCESS      KILL_TARGET 要杀死的进程      选必   <game>.conf
+# KILL_TARGET_WINDOW       KILL_TARGET 要检测可窗口      选必   <game>.conf
+# KILL_TARGET_INTERVAL     KILL_TARGET 检测间隔 (秒)     选填   <game>.conf   5
+
 # NETWORK_DROP             基于 systemd-run 的断网启动   选填   <game>.conf   <bool n>
 # NETWORK_DROP_DURATION    NETWORK_DROP 断网时长 (秒)    选填   <game>.conf   5
 # NETWORK_DROP_TABLE       NETWORK_DROP 断网管理类型     选填   <game>.conf   iptables「可选 iptables / nftables」
@@ -225,6 +230,25 @@ elif [ "$FORCE_JADEITE" = "y" ]; then
     exit 1
 fi
 
+# Kill Target
+if [ "$KILL_TARGET" = "y" ]; then
+    [ -z "$KILL_TARGET_BIN" ] && KILL_TARGET_BIN="./Tools/kill-target/kill-target"
+    KILL_TARGET_BIN="$(realpath "$KILL_TARGET_BIN")"
+
+    if [ ! -f "$KILL_TARGET_BIN" ]; then
+        [ -z "$KILL_TARGET_SRC" ] && KILL_TARGET_SRC="./Tools/kill-target/kill-target.c"
+        KILL_TARGET_SRC="$(realpath "$KILL_TARGET_SRC")"
+
+        gcc "$KILL_TARGET_SRC" -o "$KILL_TARGET_BIN" -lX11
+    fi
+    [ -x "$KILL_TARGET_BIN" ] || chmod a+x "$KILL_TARGET_BIN"
+
+    if [ -n "$KILL_TARGET_PROCESS" ] && [ -n "$KILL_TARGET_WINDOW" ]; then
+        [ -z "$KILL_TARGET_INTERVAL" ] && KILL_TARGET_INTERVAL="5"
+        WITH_CMD+=("$KILL_TARGET_BIN -p $KILL_TARGET_PROCESS -w $KILL_TARGET_WINDOW -s $KILL_TARGET_INTERVAL")
+    fi
+fi
+
 
 
 start_game() {
@@ -323,7 +347,7 @@ $flagEnd
 table inet $NETWORK_DROP_NAME {
     chain output {
         type filter hook output priority 0;
-        socket cgroupv2 level 4 \"$NETWORK_DROP_SLICE_PATH\" counter drop
+        socket cgroupv2 level 4 \\\"$NETWORK_DROP_SLICE_PATH\\\" counter drop
     }
 }
 NFT"""
@@ -332,15 +356,18 @@ NFT"""
 
         echo "[sudo 请求] 启用网络丢包 需要 root 权限"
         sudo -v
-        $WRAPPER_CMD systemd-run --user --scope --slice="$NETWORK_DROP_SLICE" --unit="$NETWORK_DROP_UNIT" $WINE "$TEMP_SCRIPT" & sudo sh -c """
-            $NETWORK_DROP_RULE_ADD
-            sleep $NETWORK_DROP_DURATION
-            $NETWORK_DROP_RULE_DEL
-        """
-    else
-        # 正常启动 不启用网络丢包
-        $WRAPPER_CMD $WINE "$TEMP_SCRIPT"
+        WRAPPER_CMD="$WRAPPER_CMD systemd-run --user --scope --slice=\"$NETWORK_DROP_SLICE\" --unit=\"$NETWORK_DROP_UNIT\""
+        WITH_CMD+=("""
+            sudo sh -c \"\"\"
+                $NETWORK_DROP_RULE_ADD
+                sleep $NETWORK_DROP_DURATION
+                $NETWORK_DROP_RULE_DEL
+            \"\"\"
+        """)
     fi
+
+    eval "$WRAPPER_CMD $WINE \"$TEMP_SCRIPT\" &"
+    for cmd in "${WITH_CMD[@]}"; do eval "$cmd" & done
 
     wait
 }

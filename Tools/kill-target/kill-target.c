@@ -52,6 +52,8 @@ int main(int argc, char *argv[]) {
     printf("进程名称: %s\n", process_name);
     printf("检查间隔: %d 秒\n", sleep_seconds);
 
+    int founded = 0;
+
     while (1) {
         sleep(sleep_seconds);
 
@@ -103,14 +105,23 @@ int main(int argc, char *argv[]) {
         char time_str[64];
         strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
 
-        if (found) {
-            printf("[%s] 窗口存在\n", time_str);
+        if (founded) {
+            if (found) {
+                printf("[%s] 窗口存在\n", time_str);
+            } else {
+                printf("[%s] 窗口不存在，执行 killall\n", time_str);
+                char command[256];
+                snprintf(command, sizeof(command), "killall %s", process_name);
+                system(command);
+                return 0;
+            }
         } else {
-            printf("[%s] 窗口不存在，执行 killall\n", time_str);
-            char command[256];
-            snprintf(command, sizeof(command), "killall %s", process_name);
-            system(command);
-            return 0;
+            if (found) {
+                printf("[%s] 窗口存在，监测已开始\n", time_str);
+                founded = 1;
+            } else {
+                printf("[%s] 窗口不存在，等待窗口出现\n", time_str);
+            }
         }
     }
 

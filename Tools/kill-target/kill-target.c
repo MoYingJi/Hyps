@@ -11,6 +11,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 int main(int argc, char *argv[]) {
     const char *target_window = NULL;

@@ -108,7 +108,8 @@ int main(int argc, char *argv[]) {
 
         if (founded) {
             if (found) {
-                printf("[%s] 窗口存在\n", time_str);
+                printf("[%s] 窗口存在\r", time_str);
+                fflush(stdout);
             } else {
                 printf("[%s] 窗口不存在，执行 killall\n", time_str);
                 char command[256];

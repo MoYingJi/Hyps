@@ -53,6 +53,8 @@ int main(int argc, char *argv[]) {
     printf("检查间隔: %d 秒\n", sleep_seconds);
 
     while (1) {
+        sleep(sleep_seconds);
+
         // 检查窗口
         Display *display = XOpenDisplay(NULL);
         int found = 0;
@@ -110,8 +112,6 @@ int main(int argc, char *argv[]) {
             system(command);
             return 0;
         }
-
-        sleep(sleep_seconds);
     }
 
     return 0;

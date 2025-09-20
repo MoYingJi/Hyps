@@ -177,7 +177,7 @@ fi
 
 # MangoHud Intel CPU Power
 if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
-    [ -z "$INTEL_CPU_POWER_FILE" ] && INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl\:0/energy_uj"
+    [ -z "$INTEL_CPU_POWER_FILE" ] && INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl:0/energy_uj"
 
     if [ -f "$INTEL_CPU_POWER_FILE" ] && [ ! -r "$INTEL_CPU_POWER_FILE" ]; then
         echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
@@ -397,8 +397,15 @@ NFT"""
         """)
     fi
 
-    eval "$WRAPPER_CMD $WINE \"$TEMP_SCRIPT\" &"
-    for cmd in "${WITH_CMD[@]}"; do eval "$cmd" & done
+    FINAL_RUN_COMMAND="$WRAPPER_CMD $WINE \"$TEMP_SCRIPT\" &"
+
+    if [ "$TEST_MODE" = "y" ]; then
+        echo "$FINAL_RUN_COMMAND"
+        IFS=$'\n' echo "${WITH_CMD[*]}"
+    else
+        eval "$FINAL_RUN_COMMAND"
+        for cmd in "${WITH_CMD[@]}"; do eval "$WRAPPER_WITH $cmd" & done
+    fi
 
     wait
 }

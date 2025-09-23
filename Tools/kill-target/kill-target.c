@@ -17,11 +17,12 @@ int main(int argc, char *argv[]) {
     const char *target_window = NULL;
     const char *process_name = NULL;
     int sleep_seconds = 0;
+    int max_attempts = 0;
     int w_flag = 0, p_flag = 0, s_flag = 0;
 
     // 解析命令行参数
     int opt;
-    while ((opt = getopt(argc, argv, "w:p:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "w:p:s:a:")) != -1) {
         switch (opt) {
             case 'w':
                 target_window = optarg;
@@ -35,8 +36,11 @@ int main(int argc, char *argv[]) {
                 sleep_seconds = atoi(optarg);
                 s_flag = 1;
                 break;
+            case 'a':
+                max_attempts = atoi(optarg);
+                break;
             default:
-                fprintf(stderr, "Usage: %s [-w window_name] [-p process_name] [-s sleep_seconds]\n", argv[0]);
+                fprintf(stderr, "Usage: %s <-w window_name> <-p process_name> <-s sleep_seconds> [-a max_attempts]\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
     }
@@ -44,15 +48,19 @@ int main(int argc, char *argv[]) {
     // 检查参数是否完整
     if (!w_flag || !p_flag || !s_flag) {
         fprintf(stderr, "错误: 缺少必要参数\n");
-        fprintf(stderr, "Usage: %s [-w window_name] [-p process_name] [-s sleep_seconds]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <-w window_name> <-p process_name> <-s sleep_seconds> [-a max_attempts]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     printf("窗口名称: %s\n", target_window);
     printf("进程名称: %s\n", process_name);
     printf("检查间隔: %d 秒\n", sleep_seconds);
+    if (max_attempts > 0) {
+        printf("最大尝试次数: %d\n", max_attempts);
+    }
 
     int founded = 0;
+    int attempt_count = 0;
 
     Display *display = XOpenDisplay(NULL);
     if (!display) {
@@ -123,7 +131,17 @@ int main(int argc, char *argv[]) {
                 printf("[%s] 窗口存在，监测已开始\n", time_str);
                 founded = 1;
             } else {
-                printf("[%s] 窗口不存在，等待窗口出现\n", time_str);
+                if (max_attempts > 0) {
+                    attempt_count ++;
+                    printf("[%s] 窗口不存在，等待窗口出现 (%d/%d)\n", time_str, attempt_count, max_attempts);
+                    if (attempt_count >= max_attempts) {
+                        printf("[%s] 最大尝试次数已用完，退出\n", time_str);
+                        XCloseDisplay(display);
+                        return 0;
+                    }
+                } else {
+                    printf("[%s] 窗口不存在，等待窗口出现\n", time_str);
+                }
             }
         }
     }

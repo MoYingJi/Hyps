@@ -51,6 +51,7 @@
 # KILL_TARGET_PROCESS      KILL_TARGET 要杀死的进程      选必   <game>.conf
 # KILL_TARGET_WINDOW       KILL_TARGET 要检测可窗口      选必   <game>.conf
 # KILL_TARGET_INTERVAL     KILL_TARGET 检测间隔 (秒)     选填   <game>.conf   5
+# KILL_TARGET_ATTEMPTS     KILL_TARGET 窗口未出尝试次数  选填   <game>.conf   18
 
 # NETWORK_DROP             基于 systemd-run 的断网启动   选填   <game>.conf   <bool n>
 # NETWORK_DROP_DURATION    NETWORK_DROP 断网时长 (秒)    选填   <game>.conf   5
@@ -276,7 +277,8 @@ if [ "$KILL_TARGET" = "y" ]; then
     # 设置游戏运行后执行程序
     if [ -n "$KILL_TARGET_PROCESS" ] && [ -n "$KILL_TARGET_WINDOW" ]; then
         [ -z "$KILL_TARGET_INTERVAL" ] && KILL_TARGET_INTERVAL="5"
-        WITH_CMD+=("$KILL_TARGET_BIN -p $KILL_TARGET_PROCESS -w $KILL_TARGET_WINDOW -s $KILL_TARGET_INTERVAL")
+        [ -z "$KILL_TARGET_ATTEMPTS" ] && KILL_TARGET_ATTEMPTS="18"
+        WITH_CMD+=("$KILL_TARGET_BIN -p $KILL_TARGET_PROCESS -w $KILL_TARGET_WINDOW -s $KILL_TARGET_INTERVAL -a $KILL_TARGET_ATTEMPTS")
     fi
 fi
 
@@ -329,6 +331,8 @@ $flagEnd
 
             ( # 后台运行部分 指定时间后删除内容
                 sleep "$NETWORK_HOSTS_DURATION"
+
+                echo "[$(date +%H:%M:%S)] 恢复 Hosts"
 
                 local tempHosts
                 tempHosts="$(sed "/^$flagStart/,/^$flagEnd/d" "$NETWORK_HOSTS_FILE")"

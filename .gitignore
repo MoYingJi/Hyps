@@ -1,2 +1,7 @@
 /Config/Games/*
 !/Config/Games/*.example.*
+
+/Config/Runners/*
+!/Config/Runners/*.example.*
+!/Config/Runners/proton-system.conf
+!/Config/Runners/umu-run.conf

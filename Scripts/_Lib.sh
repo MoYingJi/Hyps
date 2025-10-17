@@ -28,6 +28,7 @@
 # RUNNER                游戏的运行器               必填   <game>.conf
 # GAME                  游戏本体位置               必填   <game>.conf
 # GAME_PATH             游戏运行路径               选填   <game>.conf     $(dirname "$GAME")
+# GAME_ARGS             游戏启动参数               选填   <game>.conf
 # PREFIX                游戏运行的 PREIFX          选填   <game>.conf     「由 runner 决定」
 # MANGOHUD_CONFIGFILE   MangoHud 配置文件位置      选填   <game>.conf     「由 MangoHud 决定，未启用 MangoHud 则不适用」
 
@@ -178,12 +179,14 @@ fi
 
 # MangoHud Intel CPU Power
 if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
-    [ -z "$INTEL_CPU_POWER_FILE" ] && INTEL_CPU_POWER_FILE="/sys/class/powercap/intel-rapl:0/energy_uj"
+    [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
 
-    if [ -f "$INTEL_CPU_POWER_FILE" ] && [ ! -r "$INTEL_CPU_POWER_FILE" ]; then
-        echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
-        sudo chmod a+r "$INTEL_CPU_POWER_FILE"
-    fi
+    for file in "${INTEL_CPU_POWER_FILE[@]}"; do
+        if [ -f "$file" ] && [ ! -r "$file" ]; then
+            echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
+            sudo chmod a+r "$file"
+        fi
+    done
 fi
 
 # 准备启动
@@ -292,7 +295,7 @@ Z:
 $BEFORE_GAME
 
 cd "$GAME_PATH"
-start "" $GAME_EXE_PREFIX "Z:\\$GAME"
+start "" $GAME_EXE_PREFIX "Z:\\$GAME" $GAME_ARGS
 
 $AFTER_GAME
 

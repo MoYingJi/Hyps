@@ -38,7 +38,10 @@
 # MANGOHUD                    Wine 的包装 (mangohud)     选填   <g/c>.conf   <empty>
 # GAMEMODE                    Wine 的包装 (gamemoderun)  选填   <g/c>.conf   <empty>
 # TASKSET                     Wine 的包装 (taskset)      选填   <g/c>.conf   <empty>
-# INTEL_CPU_POWER_READ        Intel CPU 能耗文件均可读   选填   <g/c>.conf   <bool n>
+# GAMESCOPE                   Wine 的包装 (gamescope)    选填   <g/c>.conf   <empty>
+# GAMESCOPE_ARGS              Gamescope 启动参数         选填   <g/c>.conf   <array empty>
+# INTEL_CPU_POWER_READ        Intel CPU 能耗文件可读     选填   <g/c>.conf   <bool n>
+# INTEL_CPU_POWER_FILE        Intel CPU 能耗文件         选填   <g/c>.conf   <array /sys/class/powercap/intel-rapl:0/energy_uj>
 # GL_SHADER_DISK_CACHE        NVIDIA 缓存 是否启用       选填   <g/c>.conf   <bool n>
 # GL_SHADER_DISK_CACHE_PATH   NVIDIA 缓存 路径           选填   <g/c>.conf   $CACHE_DIR/GLShaderCache/$GAME_NAME
 # DX_CACHE                    DXVK/VKD3D 缓存 是否启用   选填   <g/c>.conf   <bool n>
@@ -177,7 +180,7 @@ if [ "$DX_CACHE" = "y" ]; then
     export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
 fi
 
-# MangoHud Intel CPU Power
+# Intel CPU 功率可供检测
 if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
     [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
 
@@ -221,16 +224,35 @@ if [ "$SYSTEMD_INHIBIT" = "y" ]; then
     WRAPPER_CMD="$INHIBIT_WRAPPER $WRAPPER_CMD"
 fi
 
+# Gamescope
+if [ -n "$GAMESCOPE" ]; then
+    if [ -n "$MANGOHUD" ]; then
+        if [ "$MANGOHUD" = "mangohud" ]; then
+            GAMESCOPE="$GAMESCOPE --mangohud"
+            echo "[Hyps] 检测到 Gamescope 搭配 MangoHud 使用，换用 \`--mangohud\` 参数"
+        else
+            echo "[Hyps] WARN: Gamescope 与 MangoHud 不能同时使用！已关闭 MangoHud！"
+        fi
+
+        MANGOHUD=""
+    fi
+
+    if [ "${#GAMESCOPE_ARGS[@]}" -gt 0 ]; then
+        GAMESCOPE="$GAMESCOPE ${GAMESCOPE_ARGS[*]}"
+    fi
+fi
+
 # MangoHud / Gamemode
 [ -n "$MANGOHUD" ] && WINE="$MANGOHUD $WINE"
 [ -n "$TASKSET" ] && WINE="$TASKSET $WINE"
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
+[ -n "$GAMESCOPE" ] && WINE="$GAMESCOPE -- $WINE"
 
 # Jadeite Patch
 if [ -n "$JADEITE_PATH" ]; then
     GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
 elif [ "$FORCE_JADEITE" = "y" ]; then
-    echo "本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
+    echo "[Hyps] 本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
     exit 1
 fi
 
@@ -264,13 +286,13 @@ if [ "$KILL_TARGET" = "y" ]; then
 
     # 如果程序不存在 但源文件存在 则尝试编译
     if [ ! -f "$KILL_TARGET_BIN" ] && [ -f "$KILL_TARGET_SRC" ]; then
-        echo "编译 $KILL_TARGET_SRC"
+        echo "[kill-target] 编译 $KILL_TARGET_SRC"
         gcc "$KILL_TARGET_SRC" -o "$KILL_TARGET_BIN" -lX11
     fi
 
     # 编译失败 源文件仍不存在
     if [ ! -f "$KILL_TARGET_BIN" ]; then
-        echo "kill-target 编译失败或源文件不存在"
+        echo "[kill-target] 编译失败或源文件不存在"
         exit 1
     fi
 

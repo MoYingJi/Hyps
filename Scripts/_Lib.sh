@@ -256,33 +256,53 @@ elif [ "$FORCE_JADEITE" = "y" ]; then
     exit 1
 fi
 
-# Kill Target
-if [ "$KILL_TARGET" = "y" ]; then
-    [ -z "$KILL_TARGET_BIN" ] && KILL_TARGET_BIN="./Tools/kill-target/kill-target"
-    [ -z "$KILL_TARGET_SRC" ] && KILL_TARGET_SRC="./Tools/kill-target/kill-target.c"
-    [ -z "$KILL_TARGET_SRC_SHA256_FILE" ] && KILL_TARGET_SRC_SHA256_FILE="$CACHE_DIR/kill-target.c.sha256"
-    KILL_TARGET_BIN="$(realpath "$KILL_TARGET_BIN")"
-    KILL_TARGET_SRC="$(realpath "$KILL_TARGET_SRC")"
-    KILL_TARGET_SRC_SHA256_FILE="$(realpath "$KILL_TARGET_SRC_SHA256_FILE")"
+check_cached_compile() {
+    local var_name="$1"
+    local bin_default="$2"
+    local src_default="$3"
+    local sha256_file_default="$4"
 
-    # 如果源文件存在 则判断需不需要重新编译
-    if [ -f "$KILL_TARGET_SRC" ]; then
+    local var_name_bin="$var_name"_BIN
+    local var_name_src="$var_name"_SRC
+    local var_name_sha256_file="$var_name"_SHA256_FILE
+
+    local bin_file="${!var_name_bin:-$bin_default}"
+    local src_file="${!var_name_src:-$src_default}"
+    local sha256_file="${!var_name_sha256_file:-$sha256_file_default}"
+
+    bin_file="$(realpath "$bin_file")"
+    src_file="$(realpath "$src_file")"
+    sha256_file="$(realpath "$sha256_file")"
+
+    declare -g "$var_name_bin=$bin_file"
+    declare -g "$var_name_src=$src_file"
+    declare -g "$var_name_sha256_file=$sha256_file"
+
+    # 判断是否需要重新编译
+    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ -f "$sha256_file" ]; then 
         # 读取先前的 sha256
-        if [ -f "$KILL_TARGET_SRC_SHA256_FILE" ]; then
-            KILL_TARGET_SRC_SHA256="$(cat "$KILL_TARGET_SRC_SHA256_FILE")"
-        else
-            KILL_TARGET_SRC_SHA256=""
-        fi
-
-        # 计算 KILL_TARGET_SRC 的 sha256 并比较
-        KILL_TARGET_SHA256_CAL="$(sha256sum "$KILL_TARGET_SRC" | awk '{print $1}')"
-
-        # 如果不一致 则删除文件 重新编译 并保存新的 sha256
-        if [ "$KILL_TARGET_SHA256_CAL" != "$KILL_TARGET_SRC_SHA256" ]; then
-            [ -f "$KILL_TARGET_BIN" ] && rm "$KILL_TARGET_BIN"
-            echo "$KILL_TARGET_SHA256_CAL" > "$KILL_TARGET_SRC_SHA256_FILE"
+        local cached_sha256
+        cached_sha256="$(cat "$sha256_file")"
+        # 计算源文件的 sha256
+        local src_sha256
+        src_sha256="$(sha256sum "$src_file" | awk '{print $1}')"
+        # 如果不一致，则删除二进制，重新编译
+        if [ "$cached_sha256" != "$src_sha256" ]; then
+            rm -f "$bin_file"
         fi
     fi
+
+    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ ! -f "$sha256_file" ]; then 
+        rm -f "$bin_file"
+    fi
+}
+
+# Kill Target
+if [ "$KILL_TARGET" = "y" ]; then
+    check_cached_compile "KILL_TARGET" \
+        "./Tools/kill-target/kill-target" \
+        "./Tools/kill-target/kill-target.c"\
+        "$CACHE_DIR/kill-target.c.sha256"
 
     # 如果程序不存在 但源文件存在 则尝试编译
     if [ ! -f "$KILL_TARGET_BIN" ] && [ -f "$KILL_TARGET_SRC" ]; then
@@ -290,10 +310,11 @@ if [ "$KILL_TARGET" = "y" ]; then
         gcc "$KILL_TARGET_SRC" -o "$KILL_TARGET_BIN" -lX11
     fi
 
-    # 编译失败 源文件仍不存在
     if [ ! -f "$KILL_TARGET_BIN" ]; then
         echo "[kill-target] 编译失败或源文件不存在"
         exit 1
+    else
+        sha256sum "$KILL_TARGET_SRC" | awk '{print $1}' > "$KILL_TARGET_SHA256_FILE"
     fi
 
     # 设置可执行权限

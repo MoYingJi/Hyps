@@ -53,25 +53,18 @@
 
 # KILL_TARGET              游戏窗口关闭时杀死进程        选填   <game>.conf   <bool n>
 # KILL_TARGET_PROCESS      KILL_TARGET 要杀死的进程      选必   <game>.conf
-# KILL_TARGET_WINDOW       KILL_TARGET 要检测可窗口      选必   <game>.conf
-# KILL_TARGET_INTERVAL     KILL_TARGET 检测间隔 (秒)     选填   <game>.conf   5
-# KILL_TARGET_ATTEMPTS     KILL_TARGET 窗口未出尝试次数  选填   <game>.conf   18
 
-# NETWORK_DROP             基于 systemd-run 的断网启动   选填   <game>.conf   <bool n>
-# NETWORK_DROP_DURATION    NETWORK_DROP 断网时长 (秒)    选填   <game>.conf   5
-# NETWORK_DROP_TABLE       NETWORK_DROP 断网管理类型     选填   <game>.conf   iptables「可选 iptables / nftables」
-# NETWORK_DROP_SLICE       NETWORK_DROP 游戏所在 slice   选填   <game>.conf   game_$GAME_NAME
-# NETWORK_DROP_NAME        NETWORK_DROP nft 表名称       选填   <game>.conf   $NETWORK_DROP_SLICE
+# XWIN_WATCH_WINDOW       XWIN_WATCH 要检测可窗口              选必   <g/c>.conf
+# XWIN_WATCH_SLEEP        XWIN_WATCH 检测窗口出现的间隔 (秒)   选填   <g/c>.conf   5
+# XWIN_WATCH_INTERVAL     XWIN_WATCH 检测窗口关闭的间隔 (秒)   选填   <g/c>.conf   $XWIN_WATCH_SLEEP
+# XWIN_WATCH_ATTEMPTS     XWIN_WATCH 检测窗口出现尝试次数      选填   <g/c>.conf   20
 
 # NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
 # NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
-# NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   5
+# NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   -「填入 `-` 则代表调用 XWIN_WATCH 等待窗口出现」
 # NETWOKR_HOSTS_CONTENT    NETWORK_HOSTS 断网规则        选必   <game>.conf
-# NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool t>
+# NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool y>
 # NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
-
-# NETWORK_NMCLI            Network Manager 断网启动      选填   <game>.conf   <bool n>
-# NETWORK_NMCLI_DURATION   NETWORK_NMCLI 断网时长 (秒)   选填   <game>.conf   5
 
 
 [ -z "$GAME_NAME" ] && exit 1
@@ -82,6 +75,10 @@ cd "$PROJECT_ROOT"
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config}/hypsc"
 [ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_DIR:-$HOME/.cache}/hypsc"
+[ -z "$TEMP_DIR" ] && TEMP_DIR="/tmp/hypsc"
+
+rm -r "$TEMP_DIR"
+mkdir -p "$TEMP_DIR"
 
 # 读取通用配置
 
@@ -192,12 +189,6 @@ if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
     done
 fi
 
-# 准备启动
-
-[ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
-[ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
-
-
 # 伪装 Hostname 为 STEAMDECK
 if [ "$HOSTNAME_STEAMDECK" = "y" ]; then
     [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDECK"
@@ -256,6 +247,29 @@ elif [ "$FORCE_JADEITE" = "y" ]; then
     exit 1
 fi
 
+# Hosts 断网启动检测参数
+if [ "$NETWORK_HOSTS" = "y" ]; then
+    if [ -z "$NETWORK_HOSTS_CONTENT" ]; then
+        echo "[Hyps] WARN: 检测到 Hosts 断网启动参数，请在 \$NETWORK_HOSTS_CONTENT 填写要在 Hosts 文件附加的内容！"
+        exit 1
+    fi
+fi
+
+
+
+set_executable() {
+    local file="$1"
+
+    if [ ! -x "$file" ]; then
+        chmod +x "$file"
+    fi
+
+    if [ ! -x "$file" ]; then
+        echo "[Hyps] ERROR: $file 不可执行！请手动设置可执行权限！"
+        exit 1
+    fi
+}
+
 check_cached_compile() {
     local var_name="$1"
     local bin_default="$2"
@@ -297,42 +311,76 @@ check_cached_compile() {
     fi
 }
 
-# Kill Target
-if [ "$KILL_TARGET" = "y" ]; then
-    check_cached_compile "KILL_TARGET" \
-        "./Tools/kill-target/kill-target" \
-        "./Tools/kill-target/kill-target.c"\
-        "$CACHE_DIR/kill-target.c.sha256"
+# 哪些要用到 XWin Watch
+[ "$KILL_TARGET" = "y" ] && XWIN_WATCH="y"
+
+if [ "$NETWORK_HOSTS" = "y" ]; then
+    if [ -z "$NETWORK_HOSTS_DURATION" ] || [ "$NETWORK_HOSTS_DURATION" = "-" ]; then
+        XWIN_WATCH="y"
+    fi 
+fi
+
+# XWin Watch
+if [ "$XWIN_WATCH" = "y" ]; then
+    check_cached_compile "XWIN_WATCH" \
+        "./Tools/xwin-watch/xwin-watch" \
+        "./Tools/xwin-watch/xwin-watch.c"\
+        "$CACHE_DIR/xwin-watch.c.sha256"
+    
+    if [ -z "$XWIN_WATCH_WINDOW" ]; then
+        echo "[xwin-watch] 缺少要监测的窗口名称"
+        exit 1
+    fi
 
     # 如果程序不存在 但源文件存在 则尝试编译
-    if [ ! -f "$KILL_TARGET_BIN" ] && [ -f "$KILL_TARGET_SRC" ]; then
-        echo "[kill-target] 编译 $KILL_TARGET_SRC"
-        gcc "$KILL_TARGET_SRC" -o "$KILL_TARGET_BIN" -lX11
+    if [ ! -f "$XWIN_WATCH_BIN" ] && [ -f "$XWIN_WATCH_SRC" ]; then
+        echo "[xwin-watch] 编译 $XWIN_WATCH_SRC"
+        gcc "$XWIN_WATCH_SRC" -o "$XWIN_WATCH_BIN" -lX11
     fi
 
-    if [ ! -f "$KILL_TARGET_BIN" ]; then
-        echo "[kill-target] 编译失败或源文件不存在"
+    if [ ! -f "$XWIN_WATCH_BIN" ]; then
+        echo "[xwin-watch] 编译失败或源文件不存在"
         exit 1
     else
-        sha256sum "$KILL_TARGET_SRC" | awk '{print $1}' > "$KILL_TARGET_SHA256_FILE"
+        sha256sum "$XWIN_WATCH_SRC" | awk '{print $1}' > "$XWIN_WATCH_SHA256_FILE"
     fi
 
-    # 设置可执行权限
-    [ -x "$KILL_TARGET_BIN" ] || chmod a+x "$KILL_TARGET_BIN"
+    # 确保可执行
+    set_executable "$XWIN_WATCH_BIN"
 
-    # 设置游戏运行后执行程序
-    if [ -n "$KILL_TARGET_PROCESS" ] && [ -n "$KILL_TARGET_WINDOW" ]; then
-        [ -z "$KILL_TARGET_INTERVAL" ] && KILL_TARGET_INTERVAL="5"
-        [ -z "$KILL_TARGET_ATTEMPTS" ] && KILL_TARGET_ATTEMPTS="18"
-        WITH_CMD+=("$KILL_TARGET_BIN -p $KILL_TARGET_PROCESS -w $KILL_TARGET_WINDOW -s $KILL_TARGET_INTERVAL -a $KILL_TARGET_ATTEMPTS")
+    [ -z "$XWIN_WATCH_SLEEP" ] && XWIN_WATCH_SLEEP="5"
+    [ -z "$XWIN_WATCH_INTERVAL" ] && XWIN_WATCH_INTERVAL="$XWIN_WATCH_SLEEP"
+    [ -z "$XWIN_WATCH_ATTEMPTS" ] && XWIN_WATCH_ATTEMPTS="20"
+
+    if [[ "$XWIN_WATCH_SLEEP" =~ [^0-9] ]]; then
+        echo "[xwin-watch] 错误: XWIN_WATCH_SLEEP 必须为数字"
+        exit 1
     fi
+
+    XWIN_WATCH_CMD="$XWIN_WATCH_BIN -w $XWIN_WATCH_WINDOW -s $XWIN_WATCH_SLEEP"
+
+    [[ "$XWIN_WATCH_ATTEMPTS" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -a $XWIN_WATCH_ATTEMPTS"
+    [[ "$XWIN_WATCH_INTERVAL" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -i $XWIN_WATCH_INTERVAL"
+fi
+
+# Kill Target
+if [ "$KILL_TARGET" = "y" ]; then
+    XWIN_WATCH_ON_CLOSED="$(cat << EOF
+$XWIN_WATCH_ON_CLOSED
+killall $KILL_TARGET_PROCESS
+EOF
+    )"
 fi
 
 
 
 start_game() {
+    # 准备启动
+    [ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+    [ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
+
     # 创建临时的 bat 文件用于启动
-    TEMP_SCRIPT="$(mktemp --suffix=.bat)"
+    TEMP_SCRIPT="$TEMP_DIR/start.bat"
     SCRIPT_CONTENT="$(cat << EOF
 Z:
 $BEFORE_GAME
@@ -342,17 +390,15 @@ start "" $GAME_EXE_PREFIX "Z:\\$GAME" $GAME_ARGS
 
 $AFTER_GAME
 
-del "%~f0" && exit
+:: del "%~f0" && exit
 EOF
     )"
     echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"
 
-    cd "$GAME_PATH"
-
     # Hosts 断网
     if [ "$NETWORK_HOSTS" = "y" ] && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
         [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
-        [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="5"
+        [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
         [ -z "$NETWORK_HOSTS_REC_PREM" ] && NETWORK_HOSTS_REC_PREM="y"
         NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
 
@@ -373,89 +419,62 @@ $flagStart
 $NETWORK_HOSTS_CONTENT
 $flagEnd
 """
+            cat "$NETWORK_HOSTS_FILE" > "$TEMP_DIR/hosts"
             echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
 
-            ( # 后台运行部分 指定时间后删除内容
-                sleep "$NETWORK_HOSTS_DURATION"
+            NETWORK_HOSTS_REC_CMD="$(cat << EOF
+echo "[$(date +%H:%M:%S)] 恢复 Hosts"
 
-                echo "[$(date +%H:%M:%S)] 恢复 Hosts"
+cat "$TEMP_DIR/hosts" > "$NETWORK_HOSTS_FILE"
 
-                local tempHosts
-                tempHosts="$(sed "/^$flagStart/,/^$flagEnd/d" "$NETWORK_HOSTS_FILE")"
-                echo -n "$tempHosts" > "$NETWORK_HOSTS_FILE"
+if [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+    echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
+    sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
+fi
+EOF
+            )"
 
-                if [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
-                    echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
-                    sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
-                fi
-            ) &
+            if [ "$NETWORK_HOSTS_DURATION" != "-" ]; then
+                (
+                    # 后台运行部分
+                    sleep "$NETWORK_HOSTS_DURATION"
+                    eval "$NETWORK_HOSTS_REC_CMD"
+                ) &
+            else
+                # 调用 XWin Watch
+                XWIN_WATCH_ON_EXISTS="$(cat << EOF
+$XWIN_WATCH_ON_EXISTS
+$NETWORK_HOSTS_REC_CMD
+EOF
+                )"
+            fi
         fi
     fi
 
-    # nmcli 断网
-    if [ "$NETWORK_NMCLI" = "y" ]; then
-        [ -z "$NETWORK_NMCLI_DURATION" ] && NETWORK_NMCLI_DURATION="5"
-        nmcli n off
-        (
-            sleep "$NETWORK_NMCLI_DURATION"
-            nmcli n on
-        ) &
-    fi
-
-    # Systemd-run 断网
-    if [ "$NETWORK_DROP" = "y" ]; then
-        [ -z "$NETWORK_DROP_DURATION" ] && NETWORK_DROP_DURATION="5"
-        [ -z "$NETWORK_DROP_UID" ] && NETWORK_DROP_UID="$(id -u)"
-        [ -z "$NETWORK_DROP_SLICE" ] && NETWORK_DROP_SLICE="game_$GAME_NAME"
-        [ -z "$NETWORK_DROP_UNIT" ] && NETWORK_DROP_UNIT="game_$GAME_NAME"
-        [ -z "$NETWORK_DROP_TABLE" ] && NETWORK_DROP_TABLE="iptables"
-
-        NETWORK_DROP_SLICE_PATH="user.slice/user-$NETWORK_DROP_UID.slice/user@$NETWORK_DROP_UID.service/$NETWORK_DROP_SLICE.slice"
-
-        if [ "$NETWORK_DROP_TABLE" = "iptables" ]; then
-
-            NETWORK_DROP_RULE="OUTPUT -p all -m cgroup --path /$NETWORK_DROP_SLICE_PATH -j DROP"
-
-            NETWORK_DROP_RULE_ADD="iptables -A $NETWORK_DROP_RULE"
-            NETWORK_DROP_RULE_DEL="iptables -D $NETWORK_DROP_RULE"
-
-        elif [ "$NETWORK_DROP_TABLE" = "nftables" ]; then
-
-            [ -z "$NETWORK_DROP_NAME" ] && NETWORK_DROP_NAME="$NETWORK_DROP_SLICE"
-
-            NETWORK_DROP_RULE_ADD="""
-                nft -f - << NFT
-table inet $NETWORK_DROP_NAME {
-    chain output {
-        type filter hook output priority 0;
-        socket cgroupv2 level 4 \\\"$NETWORK_DROP_SLICE_PATH\\\" counter drop
-    }
-}
-NFT"""
-            NETWORK_DROP_RULE_DEL="nft destroy table inet $NETWORK_DROP_NAME"
+    # XWin Watch 窗口监测程序
+    if [ "$XWIN_WATCH" = "y" ]; then
+        if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
+            TEMP_WIN_EXISTS="$TEMP_DIR/win-exists.sh"
+            echo "$XWIN_WATCH_ON_EXISTS" > "$TEMP_WIN_EXISTS"
+            set_executable "$TEMP_WIN_EXISTS"
+            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"$TEMP_WIN_EXISTS\""
         fi
 
-        echo "[sudo 请求] 启用网络丢包 需要 root 权限"
-        sudo -v
-        WRAPPER_CMD="$WRAPPER_CMD systemd-run --user --scope --slice=\"$NETWORK_DROP_SLICE\" --unit=\"$NETWORK_DROP_UNIT\""
-        WITH_CMD+=("""
-            sudo sh -c \"\"\"
-                $NETWORK_DROP_RULE_ADD
-                sleep $NETWORK_DROP_DURATION
-                $NETWORK_DROP_RULE_DEL
-            \"\"\"
-        """)
+        if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
+            TEMP_WIN_CLOSED="$TEMP_DIR/win-closed.sh"
+            echo "$XWIN_WATCH_ON_CLOSED" > "$TEMP_WIN_CLOSED"
+            set_executable "$TEMP_WIN_CLOSED"
+            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"$TEMP_WIN_CLOSED\""
+        fi
+
+        ( eval "$XWIN_WATCH_CMD" ) &
     fi
+
+    cd "$GAME_PATH"
 
     FINAL_RUN_COMMAND="$WRAPPER_CMD $WINE \"$TEMP_SCRIPT\" &"
 
-    if [ "$TEST_MODE" = "y" ]; then
-        echo "$FINAL_RUN_COMMAND"
-        IFS=$'\n' echo "${WITH_CMD[*]}"
-    else
-        eval "$FINAL_RUN_COMMAND"
-        for cmd in "${WITH_CMD[@]}"; do eval "$WRAPPER_WITH $cmd" & done
-    fi
+    eval "$FINAL_RUN_COMMAND"
 
     wait
 }

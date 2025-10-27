@@ -26,9 +26,7 @@
 - [x] 启用 NVIDIA 着色器缓存并自定义路径
 - [x] 启用 NVIDIA Smooth Motion
 - [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
-- [x] 【部分游戏】【断网启动】通过临时修改 Hosts【最推荐】
-- [x] 【部分游戏】【断网启动】通过 systemd-run + iptables / nftables
-- [x] 【部分游戏】【断网启动】通过 nmcli
+- [x] 【部分游戏/通用】通过临时修改 Hosts 断网启动
 - [x] 【原神/通用】通过注册表伪装 Hostname
 - [x] 【原神/通用】游戏窗口关闭时杀死进程
 - [x] 【原神】使用 FPS Unlocker 解锁帧率

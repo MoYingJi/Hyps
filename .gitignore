@@ -17,5 +17,5 @@
 !/Scripts/Yuanshen.sh
 !/Scripts/ZenlessZoneZero.sh
 
-/Tools/xwin-watch/*
+/Tools/*
 !/Tools/xwin-watch/xwin-watch.c

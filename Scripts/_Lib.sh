@@ -280,9 +280,9 @@ check_cached_compile() {
     local var_name_src="$var_name"_SRC
     local var_name_sha256_file="$var_name"_SHA256_FILE
 
-    local bin_file="${!var_name_bin:-$bin_default}"
-    local src_file="${!var_name_src:-$src_default}"
-    local sha256_file="${!var_name_sha256_file:-$sha256_file_default}"
+    local bin_file="${!var_name_bin:=$bin_default}"
+    local src_file="${!var_name_src:=$src_default}"
+    local sha256_file="${!var_name_sha256_file:=$sha256_file_default}"
 
     bin_file="$(realpath "$bin_file")"
     src_file="$(realpath "$src_file")"
@@ -324,7 +324,7 @@ fi
 if [ "$XWIN_WATCH" = "y" ]; then
     check_cached_compile "XWIN_WATCH" \
         "./Tools/xwin-watch/xwin-watch" \
-        "./Tools/xwin-watch/xwin-watch.c"\
+        "./Tools/xwin-watch/xwin-watch.c" \
         "$CACHE_DIR/xwin-watch.c.sha256"
     
     if [ -z "$XWIN_WATCH_WINDOW" ]; then

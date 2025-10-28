@@ -40,9 +40,13 @@
 ## 使用方法
 
 1. clone 本项目
+
 2. 你可以选择在本项目的 `config.conf` 中修改配置文件的路径，默认路径就是本项目的 `./Config` 文件夹，所以你也可以选择不改
-3. 到配置文件夹的 `Games` 目录下，找到 `_common.example.conf`，复制文件，重命名为 `_common.conf` 并修改里面的配置，很多功能默认都被注释掉了，如有需要可以将其打开
-4. 到配置文件夹的 `Games` 目录下，选个你想玩的游戏，复制一个 `.example.conf` 文件，并修改里面的配置，比如 `RUNNER` 和一些路径
+
+3. 到配置文件夹的 `Games` 目录下，找到 `_common.example.conf`，复制文件到配置文件夹的 `Games` 下（如果没改配置文件夹，复制一份就好了），重命名为 `_common.conf` 并修改里面的配置。很多功能默认都被注释掉了，如有需要可以将其打开
+
+4. 到配置文件夹的 `Games` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `Games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `RUNNER` 和一些路径
+
 5. 运行 `Scripts` 文件夹下对应游戏的脚本
 
 ### Runner
@@ -53,9 +57,9 @@
 
 `umu-run` 对应 `umu-run` 命令，同时指定了 Proton 路径为系统 Proton。
 
-如果你是 Arch Linux，那么安装 `aur/proton-ge-custom-bin` 即可使用 `proton-system`，安装 `umu-launcher` 和 `aur/proton-ge-custom-bin` 即可使用 `umu-run`。
+如果你是 Arch Linux，那么安装 `aur/proton-ge-custom-bin` 即可使用 `proton-system`，安装 `umu-launcher` 和 `aur/proton-ge-custom-bin` 即可使用 `umu-run`
 
-一般情况下，我个人会推荐 `proton-system`，如果遇到问题可以改用 `umu-run`。
+一般情况下，我个人会推荐 `proton-system`，如果遇到问题可以改用 `umu-run`
 
 ### 新增游戏适配
 

@@ -374,16 +374,10 @@ fi
 
 trap cleanup SIGTERM
 trap cleanup SIGINT
-declare -a BACKGROUND_PID=()
 
 cleanup() {
-    if [ "${#BACKGROUND_PID[@]}" -gt 0 ]; then
-        echo "正在终止 ${#BACKGROUND_PID[@]} 个后台进程"
-        for pid in "${BACKGROUND_PID[@]}"; do
-            echo "正在终止进程 $pid"
-            kill "$pid"
-        done
-    fi
+    # TODO
+    echo "[Hyps] 终止"
 }
 
 

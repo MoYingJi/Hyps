@@ -41,8 +41,8 @@ if [ "$FPS_UNLOCK" = "y" ]; then
     [ ! -d "$FPS_UNLOCK_PATH" ] && git clone https://github.com/everything411/fpsunlock "$FPS_UNLOCK_PATH"
 
     check_cached_compile "FPS_UNLOCK" \
-        "$FPS_UNLOCK_PATH/unlocker.c" \
         "$FPS_UNLOCK_PATH/unlocker" \
+        "$FPS_UNLOCK_PATH/unlocker.c" \
         "$CACHE_DIR/unlocker.c.sha256"
 
     if [ -n "$FPS_UNLOCK_BIN" ] && [ ! -f "$FPS_UNLOCK_BIN" ] && [ -f "$FPS_UNLOCK_SRC" ]; then
@@ -60,15 +60,24 @@ if [ "$FPS_UNLOCK" = "y" ]; then
     # 确保可执行
     set_executable "$FPS_UNLOCK_BIN"
 
+    # 权限/mnt/dal/Projects/Hyps/Tools/fpsunlock/unlocker
+    if [[ ! "$(getcap "$FPS_UNLOCK_BIN")" =~ cap_sys_ptrace=ep  ]]; then
+        echo "[sudo 请求] 赋予读写进程内存权限 需要 root 权限"
+        sudo setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"
+    fi
+
+    # PID
     if [ -z "$FPS_UNLOCK_PID" ]; then
         [ -z "$FPS_UNLOCK_PROG" ] && FPS_UNLOCK_PROG="YuanShen.exe"
-        FPS_UNLOCK_PID="\$(pgrep -f \"\$FPS_UNLOCK_PROG\")"
+        FPS_UNLOCK_PID="\$(pgrep -f \"$FPS_UNLOCK_PROG\")"
     fi
 
     # 调用 XWin Watch
     XWIN_WATCH_ON_EXISTS="$(cat << EOF
 $XWIN_WATCH_ON_EXISTS
-\"$FPS_UNLOCK_BIN\" \"$FPS_UNLOCK_PID\" $FPS_UNLOCK_FPS $FPS_UNLOCKER_INTERVAL
+game_pid="$FPS_UNLOCK_PID"
+echo "[fpsunlock] PID: \$game_pid"
+"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCKER_INTERVAL" &
 EOF
     )"
 fi

@@ -36,3 +36,31 @@
 
 - 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK 等
 - 新增永久性的 Hosts 条目以禁止日志上传、分析等
+
+## 使用方法
+
+1. clone 本项目
+2. 你可以选择在本项目的 `config.conf` 中修改配置文件的路径，默认路径就是本项目的 `./Config` 文件夹，所以你也可以选择不改
+3. 到配置文件夹的 `Games` 目录下，找到 `_common.example.conf`，复制文件，重命名为 `_common.conf` 并修改里面的配置，很多功能默认都被注释掉了，如有需要可以将其打开
+4. 到配置文件夹的 `Games` 目录下，选个你想玩的游戏，复制一个 `.example.conf` 文件，并修改里面的配置，比如 `RUNNER` 和一些路径
+5. 运行 `Scripts` 文件夹下对应游戏的脚本
+
+### Runner
+
+`RUNNER` 即是你要运行游戏的运行器，默认提供了 `proton-system` 和 `umu-run` 两个运行器，如果你的运行器不在这两个里面，请仿照默认配置自行添加
+
+`proton-system` 对应 `proton-ge` 命令
+
+`umu-run` 对应 `umu-run` 命令，同时指定了 Proton 路径为系统 Proton。
+
+如果你是 Arch Linux，那么安装 `aur/proton-ge-custom-bin` 即可使用 `proton-system`，安装 `umu-launcher` 和 `aur/proton-ge-custom-bin` 即可使用 `umu-run`。
+
+一般情况下，我个人会推荐 `proton-system`，如果遇到问题可以改用 `umu-run`。
+
+### 新增游戏适配
+
+其实非常简单，在 `Scripts` 文件夹下新建一个脚本，仿照其他脚本写一下就好了
+
+`GAME_NAME` 就是决定了配置文件 `Games/${GAME_NAME}.conf` 的名字的，同时也会决定 DXVK/VKD3D 或 NVIDIA 的缓存路径
+
+个人觉得，最好抄绝区零的配置，相对简单一点，配置文件里只留基础的 `RUNNER`、`GAME` 就能运行了，不过最好还是写一下 `PREFIX`，个人习惯隔离运行环境

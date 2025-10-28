@@ -9,5 +9,13 @@
 !/Config/Runners/proton-system.conf
 !/Config/Runners/umu-run.conf
 
+/Scripts/*
+!/Scripts/_Lib.sh
+!/Scripts/Honkai3.sh
+!/Scripts/StarRail.sh
+!/Scripts/WutheringWaves.sh
+!/Scripts/Yuanshen.sh
+!/Scripts/ZenlessZoneZero.sh
+
 /Tools/xwin-watch/*
 !/Tools/xwin-watch/xwin-watch.c

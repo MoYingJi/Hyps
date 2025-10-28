@@ -13,29 +13,29 @@ if [ -n "$FPS_UNLOCKER_PATH" ]; then
     FPS_UNLOCKER_RUN_PATH="$(dirname "$FPS_UNLOCKER_PATH")"
     FPS_UNLOCKER_RUN_NAME="$(basename "$FPS_UNLOCKER_PATH")"
 
-    if [ -z "$FPS_UNLOCKER_FPS" ]; then
+    if [ -z "$FPS_UNLOCK_FPS" ]; then
         echo "[fpsunlocker] 缺少 FPS 参数"
         exit 1
     fi
 
-    [ -z "$FPS_UNLOCKER_INTERVAL" ] && FPS_UNLOCKER_INTERVAL="5000"
+    [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
 
     AFTER_GAME="$(cat << EOF
 $AFTER_GAME
 cd "$FPS_UNLOCKER_RUN_PATH"
-start $FPS_UNLOCKER_RUN_NAME $FPS_UNLOCKER_FPS $FPS_UNLOCKER_INTERVAL
+start $FPS_UNLOCKER_RUN_NAME $FPS_UNLOCK_FPS $FPS_UNLOCK_INTERVAL
 EOF
     )"
 fi
 
 # 方法 2
-if [ "$FPS_UNLOCK" = "y" ]; then
+if [ "$FPS_UNLOCK_NATIVE" = "y" ]; then
     if [ -z "$FPS_UNLOCK_FPS" ]; then
         echo "[fpsunlock] 缺少 FPS 参数"
         exit 1
     fi
 
-    [ -z "$FPS_UNLOCKER_INTERVAL" ] && FPS_UNLOCKER_INTERVAL="5000"
+    [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
 
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
     [ ! -d "$FPS_UNLOCK_PATH" ] && git clone https://github.com/everything411/fpsunlock "$FPS_UNLOCK_PATH"
@@ -77,7 +77,7 @@ if [ "$FPS_UNLOCK" = "y" ]; then
 $XWIN_WATCH_ON_EXISTS
 game_pid="$FPS_UNLOCK_PID"
 echo "[fpsunlock] PID: \$game_pid"
-"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCKER_INTERVAL" &
+"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" &
 EOF
     )"
 fi

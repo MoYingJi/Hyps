@@ -1,7 +1,7 @@
 // 部分代码取自 everything411 的 kill-genshin.c，灵感也来源于此
 // https://gist.github.com/everything411/a4ebb2e3479711bd6529e58bff553a34
 
-// 编译: `gcc win-watch.c -o win-watch -lX11`
+// 编译: `gcc xwin-watch.c -o xwin-watch -lX11`
 
 // 已经堆成石山了，将就用吧
 
@@ -27,7 +27,8 @@ typedef struct {
 static bool check_window_exists(Display *display, const char *target_window);
 static void print_usage(const char *program_name);
 static bool parse_arguments(int argc, char *argv[], app_config_t *config);
-static void print_current_time(void);
+static void print_current_time();
+static void run_command(const char *command);
 
 int main(const int argc, char *argv[]) {
     app_config_t config = { nullptr };
@@ -73,9 +74,8 @@ int main(const int argc, char *argv[]) {
                 fflush(stdout);
             } else {
                 printf(" 窗口不存在，监测结束\n");
-                char command[256];
-                snprintf(command, sizeof(command), "%s", config.window_closed_cmd);
-                system(command);
+                // 因为下面判断过了, 进入 window_found 分支的一定要执行 window_closed_cmd
+                run_command(config.window_closed_cmd);
                 XCloseDisplay(display);
                 return 0;
             }
@@ -87,9 +87,7 @@ int main(const int argc, char *argv[]) {
                         printf(" (尝试次数 %d/%d)", attempt_count, config.max_attempts);
                     }
                     puts("");
-                    char command[256];
-                    snprintf(command, sizeof(command), "%s", config.window_exists_cmd);
-                    system(command);
+                    run_command(config.window_exists_cmd);
                     XCloseDisplay(display);
                     return 0;
                 }
@@ -98,9 +96,7 @@ int main(const int argc, char *argv[]) {
                     printf(" (尝试次数 %d/%d)", attempt_count, config.max_attempts);
                 }
                 puts("");
-                char command[256];
-                snprintf(command, sizeof(command), "%s", config.window_exists_cmd);
-                system(command);
+                run_command(config.window_exists_cmd);
                 sleep_seconds = config.check_closed_interval;
                 window_found = true;
             } else {
@@ -112,7 +108,7 @@ int main(const int argc, char *argv[]) {
                         print_current_time();
                         printf(" 最大尝试次数 (%d) 已用完，退出\n", config.max_attempts);
                         XCloseDisplay(display);
-                        return 0;
+                        exit(EXIT_FAILURE);
                     }
                 } else {
                     printf(" 等待窗口出现 \r");
@@ -229,10 +225,18 @@ static bool check_window_exists(Display *display, const char *target_window) {
     return found;
 }
 
-static void print_current_time(void) {
+static void print_current_time() {
     const time_t now = time(nullptr);
     const struct tm *tm_info = localtime(&now);
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
     printf("[%s]", time_str);
+}
+
+static void run_command(const char *command) {
+    if (command != nullptr) {
+        print_current_time();
+        printf(" 运行命令: %s\n", command);
+        system(command);
+    }
 }

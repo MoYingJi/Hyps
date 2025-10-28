@@ -1,3 +1,6 @@
+.idea
+.vscode
+
 /Config/Games/*
 !/Config/Games/*.example.*
 
@@ -6,4 +9,5 @@
 !/Config/Runners/proton-system.conf
 !/Config/Runners/umu-run.conf
 
-/Tools/xwin-watch/xwin-watch
+/Tools/xwin-watch/*
+!/Tools/xwin-watch/xwin-watch.c

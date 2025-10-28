@@ -372,6 +372,19 @@ EOF
     )"
 fi
 
+trap cleanup SIGTERM
+trap cleanup SIGINT
+declare -a BACKGROUND_PID=()
+
+cleanup() {
+    if [ "${#BACKGROUND_PID[@]}" -gt 0 ]; then
+        echo "正在终止 ${#BACKGROUND_PID[@]} 个后台进程"
+        for pid in "${BACKGROUND_PID[@]}"; do
+            echo "正在终止进程 $pid"
+            kill "$pid"
+        done
+    fi
+}
 
 
 start_game() {
@@ -440,6 +453,7 @@ EOF
                     sleep "$NETWORK_HOSTS_DURATION"
                     eval "$NETWORK_HOSTS_REC_CMD"
                 ) &
+                BACKGROUND_PID+=("$!")
             else
                 # 调用 XWin Watch
                 XWIN_WATCH_ON_EXISTS="$(cat << EOF
@@ -468,13 +482,13 @@ EOF
         fi
 
         ( eval "$XWIN_WATCH_CMD" ) &
+        BACKGROUND_PID+=("$!")
     fi
 
     cd "$GAME_PATH"
 
-    FINAL_RUN_COMMAND="$WRAPPER_CMD $WINE \"$TEMP_SCRIPT\" &"
-
-    eval "$FINAL_RUN_COMMAND"
+    eval $WRAPPER_CMD $WINE "$TEMP_SCRIPT" &
+    BACKGROUND_PID+=("$!")
 
     wait
 }

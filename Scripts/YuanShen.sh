@@ -29,7 +29,7 @@ EOF
 fi
 
 # 方法 2
-if [ "$FPS_UNLOCK_NATIVE" = "y" ]; then
+if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
     if [ -z "$FPS_UNLOCK_FPS" ]; then
         echo "[fpsunlock] 缺少 FPS 参数"
         exit 1

@@ -29,7 +29,7 @@ EOF
 fi
 
 # 方法 2
-if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
+if [ "$FPS_UNLOCK_NATIVE" = "y" ]; then
     if [ -z "$FPS_UNLOCK_FPS" ]; then
         echo "[fpsunlock] 缺少 FPS 参数"
         exit 1
@@ -60,7 +60,7 @@ if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
     # 确保可执行
     set_executable "$FPS_UNLOCK_BIN"
 
-    # 权限/mnt/dal/Projects/Hyps/Tools/fpsunlock/unlocker
+    # 权限
     if [[ ! "$(getcap "$FPS_UNLOCK_BIN")" =~ cap_sys_ptrace=ep  ]]; then
         echo "[sudo 请求] 赋予读写进程内存权限 需要 root 权限"
         sudo setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"

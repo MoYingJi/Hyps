@@ -430,7 +430,7 @@ $flagEnd
             echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
 
             NETWORK_HOSTS_REC_CMD="$(cat << EOF
-echo "[$(date +%H:%M:%S)] 恢复 Hosts"
+echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
 
 cat "$TEMP_DIR/hosts" > "$NETWORK_HOSTS_FILE"
 

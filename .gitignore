@@ -18,5 +18,12 @@
 !/Scripts/ZenlessZoneZero.sh
 
 /Tools/*
+
+!/Tools/fpsunlock
+!/Tools/xwin-watch
+
+/Tools/fpsunlock/*
+/Tools/xwin-watch/*
+
 !/Tools/fpsunlock/unlocker.c
 !/Tools/xwin-watch/xwin-watch.c

@@ -119,7 +119,7 @@ int main(const int argc, char *argv[]) {
     }
 }
 
-static bool parse_arguments(int argc, char *argv[], app_config_t *config) {
+static bool parse_arguments(const int argc, char *argv[], app_config_t *config) {
     bool w_flag = false, s_flag = false;
     bool e_flag = false, c_flag = false;
     bool i_flag = false;

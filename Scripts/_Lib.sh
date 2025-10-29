@@ -322,9 +322,11 @@ fi
 
 # XWin Watch
 if [ "$XWIN_WATCH" = "y" ]; then
+    [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./Tools/xwin-watch"
+
     check_cached_compile "XWIN_WATCH" \
-        "./Tools/xwin-watch/xwin-watch" \
-        "./Tools/xwin-watch/xwin-watch.c" \
+        "$XWIN_WATCH_PATH/xwin-watch" \
+        "$XWIN_WATCH_PATH/xwin-watch.c" \
         "$CACHE_DIR/xwin-watch.c.sha256"
     
     if [ -z "$XWIN_WATCH_WINDOW" ]; then

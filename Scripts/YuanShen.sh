@@ -30,15 +30,7 @@ fi
 
 # 方法 2
 if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
-    if [ -z "$FPS_UNLOCK_FPS" ]; then
-        echo "[fpsunlock] 缺少 FPS 参数"
-        exit 1
-    fi
-
-    [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
-
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
-    [ ! -d "$FPS_UNLOCK_PATH" ] && git clone https://github.com/everything411/fpsunlock "$FPS_UNLOCK_PATH"
 
     check_cached_compile "FPS_UNLOCK" \
         "$FPS_UNLOCK_PATH/unlocker" \
@@ -66,6 +58,15 @@ if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
         sudo setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"
     fi
 
+    # 参数
+    if [ -z "$FPS_UNLOCK_FPS" ]; then
+        echo "[fpsunlock] 缺少 FPS 参数"
+        exit 1
+    fi
+
+    [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
+    [ -z "$FPS_UNLCOK_FIFO" ] && FPS_UNLCOK_FIFO="$TEMP_DIR/fpsunlock_fifo"
+
     # PID
     if [ -z "$FPS_UNLOCK_PID" ]; then
         [ -z "$FPS_UNLOCK_PROG" ] && FPS_UNLOCK_PROG="YuanShen.exe"
@@ -77,7 +78,7 @@ if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
 $XWIN_WATCH_ON_EXISTS
 game_pid="$FPS_UNLOCK_PID"
 echo "[fpsunlock] PID: \$game_pid"
-"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" &
+"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLCOK_FIFO" &
 EOF
     )"
 fi

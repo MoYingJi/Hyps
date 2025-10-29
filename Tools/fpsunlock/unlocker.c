@@ -203,8 +203,8 @@ uintptr_t find_fps_var_address(pid_t pid) {
     uint8_t *setter_call = NULL;
     uintptr_t fps_var_addr = 0; // Default return value is 0 (failure)
 
-    const int16_t pattern[] = { 0xB9, 0x3C, 0x00, 0x00, 0x00, 0xE8, ANY_, ANY_, ANY_, ANY_, 0x80 };
-    const size_t pattern_len = sizeof(pattern)/sizeof(pattern[0]);
+    constexpr int16_t pattern[] = { 0xB9, 0x3C, 0x00, 0x00, 0x00, 0xE8, ANY_, ANY_, ANY_, ANY_, 0x80 };
+    constexpr size_t pattern_len = sizeof(pattern)/sizeof(pattern[0]);
 
     snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
     fp = fopen(maps_path, "r");

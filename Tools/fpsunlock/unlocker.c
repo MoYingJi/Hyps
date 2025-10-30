@@ -11,7 +11,7 @@
 // 2. Grant capability: `sudo setcap cap_sys_ptrace+ep ./unlocker`
 // 3. Run as a normal user.
 //
-// Usage: ./unlocker <PID> <FPS> [INTERVAL_MS]
+// Usage: ./unlocker <PID> <FPS> [INTERVAL_MS] [FIFO_PATH]
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -37,15 +37,6 @@ static int ends_with(const char *str, const char *suffix);
 static uintptr_t find_fps_var_address(pid_t pid);
 
 int main(const int argc, char **argv) {
-    pid_t pid;
-    int32_t target_fps;
-    int is_dry_run;
-    int64_t interval = 5000;
-    char *fifo_path = nullptr;
-    int fifo_fd = -1;
-    bool use_fifo = false;
-    uintptr_t fps_addr;
-
     if (argc < 3 || argc > 5) {
         fprintf(stderr, "Usage: %s <PID> <FPS> [INTERVAL_MS] [FIFO_PATH]\n", argv[0]);
         fprintf(stderr, "       If FPS < 1, program enters dry-run mode (read-only).\n");
@@ -53,18 +44,24 @@ int main(const int argc, char **argv) {
         return 1;
     }
 
-    pid = atoi(argv[1]);
+    int32_t target_fps;
+    int64_t interval = 5000;
+    const char *fifo_path = nullptr;
+    int fifo_fd = -1;
+    bool use_fifo = false;
+
+    const pid_t pid = atoi(argv[1]);
     target_fps = atoi(argv[2]);
-    is_dry_run = target_fps < 1;
+    const int is_dry_run = target_fps < 1;
     if (argc >= 4) interval = atol(argv[3]);
     if (argc == 5) fifo_path = argv[4];
-    
+
     if (!verify_process(pid)) {
         fprintf(stderr, "Error: PID %d does not appear to be a Genshin Impact process.\n", pid);
         return 1;
     }
 
-    fps_addr = find_fps_var_address(pid);
+    const uintptr_t fps_addr = find_fps_var_address(pid);
     if (!fps_addr) {
         return 1;
     }
@@ -116,7 +113,7 @@ int main(const int argc, char **argv) {
     return 0;
 }
 
-bool setup_fifo(const char* fifo_path) {
+static bool setup_fifo(const char* fifo_path) {
     // 创建命名管道
     if (mkfifo(fifo_path, 0666) == -1) {
         if (errno != EEXIST) {
@@ -127,14 +124,14 @@ bool setup_fifo(const char* fifo_path) {
     return true;
 }
 
-void close_fifo(const int fifo_fd, const char* fifo_path) {
+static void close_fifo(const int fifo_fd, const char* fifo_path) {
     if (fifo_fd != -1) {
         close(fifo_fd);
         unlink(fifo_path);
     }
 }
 
-bool read_process_memory(const pid_t pid, const uintptr_t addr, void* buf, const size_t size) {
+static bool read_process_memory(const pid_t pid, const uintptr_t addr, void* buf, const size_t size) {
     struct iovec local = { .iov_base = buf, .iov_len = size };
     struct iovec remote = { .iov_base = (void*)addr, .iov_len = size };
     ssize_t bytes_read = process_vm_readv(pid, &local, 1, &remote, 1, 0);
@@ -145,7 +142,7 @@ bool read_process_memory(const pid_t pid, const uintptr_t addr, void* buf, const
     return bytes_read == (ssize_t)size;
 }
 
-bool write_process_memory(const pid_t pid, const uintptr_t addr, const void* buf, const size_t size) {
+static bool write_process_memory(const pid_t pid, const uintptr_t addr, const void* buf, const size_t size) {
     const struct iovec local = { .iov_base = (void*)buf, .iov_len = size };
     const struct iovec remote = { .iov_base = (void*)addr, .iov_len = size };
     const ssize_t bytes_written = process_vm_writev(pid, &local, 1, &remote, 1, 0);
@@ -156,7 +153,7 @@ bool write_process_memory(const pid_t pid, const uintptr_t addr, const void* buf
     return bytes_written == (ssize_t)size;
 }
 
-void* find_pattern_in_process(const pid_t pid, const uintptr_t start, const size_t len, const int16_t* pattern, const size_t plen) {
+static void* find_pattern_in_process(const pid_t pid, const uintptr_t start, const size_t len, const int16_t* pattern, const size_t plen) {
     auto const remote = (uint8_t*)start;
     uint8_t buf[4096];
     for (size_t i = 0; i < len; i += sizeof(buf) - plen) {
@@ -172,7 +169,7 @@ void* find_pattern_in_process(const pid_t pid, const uintptr_t start, const size
     return NULL;
 }
 
-int ends_with(const char *str, const char *suffix) {
+static int ends_with(const char *str, const char *suffix) {
     if (!str || !suffix) return 0;
     const size_t len_str = strlen(str);
     const size_t len_suffix = strlen(suffix);
@@ -180,7 +177,7 @@ int ends_with(const char *str, const char *suffix) {
     return !strncmp(str + len_str - len_suffix, suffix, len_suffix);
 }
 
-int verify_process(const pid_t pid) {
+static int verify_process(const pid_t pid) {
     char path[64];
     char cmdline[1024] = {0};
 
@@ -195,7 +192,7 @@ int verify_process(const pid_t pid) {
     return ends_with(cmdline, "GenshinImpact.exe") || ends_with(cmdline, "YuanShen.exe");
 }
 
-uintptr_t find_fps_var_address(pid_t pid) {
+static uintptr_t find_fps_var_address(const pid_t pid) {
     char maps_path[64];
     FILE *fp = NULL;
     char *line = NULL;
@@ -230,7 +227,7 @@ uintptr_t find_fps_var_address(pid_t pid) {
                 continue;
             }
         }
-        
+
         // A gap in memory addresses signifies the end of the module's segments.
         if (last_end != 0 && start != last_end) {
             break;

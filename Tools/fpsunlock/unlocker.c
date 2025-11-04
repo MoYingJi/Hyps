@@ -1,6 +1,13 @@
 // 修改自 everything411 的 unlocker.c
 // https://github.com/everything411/fpsunlock
 
+// We will defy this world with a power from beyond. 
+// 从世界之外，我们取得否定世界的力量。
+
+// 此代码非常危险！原理是读写内存！
+// 同时也不要在其他地方公开提及！
+// 仅在 Linux 上运行！
+
 // unlocker.c - FPS unlocker refactored for native linux.
 //
 // To compile:

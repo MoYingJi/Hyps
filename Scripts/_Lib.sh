@@ -77,7 +77,7 @@ cd "$PROJECT_ROOT"
 [ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_DIR:-$HOME/.cache}/hypsc"
 [ -z "$TEMP_DIR" ] && TEMP_DIR="/tmp/hypsc"
 
-rm -r "$TEMP_DIR"
+[ -e "$TEMP_DIR" ] && rm -r "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 
 # 读取通用配置
@@ -157,9 +157,18 @@ export MANGOHUD_CONFIGFILE
 [ "$PROTON_PREFER_SDL" = "y" ] && PROTON_PREFER_SDL=1
 export PROTON_PREFER_SDL
 
+# Proton Wayland
+[ "$PROTON_ENABLE_WAYLAND" = "y" ] && PROTON_ENABLE_WAYLAND=1
+export PROTON_ENABLE_WAYLAND
+
+# Proton HDR
+[ "$PROTON_ENABLE_HDR" = "y" ] && PROTON_ENABLE_HDR=1
+export PROTON_ENABLE_HDR
+
 # NVIDIA Smooth Motion
 [ "$NVIDIA_SMOOTH_MOTION" = "y" ] && NVPRESENT_ENABLE_SMOOTH_MOTION=1
 export NVPRESENT_ENABLE_SMOOTH_MOTION
+
 
 # GL_SHADER_DISK_CACHE
 if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
@@ -246,6 +255,7 @@ fi
 # Jadeite Patch
 if [ -n "$JADEITE_PATH" ]; then
     GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
+    GAME_ARGS="$JADEITE_ARGS -- $GAME_ARGS"
 elif [ "$FORCE_JADEITE" = "y" ]; then
     echo "[Hyps] 本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
     exit 1

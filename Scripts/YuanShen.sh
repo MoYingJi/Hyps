@@ -6,30 +6,7 @@ GAME_NAME="yuanshen"
 source _Lib.sh
 
 # FPS 解锁
-
-# 方法 1
-if [ -n "$FPS_UNLOCKER_PATH" ]; then
-    FPS_UNLOCKER_PATH="$(realpath "$FPS_UNLOCKER_PATH")"
-    FPS_UNLOCKER_RUN_PATH="$(dirname "$FPS_UNLOCKER_PATH")"
-    FPS_UNLOCKER_RUN_NAME="$(basename "$FPS_UNLOCKER_PATH")"
-
-    if [ -z "$FPS_UNLOCK_FPS" ]; then
-        echo "[fpsunlocker] 缺少 FPS 参数"
-        exit 1
-    fi
-
-    [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
-
-    AFTER_GAME="$(cat << EOF
-$AFTER_GAME
-cd "$FPS_UNLOCKER_RUN_PATH"
-start $FPS_UNLOCKER_RUN_NAME $FPS_UNLOCK_FPS $FPS_UNLOCK_INTERVAL
-EOF
-    )"
-fi
-
-# 方法 2
-if [ "$FPS_UNLOCKER_NATIVE" = "y" ]; then
+if [ "$FPS_UNLOCK" = "y" ]; then
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
 
     check_cached_compile "FPS_UNLOCK" \

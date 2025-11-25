@@ -29,8 +29,7 @@
 # GAME                  游戏本体位置               必填   <game>.conf
 # GAME_PATH             游戏运行路径               选填   <game>.conf     $(dirname "$GAME")
 # GAME_ARGS             游戏启动参数               选填   <game>.conf
-# PREFIX                游戏运行的 PREIFX          选填   <game>.conf     「由 runner 决定」
-# MANGOHUD_CONFIGFILE   MangoHud 配置文件位置      选填   <game>.conf     「由 MangoHud 决定，未启用 MangoHud 则不适用」
+# PREFIX                游戏运行的 PREFIX          选填   <game>.conf     「由 runner 决定」
 
 # PROTON_TO_WINE_LINK         创建 Proton 前缀的软链接   选填   <g/c>.conf   <bool n>
 # WINESERVER_KILL             游戏启动前运行杀死命令     选填   <g/c>.conf   <bool n>
@@ -46,6 +45,8 @@
 # GL_SHADER_DISK_CACHE_PATH   NVIDIA 缓存 路径           选填   <g/c>.conf   $CACHE_DIR/GLShaderCache/$GAME_NAME
 # DX_CACHE                    DXVK/VKD3D 缓存 是否启用   选填   <g/c>.conf   <bool n>
 # DX_CACHE_PATH               DXVK/VKD3D 缓存 路径       选填   <g/c>.conf   $CACHE_DIR/DXCache/$GAME_NAME
+# MANGOHUD_CONFIGFILE         MangoHud 配置文件位置      选填   <g/c>.conf   「由 MangoHud 决定，未启用 MangoHud 则不适用」
+# PROTON_PREFER_SDL          【不知道 和手柄有关的】     选填   <g/c>.conf   <bool n>
 # NVIDIA_SMOOTH_MOTION        NVIDIA Smooth Motion       选填   <g/c>.conf   <bool n>
 
 # HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>

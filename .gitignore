@@ -3,6 +3,7 @@
 
 /Config/Games/*
 !/Config/Games/*.example.*
+!/Config/Games/.gitkeep
 
 /Config/Runners/*
 !/Config/Runners/*.example.*

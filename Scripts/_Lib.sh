@@ -70,7 +70,7 @@
 
 [ -z "$GAME_NAME" ] && exit 1
 
-PROJECT_ROOT="$(dirname "$(realpath "$0")")/.."
+[ -z "$PROJECT_ROOT" ] && PROJECT_ROOT="$(dirname "$(realpath "$0")")/.."
 cd "$PROJECT_ROOT"
 [ -f "config.conf" ] && source config.conf
 
@@ -152,6 +152,10 @@ export GAMEID
 
 # MangoHud
 export MANGOHUD_CONFIGFILE
+
+# SteamDeck
+export STEAMDECK
+export SteamOS
 
 
 # Proton 手柄问题

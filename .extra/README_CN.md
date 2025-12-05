@@ -34,7 +34,7 @@
 
 目前 **不支持** 的功能：
 
-- 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK 等
+- 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK/VKD3D 等
 - 新增永久性的 Hosts 条目以禁止日志上传、分析等
 
 ## 使用方法
@@ -80,3 +80,15 @@
 这几个配置的优先级从小到大是 `_common.conf` < `<name>.conf` < `<runner>.conf` <br/>
 `_common.conf` < `<name>.conf` 是能理解的 <br/>
 `<runner>.conf` 最大是因为脚本需要读取前两个文件才能得知需要用哪一个 Runner，因此这个文件最后被读取，会覆盖前面的配置，尽量少而必要地在这里写东西吧
+
+## 其他
+
+### 下载和更新游戏
+
+我推荐直接使用 Wine 运行官方启动器
+
+对于鸣潮，可能需要[特殊解决方案](https://moyingji.github.io/record/linux-wuwa-launcher)，或者使用 [ww-cli](https://github.com/timetetng/wutheringwaves-cli-manager)
+
+### NVIDIA 出现问题
+
+你可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`

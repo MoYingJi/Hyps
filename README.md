@@ -1,3 +1,3 @@
 自用小脚本
 
-参见 [README_CN.md](_docs/_README_CN.md)
+参见 [README_CN.md](.extra/README_CN.md)

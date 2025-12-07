@@ -159,6 +159,7 @@ export SteamOS
 
 # Steam
 export WINE_ENABLE_STEAM_STUB
+export STEAM_COMPAT_CLIENT_INSTALL_PATH
 
 
 # Proton 手柄问题
@@ -405,11 +406,8 @@ cleanup() {
 }
 
 
-start_game() {
-    # 准备启动
-    [ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
-    [ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
 
+gen_script() {
     # 创建临时的 bat 文件用于启动
     TEMP_SCRIPT="$TEMP_DIR/start.bat"
     SCRIPT_CONTENT="$(cat << EOF
@@ -425,6 +423,14 @@ $AFTER_GAME
 EOF
     )"
     echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"
+}
+
+
+
+run_prepare() {
+    # 准备启动
+    [ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+    [ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
 
     # Hosts 断网
     if [ "$NETWORK_HOSTS" = "y" ] && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
@@ -502,6 +508,13 @@ EOF
         ( eval "$XWIN_WATCH_CMD" ) &
         BACKGROUND_PID+=("$!")
     fi
+}
+
+
+
+start_game() {
+    gen_script
+    run_prepare
 
     cd "$GAME_PATH"
 

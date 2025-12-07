@@ -2,7 +2,9 @@
 #shellcheck source=_Lib.sh disable=2034,2164
 
 GAME_NAME="wuwa"
-FORCE_JADEITE="y"
+
+# 现在 Jadeite 是可选的
+#FORCE_JADEITE="y"
 
 source _Lib.sh
 

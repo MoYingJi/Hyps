@@ -47,7 +47,7 @@ if [ "$FPS_UNLOCK" = "y" ]; then
     # PID
     if [ -z "$FPS_UNLOCK_PID" ]; then
         [ -z "$FPS_UNLOCK_PROG" ] && FPS_UNLOCK_PROG="YuanShen.exe"
-        FPS_UNLOCK_PID="\$(pgrep -f \"$FPS_UNLOCK_PROG\")"
+        FPS_UNLOCK_PID="\$(pgrep \"$FPS_UNLOCK_PROG\")"
     fi
 
     # 调用 XWin Watch

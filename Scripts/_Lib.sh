@@ -157,6 +157,9 @@ export MANGOHUD_CONFIGFILE
 export STEAMDECK
 export SteamOS
 
+# Steam
+export WINE_ENABLE_STEAM_STUB
+
 
 # Proton 手柄问题
 [ "$PROTON_PREFER_SDL" = "y" ] && PROTON_PREFER_SDL=1

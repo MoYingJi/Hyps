@@ -146,15 +146,20 @@ export "${PREFIX_VAR_NAME?}"
 
 # 导出环境变量
 
+# Wine
+export WINEDLLOVERRIDES
+
 # umu-launcher
 export PROTONPATH
 export GAMEID
+export UMU_USE_STEAM
 
 # MangoHud
 export MANGOHUD_CONFIGFILE
 
 # SteamDeck
 export STEAMDECK
+export SteamDeck
 export SteamOS
 
 # Steam
@@ -333,6 +338,8 @@ check_cached_compile() {
         rm -f "$bin_file"
     fi
 }
+
+
 
 # 哪些要用到 XWin Watch
 [ "$KILL_TARGET" = "y" ] && XWIN_WATCH="y"

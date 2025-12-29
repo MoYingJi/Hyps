@@ -410,6 +410,7 @@ trap cleanup SIGINT
 cleanup() {
     # TODO
     echo "[Hyps] 终止"
+    exit
 }
 
 

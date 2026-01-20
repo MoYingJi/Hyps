@@ -15,16 +15,17 @@
 
 其他
 - [x] 鸣潮
-- [ ] 明日方舟：终末地 (如果可能的话)
+- [ ] 明日方舟 PC (如果可能的话)
+- [ ] 明日方舟：终末地 (待测试)
 
 目前支持或准备支持的功能：
 
-- [x] 启动游戏
+- [x] 启动游戏（废话）
 - [x] 使用 Gamemode 或 MangoHud 启动游戏
 - [x] 使用 Taskset 关联 CPU 核心
 - [x] 自定义 DXVK/VKD3D 缓存路径
 - [x] 启用 NVIDIA 着色器缓存并自定义路径
-- [x] 启用 NVIDIA Smooth Motion
+- [x] 修改 NVIDIA DLSS (DXVK NVAPI) 相关设置
 - [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
 - [x] 【部分游戏/通用】通过临时修改 Hosts 断网启动
 - [x] 【原神/通用】通过注册表伪装 Hostname
@@ -35,7 +36,7 @@
 目前 **不支持** 的功能：
 
 - 自动下载、安装或更新：游戏、启动器、Jadeite、Wine/Proton、DXVK/VKD3D 等
-- 新增永久性的 Hosts 条目以禁止日志上传、分析等
+- 新增永久性的 Hosts 条目等
 
 ## 使用方法
 
@@ -92,3 +93,11 @@
 ### NVIDIA 出现问题
 
 你可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`
+
+## 删除
+
+删掉本项目的文件夹即可
+
+如果还设置了单独的配置文件夹，也别忘了
+
+本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_DIR/hypsc` 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值

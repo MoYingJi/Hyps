@@ -169,6 +169,7 @@ export STEAM_COMPAT_CLIENT_INSTALL_PATH
 # DXVK NVAPI
 export DXVK_NVAPI_DRS_SETTINGS
 export DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION
+export DXVK_NVAPI_DRS_NGX_DLSSG_MULTI_FRAME_COUNT
 export DXVK_NVAPI_SET_NGX_DEBUG_OPTIONS
 export DXVK_NVAPI_GPU_ARCH
 
@@ -535,12 +536,20 @@ EOF
 
 
 start_game() {
-    gen_script
+    WIN_EXECUTABLE=""
+
+    if [ "$SKIP_SCRIPT" = "y" ]; then
+        WIN_EXECUTABLE="$GAME"
+    else
+        gen_script
+        WIN_EXECUTABLE="$TEMP_SCRIPT"
+    fi
+    
     run_prepare
 
     cd "$GAME_PATH"
 
-    eval $WRAPPER_CMD $WINE "$TEMP_SCRIPT" &
+    eval $WRAPPER_CMD $WINE "$WIN_EXECUTABLE" &
     BACKGROUND_PID+=("$!")
 
     wait

@@ -12,6 +12,7 @@
 
 /Scripts/*
 !/Scripts/_Lib.sh
+!/Scripts/Endfield.sh
 !/Scripts/Honkai3.sh
 !/Scripts/StarRail.sh
 !/Scripts/WutheringWaves.sh

@@ -94,6 +94,19 @@
 
 你可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`
 
+### Hosts 权限
+
+部分游戏需要临时修改 `/etc/hosts` 以启动，因此需要打开 `NETWORK_HOSTS` 选项，这个选项会修改 hosts，当没有写入权限时会索要 sudo 以临时使 hosts 可写（a+w）。但放心，hosts 会在脚本结束前被恢复原状，包括权限（会再索要一次 sudo 以恢复权限，如果 sudo 过期时间较长，可能不需要手动干预）
+
+要使得脚本不索要 sudo，推荐让自己可写 hosts，个人推荐做法是新建一个用户组
+
+```bash
+sudo groupadd hosts
+sudo usermod -aG hosts $(whoami)
+sudo chgrp hosts /etc/hosts
+sudo chmod g+w /etc/hosts
+```
+
 ## 删除
 
 删掉本项目的文件夹即可

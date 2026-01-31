@@ -9,6 +9,7 @@
 !/Config/Runners/*.example.*
 !/Config/Runners/proton-system.conf
 !/Config/Runners/umu-run.conf
+!/Config/Runners/umu-cachyos.conf
 
 /Scripts/*
 !/Scripts/_Lib.sh

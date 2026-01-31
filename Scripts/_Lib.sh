@@ -46,8 +46,16 @@
 # DX_CACHE                    DXVK/VKD3D 缓存 是否启用   选填   <g/c>.conf   <bool n>
 # DX_CACHE_PATH               DXVK/VKD3D 缓存 路径       选填   <g/c>.conf   $CACHE_DIR/DXCache/$GAME_NAME
 # MANGOHUD_CONFIGFILE         MangoHud 配置文件位置      选填   <g/c>.conf   「由 MangoHud 决定，未启用 MangoHud 则不适用」
-# PROTON_PREFER_SDL          【不知道 和手柄有关的】     选填   <g/c>.conf   <bool n>
-# NVIDIA_SMOOTH_MOTION        NVIDIA Smooth Motion       选填   <g/c>.conf   <bool n>
+
+# PROTON_DLSS_UPGRADE         自动升级 DLSS 有关的 dll 文件         选填   <g/c>.conf   <bool n>
+# PROTON_DLSS_VERSION         升级的 DLSS 版本                      选填   <g/c>.conf   <empty>
+# PROTON_DLSS_INDICATOR       启用 DLSS 叠加层                      选填   <g/c>.conf   <bool n>
+# PROTON_FSR4_UPGRADE         自动升级 FSR4 有关的 dll 文件         选填   <g/c>.conf   <bool n>
+# PROTON_FSR4_VERSION         升级的 FSR4 版本                      选填   <g/c>.conf   <empty>
+# PROTON_FSR4_INDICATOR       启用 FSR4 叠加层                      选填   <g/c>.conf   <bool n>
+# PROTON_PREFER_SDL          【不知道 和手柄有关的 开了更好】       选填   <g/c>.conf   <bool n>
+# NVIDIA_SMOOTH_MOTION        NVIDIA AI 插帧 (旧称 Smooth Motion)   选填   <g/c>.conf   <bool n>
+# NVIDIA_REFLEX               NVIDIA Reflex 低延迟                  选填   <g/c>.conf   <bool n>
 
 # HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
 # HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
@@ -67,6 +75,10 @@
 # NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool y>
 # NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
 
+if [ "$UID" -eq 0 ]; then
+    echo "你个小天才是怎么想到用 root 运行的（"
+    exit 1
+fi
 
 [ -z "$GAME_NAME" ] && exit 1
 
@@ -116,26 +128,34 @@ if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]
     PREFIX="${!PREFIX_VAR_NAME}"
 fi
 
-PREFIX="$(realpath "$PREFIX")"
+if [ -n "$PREFIX" ]; then
+    PREFIX="$(realpath "$PREFIX")"
 
-mkdir -p "$PREFIX"
+    mkdir -p "$PREFIX"
 
-# 在 PREFIX 创建由 pfx 到 . 的软链接
-# 和一些判断的逻辑
-if [ "$PROTON_TO_WINE_LINK" = "y" ] && [ ! -L "$PREFIX/pfx" ]; then
-    # 判断是否原有 pfx
-    if [ -d "$PREFIX/pfx" ]; then
-        # 判断是否原有 wineprefix
-        if [ -d "$PREFIX/dosdevices" ]; then
-            # 使用原有 wineprefix 而删除 pfx
-            rm -rf "$PREFIX/pfx"
-        else
-            # 将原有的 pfx 移动到 原目录
-            mv "$PREFIX/pfx" "$PREFIX"
+    # 在 PREFIX 创建由 pfx 到 . 的软链接
+    # 和一些判断的逻辑
+    if [ "$PROTON_TO_WINE_LINK" = "y" ] && [ ! -L "$PREFIX/pfx" ]; then
+        # 判断是否原有 pfx
+        if [ -d "$PREFIX/pfx" ]; then
+            # 判断是否原有 wineprefix
+            if [ -d "$PREFIX/dosdevices" ]; then
+                # 使用原有 wineprefix 而删除 pfx
+                rm -rf "$PREFIX/pfx"
+            else
+                # 将原有的 pfx 移动到 原目录
+                mv "$PREFIX/pfx" "$PREFIX"
+            fi
         fi
+        # 创建链接
+        ln -s . "$PREFIX/pfx"
     fi
-    # 创建链接
-    ln -s . "$PREFIX/pfx"
+fi
+
+if [ -z "$PREFIX" ]; then
+    if [ "$PROTON_TO_WINE_LINK" = "y" ]; then
+        echo "自动选择 PREFIX 无法也无需开启 PROTON_TO_WINE_LINK"
+    fi
 fi
 
 # 将 $PREFIX 的值 赋值给 名为 $PREFIX_VAR_NAME 的值的变量
@@ -143,6 +163,21 @@ fi
 [ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
 
 export "${PREFIX_VAR_NAME?}"
+
+# is yes
+isy() {
+    if [ "$1" = "y" ] ||
+       [ "$1" = "Y" ] ||
+       [ "$1" = "yes" ] ||
+       [ "$1" = "Yes" ] ||
+       [ "$1" = "YES" ] ||
+       [ "$1" = "1" ]
+    then
+        return 0
+    else
+        return 1
+    fi
+}
 
 # 导出环境变量
 
@@ -172,28 +207,45 @@ export DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION
 export DXVK_NVAPI_DRS_NGX_DLSSG_MULTI_FRAME_COUNT
 export DXVK_NVAPI_SET_NGX_DEBUG_OPTIONS
 export DXVK_NVAPI_GPU_ARCH
+
+
+# PROTON DLSS UPGRADE
+isy "$PROTON_DLSS_UPGRADE" && PROTON_DLSS_UPGRADE=1
+[ -n "$PROTON_DLSS_VERSION" ] && PROTON_DLSS_UPGRADE="$PROTON_DLSS_VERSION"
+export PROTON_DLSS_UPGRADE
+
+# PROTON DLSS INDICATOR
+isy "$PROTON_DLSS_INDICATOR" && PROTON_DLSS_INDICATOR=1
+export PROTON_DLSS_INDICATOR
+
+# PROTON FSR4 UPGRADE
+isy "$PROTON_FSR4_UPGRADE" && PROTON_FSR4_UPGRADE=1
+[ -n "$PROTON_FSR4_VERSION" ] && PROTON_FSR4_UPGRADE="$PROTON_FSR4_VERSION"
+export PROTON_DLSS_UPGRADE
+
+# PROTON FSR4 INDICATOR
+isy "$PROTON_FSR4_INDICATOR" && PROTON_FSR4_INDICATOR=1
+export PROTON_FSR4_INDICATOR
+
+# NVIDIA REFLEX 低延迟
+isy "$NVIDIA_REFLEX" && DXVK_NVAPI_VKREFLEX=1
 export DXVK_NVAPI_VKREFLEX
 
+# NVIDIA Smooth Motion
+isy "$NVIDIA_SMOOTH_MOTION" && NVPRESENT_ENABLE_SMOOTH_MOTION=1
+export NVPRESENT_ENABLE_SMOOTH_MOTION
 
 # Proton 手柄问题
-[ "$PROTON_PREFER_SDL" = "y" ] && PROTON_PREFER_SDL=1
+isy "$PROTON_PREFER_SDL" && PROTON_PREFER_SDL=1
 export PROTON_PREFER_SDL
 
 # Proton Wayland
-[ "$PROTON_ENABLE_WAYLAND" = "y" ] && PROTON_ENABLE_WAYLAND=1
+isy "$PROTON_ENABLE_WAYLAND" && PROTON_ENABLE_WAYLAND=1
 export PROTON_ENABLE_WAYLAND
 
 # Proton HDR
-[ "$PROTON_ENABLE_HDR" = "y" ] && PROTON_ENABLE_HDR=1
+isy "$PROTON_ENABLE_HDR" && PROTON_ENABLE_HDR=1
 export PROTON_ENABLE_HDR
-
-# NVIDIA Smooth Motion
-[ "$NVIDIA_SMOOTH_MOTION" = "y" ] && NVPRESENT_ENABLE_SMOOTH_MOTION=1
-export NVPRESENT_ENABLE_SMOOTH_MOTION
-
-# PROTON DLSS UPGRADE
-[ "$PROTON_DLSS_UPGRADE" = "y" ] && PROTON_DLSS_UPGRADE=1
-export PROTON_DLSS_UPGRADE
 
 
 # GL_SHADER_DISK_CACHE

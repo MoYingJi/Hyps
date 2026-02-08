@@ -146,6 +146,8 @@ if [ -n "$PREFIX" ]; then
                 # 将原有的 pfx 移动到 原目录
                 mv "$PREFIX/pfx" "$PREFIX"
             fi
+        else
+            mkdir -p "$PREFIX/pfx"
         fi
         # 创建链接
         ln -s . "$PREFIX/pfx"
@@ -246,6 +248,10 @@ export PROTON_ENABLE_WAYLAND
 # Proton HDR
 isy "$PROTON_ENABLE_HDR" && PROTON_ENABLE_HDR=1
 export PROTON_ENABLE_HDR
+
+# Vulkan HDR WSI
+isy "$ENABLE_HDR_WSI" && ENABLE_HDR_WSI=1
+export ENABLE_HDR_WSI
 
 
 # GL_SHADER_DISK_CACHE
@@ -602,4 +608,6 @@ start_game() {
     BACKGROUND_PID+=("$!")
 
     wait
+
+    cleanup
 }

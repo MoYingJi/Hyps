@@ -5,16 +5,18 @@
 
 // 已经堆成石山了，将就用吧
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include <getopt.h>
+#include <signal.h>
+#include <unistd.h>
+
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <time.h>
-#include <string.h>
-#include <stdlib.h>
-#include <getopt.h>
-#include <signal.h>
 
 typedef struct {
     const char *target_window;
@@ -26,63 +28,40 @@ typedef struct {
     int max_attempts;
 } app_config_t;
 
-// 全局变量，用于信号处理
-static Display *g_display = nullptr;
-static app_config_t g_config = { nullptr };
-static bool g_window_found = false;
-
-static void signal_handler(int signum);
-static bool check_window_exists(Display *display, const char *target_window);
-static void print_usage(const char *program_name);
+// 函数声明
 static bool parse_arguments(int argc, char *argv[]);
+static void print_usage(const char *program_name);
+static void print_arguments();
 static void print_current_time();
 static void run_command(const char *command);
+static bool check_window_exists(Display *display, const char *target_window);
+static void handle_signal_and_exit(int signum);
 
-static void signal_handler(int signum) {
-    printf("\n收到信号 %d，开始清理...\n", signum);
+// 全局变量
+static volatile sig_atomic_t g_signal_received = 0;
+static bool g_window_found = false;
+static Display *g_display = nullptr;
 
-    if (g_window_found) {
-        if (g_config.window_closed_cmd != nullptr) {
-            printf("执行窗口关闭命令...\n");
-            run_command(g_config.window_closed_cmd);
-        }
-    } else {
-        if (g_config.window_failed_cmd != nullptr) {
-            printf("执行检查失败命令...\n");
-            run_command(g_config.window_failed_cmd);
-        }
-    }
+static app_config_t g_config = {
+    .target_window = nullptr,
+    .window_exists_cmd = nullptr,
+    .window_closed_cmd = nullptr,
+    .window_failed_cmd = nullptr,
+    .check_exists_interval = 0,
+    .check_closed_interval = 0,
+    .max_attempts = 0
+};
 
-    if (g_display) {
-        XCloseDisplay(g_display);
-    }
-
-    exit(signum);
+static void signal_handler(const int signum) {
+    g_signal_received = signum;
 }
 
 int main(const int argc, char *argv[]) {
     if (!parse_arguments(argc, argv)) {
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
-    printf("窗口名称: %s\n", g_config.target_window);
-    puts("=== 窗口出现 ===");
-    if (g_config.window_exists_cmd != nullptr) {
-        printf("执行命令: %s\n", g_config.window_exists_cmd);
-    }
-    printf("检查间隔: %d 秒\n", g_config.check_exists_interval);
-    if (g_config.max_attempts > 0) {
-        printf("最大尝试次数: %d\n", g_config.max_attempts);
-        if (g_config.window_failed_cmd != nullptr) {
-            puts("=== 检查失败 ===");
-            printf("执行命令: %s\n", g_config.window_failed_cmd);
-        }
-    }
-    if (g_config.window_closed_cmd != nullptr) {
-        puts("=== 窗口关闭 ===");
-        printf("执行命令: %s\n", g_config.window_closed_cmd);
-        printf("检查间隔: %d 秒\n", g_config.check_closed_interval);
-    }
+    print_arguments();
 
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -93,11 +72,12 @@ int main(const int argc, char *argv[]) {
     g_display = XOpenDisplay(nullptr);
     if (!g_display) {
         fprintf(stderr, "无法打开 X Display\n");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
-    while (1) {
+    while (true) {
         sleep(sleep_seconds);
+        handle_signal_and_exit(g_signal_received);
 
         const bool found = check_window_exists(g_display, g_config.target_window);
         print_current_time();
@@ -111,7 +91,7 @@ int main(const int argc, char *argv[]) {
                 run_command(g_config.window_closed_cmd);
                 XCloseDisplay(g_display);
                 g_display = nullptr; // 防止信号处理器再次关闭
-                return 0;
+                return EXIT_SUCCESS;
             }
         } else {
             if (found) {
@@ -124,7 +104,7 @@ int main(const int argc, char *argv[]) {
                     run_command(g_config.window_exists_cmd);
                     XCloseDisplay(g_display);
                     g_display = nullptr;
-                    return 0;
+                    return EXIT_SUCCESS;
                 }
                 printf(" 窗口存在，监测已开始");
                 if (g_config.max_attempts > 0){
@@ -147,7 +127,7 @@ int main(const int argc, char *argv[]) {
                         }
                         XCloseDisplay(g_display);
                         g_display = nullptr;
-                        exit(EXIT_FAILURE);
+                        return EXIT_FAILURE;
                     }
                 } else {
                     printf(" 等待窗口出现 \r");
@@ -160,7 +140,7 @@ int main(const int argc, char *argv[]) {
 
 static bool parse_arguments(const int argc, char *argv[]) {
     bool w_flag = false, s_flag = false;
-    bool e_flag = false, c_flag = false, f_flag = false;
+    bool e_flag = false, c_flag = false;
     bool i_flag = false;
     int opt;
     while ((opt = getopt(argc, argv, "w:a:e:c:f:s:i:")) != -1) {
@@ -179,7 +159,7 @@ static bool parse_arguments(const int argc, char *argv[]) {
                 c_flag = true; break;
             case 'f':
                 g_config.window_failed_cmd = optarg;
-                f_flag = true; break;
+                break;
             case 's':
                 g_config.check_exists_interval = atoi(optarg);
                 s_flag = true; break;
@@ -226,9 +206,71 @@ static void print_usage(const char *program_name) {
     puts("    -i <检查窗口关闭的间隔>         检查窗口关闭的间隔，默认等于检查窗口出现的间隔");
 }
 
+static void print_arguments() {
+    printf("窗口名称: %s\n", g_config.target_window);
+    puts("=== 窗口出现 ===");
+    if (g_config.window_exists_cmd != nullptr) {
+        printf("执行命令: %s\n", g_config.window_exists_cmd);
+    }
+    printf("检查间隔: %d 秒\n", g_config.check_exists_interval);
+    if (g_config.max_attempts > 0) {
+        printf("最大尝试次数: %d\n", g_config.max_attempts);
+        if (g_config.window_failed_cmd != nullptr) {
+            puts("=== 检查失败 ===");
+            printf("执行命令: %s\n", g_config.window_failed_cmd);
+        }
+    }
+    if (g_config.window_closed_cmd != nullptr) {
+        puts("=== 窗口关闭 ===");
+        printf("执行命令: %s\n", g_config.window_closed_cmd);
+        printf("检查间隔: %d 秒\n", g_config.check_closed_interval);
+    }
+}
+
+static void handle_signal_and_exit(const int signum) {
+    if (signum) {
+        printf("\n收到信号 %d，开始清理...\n", signum);
+
+        // 保证脚本执行逻辑完整
+        if (signum) {
+            if (g_config.window_closed_cmd != nullptr) {
+                printf("执行窗口关闭命令...\n");
+                run_command(g_config.window_closed_cmd);
+            }
+        } else {
+            if (g_config.window_failed_cmd != nullptr) {
+                printf("执行检查失败命令...\n");
+                run_command(g_config.window_failed_cmd);
+            }
+        }
+
+        if (g_display) {
+            XCloseDisplay(g_display);
+        }
+
+        exit(signum);
+    }
+}
+
+static void print_current_time() {
+    const time_t now = time(nullptr);
+    const struct tm *tm_info = localtime(&now);
+    char time_str[64];
+    strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
+    printf("[%s]", time_str);
+}
+
+static void run_command(const char *command) {
+    if (command != nullptr) {
+        print_current_time();
+        printf(" 运行命令: %s\n", command);
+        system(command);
+    }
+}
+
 static bool check_window_exists(Display *display, const char *target_window) {
-    Window root = DefaultRootWindow(display);
-    Atom net_client_list = XInternAtom(display, "_NET_CLIENT_LIST", False);
+    const Window root = DefaultRootWindow(display);
+    const Atom net_client_list = XInternAtom(display, "_NET_CLIENT_LIST", False);
 
     Atom type;
     int format;
@@ -245,7 +287,7 @@ static bool check_window_exists(Display *display, const char *target_window) {
         return false;
     }
 
-    Window *windows = (Window *) data;
+    const Window *windows = (Window *) data;
     bool found = false;
 
     for (unsigned long i = 0; i < nitems; i++) {
@@ -263,23 +305,7 @@ static bool check_window_exists(Display *display, const char *target_window) {
         }
         if (found) break;
     }
-    
+
     XFree(data);
     return found;
-}
-
-static void print_current_time() {
-    const time_t now = time(nullptr);
-    const struct tm *tm_info = localtime(&now);
-    char time_str[64];
-    strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
-    printf("[%s]", time_str);
-}
-
-static void run_command(const char *command) {
-    if (command != nullptr) {
-        print_current_time();
-        printf(" 运行命令: %s\n", command);
-        system(command);
-    }
 }

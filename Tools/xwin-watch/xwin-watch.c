@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <signal.h>
 
 typedef struct {
     const char *target_window;
@@ -25,44 +26,72 @@ typedef struct {
     int max_attempts;
 } app_config_t;
 
+// 全局变量，用于信号处理
+static Display *g_display = nullptr;
+static app_config_t g_config = { nullptr };
+static bool g_window_found = false;
+
+static void signal_handler(int signum);
 static bool check_window_exists(Display *display, const char *target_window);
 static void print_usage(const char *program_name);
-static bool parse_arguments(int argc, char *argv[], app_config_t *config);
+static bool parse_arguments(int argc, char *argv[]);
 static void print_current_time();
 static void run_command(const char *command);
 
+static void signal_handler(int signum) {
+    printf("\n收到信号 %d，开始清理...\n", signum);
+
+    if (g_window_found) {
+        if (g_config.window_closed_cmd != nullptr) {
+            printf("执行窗口关闭命令...\n");
+            run_command(g_config.window_closed_cmd);
+        }
+    } else {
+        if (g_config.window_failed_cmd != nullptr) {
+            printf("执行检查失败命令...\n");
+            run_command(g_config.window_failed_cmd);
+        }
+    }
+
+    if (g_display) {
+        XCloseDisplay(g_display);
+    }
+
+    exit(signum);
+}
+
 int main(const int argc, char *argv[]) {
-    app_config_t config = { nullptr };
-    
-    if (!parse_arguments(argc, argv, &config)) {
+    if (!parse_arguments(argc, argv)) {
         exit(EXIT_FAILURE);
     }
 
-    printf(    "窗口名称: %s\n",     config.target_window);         // w
+    printf("窗口名称: %s\n", g_config.target_window);
     puts("=== 窗口出现 ===");
-    if (config.window_exists_cmd != nullptr) {
-        printf("执行命令: %s\n",     config.window_exists_cmd);     // e
+    if (g_config.window_exists_cmd != nullptr) {
+        printf("执行命令: %s\n", g_config.window_exists_cmd);
     }
-    printf(    "检查间隔: %d 秒\n",  config.check_exists_interval); // s
-    if (config.max_attempts > 0) {
-        printf("最大尝试次数: %d\n", config.max_attempts);          // a
-        if (config.window_failed_cmd != nullptr) {
+    printf("检查间隔: %d 秒\n", g_config.check_exists_interval);
+    if (g_config.max_attempts > 0) {
+        printf("最大尝试次数: %d\n", g_config.max_attempts);
+        if (g_config.window_failed_cmd != nullptr) {
             puts("=== 检查失败 ===");
-            printf("执行命令: %s\n", config.window_failed_cmd);     // f
+            printf("执行命令: %s\n", g_config.window_failed_cmd);
         }
     }
-    if (config.window_closed_cmd != nullptr) {
+    if (g_config.window_closed_cmd != nullptr) {
         puts("=== 窗口关闭 ===");
-        printf("执行命令: %s\n",     config.window_closed_cmd);     // c
-        printf("检查间隔: %d 秒\n",  config.check_closed_interval); // i
+        printf("执行命令: %s\n", g_config.window_closed_cmd);
+        printf("检查间隔: %d 秒\n", g_config.check_closed_interval);
     }
 
-    bool window_found = false;
-    int attempt_count = 0;
-    int sleep_seconds = config.check_exists_interval;
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-    Display *display = XOpenDisplay(nullptr);
-    if (!display) {
+    int attempt_count = 0;
+    int sleep_seconds = g_config.check_exists_interval;
+
+    g_display = XOpenDisplay(nullptr);
+    if (!g_display) {
         fprintf(stderr, "无法打开 X Display\n");
         exit(EXIT_FAILURE);
     }
@@ -70,52 +99,54 @@ int main(const int argc, char *argv[]) {
     while (1) {
         sleep(sleep_seconds);
 
-        const bool found = check_window_exists(display, config.target_window);
+        const bool found = check_window_exists(g_display, g_config.target_window);
         print_current_time();
 
-        if (window_found) {
+        if (g_window_found) {
             if (found) {
                 printf(" 窗口存在 \r");
                 fflush(stdout);
             } else {
                 printf(" 窗口不存在，监测结束\n");
-                // 因为下面判断过了, 进入 window_found 分支的一定要执行 window_closed_cmd
-                run_command(config.window_closed_cmd);
-                XCloseDisplay(display);
+                run_command(g_config.window_closed_cmd);
+                XCloseDisplay(g_display);
+                g_display = nullptr; // 防止信号处理器再次关闭
                 return 0;
             }
         } else {
             if (found) {
-                if (config.window_closed_cmd == nullptr) {
+                if (g_config.window_closed_cmd == nullptr) {
                     printf(" 窗口存在，监测已结束");
-                    if (config.max_attempts > 0){
-                        printf(" (尝试次数 %d/%d)", attempt_count, config.max_attempts);
+                    if (g_config.max_attempts > 0){
+                        printf(" (尝试次数 %d/%d)", attempt_count, g_config.max_attempts);
                     }
                     puts("");
-                    run_command(config.window_exists_cmd);
-                    XCloseDisplay(display);
+                    run_command(g_config.window_exists_cmd);
+                    XCloseDisplay(g_display);
+                    g_display = nullptr;
                     return 0;
                 }
                 printf(" 窗口存在，监测已开始");
-                if (config.max_attempts > 0){
-                    printf(" (尝试次数 %d/%d)", attempt_count, config.max_attempts);
+                if (g_config.max_attempts > 0){
+                    printf(" (尝试次数 %d/%d)", attempt_count, g_config.max_attempts);
                 }
                 puts("");
-                run_command(config.window_exists_cmd);
-                sleep_seconds = config.check_closed_interval;
-                window_found = true;
+                run_command(g_config.window_exists_cmd);
+                sleep_seconds = g_config.check_closed_interval;
+                g_window_found = true;
             } else {
-                if (config.max_attempts > 0) {
+                if (g_config.max_attempts > 0) {
                     attempt_count++;
-                    printf(" 等待窗口出现 (%d/%d) \r", attempt_count, config.max_attempts);
+                    printf(" 等待窗口出现 (%d/%d) \r", attempt_count, g_config.max_attempts);
                     fflush(stdout);
-                    if (attempt_count >= config.max_attempts) {
+                    if (attempt_count >= g_config.max_attempts) {
                         print_current_time();
-                        printf(" 最大尝试次数 (%d) 已用完，退出\n", config.max_attempts);
-                        if (config.window_failed_cmd != nullptr) {
-                            run_command(config.window_failed_cmd);
+                        printf(" 最大尝试次数 (%d) 已用完，退出\n", g_config.max_attempts);
+                        if (g_config.window_failed_cmd != nullptr) {
+                            run_command(g_config.window_failed_cmd);
                         }
-                        XCloseDisplay(display);
+                        XCloseDisplay(g_display);
+                        g_display = nullptr;
                         exit(EXIT_FAILURE);
                     }
                 } else {
@@ -127,7 +158,7 @@ int main(const int argc, char *argv[]) {
     }
 }
 
-static bool parse_arguments(const int argc, char *argv[], app_config_t *config) {
+static bool parse_arguments(const int argc, char *argv[]) {
     bool w_flag = false, s_flag = false;
     bool e_flag = false, c_flag = false, f_flag = false;
     bool i_flag = false;
@@ -135,25 +166,25 @@ static bool parse_arguments(const int argc, char *argv[], app_config_t *config) 
     while ((opt = getopt(argc, argv, "w:a:e:c:f:s:i:")) != -1) {
         switch (opt) {
             case 'w':
-                config -> target_window = optarg;
+                g_config.target_window = optarg;
                 w_flag = true; break;
             case 'a':
-                config -> max_attempts = atoi(optarg);
+                g_config.max_attempts = atoi(optarg);
                 break;
             case 'e':
-                config -> window_exists_cmd = optarg;
+                g_config.window_exists_cmd = optarg;
                 e_flag = true; break;
             case 'c':
-                config -> window_closed_cmd = optarg;
+                g_config.window_closed_cmd = optarg;
                 c_flag = true; break;
             case 'f':
-                config -> window_failed_cmd = optarg;
+                g_config.window_failed_cmd = optarg;
                 f_flag = true; break;
             case 's':
-                config -> check_exists_interval = atoi(optarg);
+                g_config.check_exists_interval = atoi(optarg);
                 s_flag = true; break;
             case 'i':
-                config -> check_closed_interval = atoi(optarg);
+                g_config.check_closed_interval = atoi(optarg);
                 i_flag = true; break;
 
             default:
@@ -176,7 +207,7 @@ static bool parse_arguments(const int argc, char *argv[], app_config_t *config) 
 
     // 默认监测关闭间隔等于监测打开间隔
     if (!i_flag) {
-        config -> check_closed_interval = config -> check_exists_interval;
+        g_config.check_closed_interval = g_config.check_exists_interval;
     }
 
     return true;

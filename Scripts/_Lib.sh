@@ -576,26 +576,23 @@ EOF
     if [ "$XWIN_WATCH" = "y" ]; then
         if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
             local file
-            file="$(mktemp -p "$TEMP_DIR" "xwin-watch-on-exists-XXX.sh")"
+            file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_EXISTS" > "$file"
-            set_executable "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"$file\""
+            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"bash $file\""
         fi
 
         if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
             local file
-            file="$(mktemp -p "$TEMP_DIR" "xwin-watch-on-closed-XXX.sh")"
+            file="$(mktemp "$TEMP_DIR/xwin-watch-on-closed.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_CLOSED" > "$file"
-            set_executable "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"$file\""
+            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"bash $file\""
         fi
 
         if [ -n "$XWIN_WATCH_ON_FAILED" ]; then
             local file
-            file="$(mktemp -p "$TEMP_DIR" "xwin-watch-on-failed-XXX.sh")"
+            file="$(mktemp "$TEMP_DIR/xwin-watch-on-failed.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_FAILED" > "$file"
-            set_executable "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"$file\""
+            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"bash $file\""
         fi
 
         ( eval "$XWIN_WATCH_CMD" ) &

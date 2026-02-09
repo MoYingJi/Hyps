@@ -19,6 +19,7 @@ typedef struct {
     const char *target_window;
     const char *window_exists_cmd;
     const char *window_closed_cmd;
+    const char *window_failed_cmd;
     int check_exists_interval;
     int check_closed_interval;
     int max_attempts;
@@ -45,6 +46,10 @@ int main(const int argc, char *argv[]) {
     printf(    "检查间隔: %d 秒\n",  config.check_exists_interval); // s
     if (config.max_attempts > 0) {
         printf("最大尝试次数: %d\n", config.max_attempts);          // a
+        if (config.window_failed_cmd != nullptr) {
+            puts("=== 检查失败 ===");
+            printf("执行命令: %s\n", config.window_failed_cmd);     // f
+        }
     }
     if (config.window_closed_cmd != nullptr) {
         puts("=== 窗口关闭 ===");
@@ -107,6 +112,9 @@ int main(const int argc, char *argv[]) {
                     if (attempt_count >= config.max_attempts) {
                         print_current_time();
                         printf(" 最大尝试次数 (%d) 已用完，退出\n", config.max_attempts);
+                        if (config.window_failed_cmd != nullptr) {
+                            run_command(config.window_failed_cmd);
+                        }
                         XCloseDisplay(display);
                         exit(EXIT_FAILURE);
                     }
@@ -121,10 +129,10 @@ int main(const int argc, char *argv[]) {
 
 static bool parse_arguments(const int argc, char *argv[], app_config_t *config) {
     bool w_flag = false, s_flag = false;
-    bool e_flag = false, c_flag = false;
+    bool e_flag = false, c_flag = false, f_flag = false;
     bool i_flag = false;
     int opt;
-    while ((opt = getopt(argc, argv, "w:a:e:c:s:i:")) != -1) {
+    while ((opt = getopt(argc, argv, "w:a:e:c:f:s:i:")) != -1) {
         switch (opt) {
             case 'w':
                 config -> target_window = optarg;
@@ -138,6 +146,9 @@ static bool parse_arguments(const int argc, char *argv[], app_config_t *config) 
             case 'c':
                 config -> window_closed_cmd = optarg;
                 c_flag = true; break;
+            case 'f':
+                config -> window_failed_cmd = optarg;
+                f_flag = true; break;
             case 's':
                 config -> check_exists_interval = atoi(optarg);
                 s_flag = true; break;
@@ -179,6 +190,7 @@ static void print_usage(const char *program_name) {
     puts("    -a <检查窗口出现最大尝试次数>   检查窗口出现的最大尝试次数，默认为 0，表示无限制");
     puts("    -e <窗口出现命令>               窗口出现时执行的命令，不填写代表不执行");
     puts("    -c <窗口关闭命令>               窗口关闭时执行的命令，不填写代表不检测窗口关闭");
+    puts("    -f <检查窗口失败命令>           检查窗口失败时执行的命令，例如最大尝试次数用完");
     puts("    -s <检查窗口出现的间隔>         检查窗口出现的间隔，必填");
     puts("    -i <检查窗口关闭的间隔>         检查窗口关闭的间隔，默认等于检查窗口出现的间隔");
 }

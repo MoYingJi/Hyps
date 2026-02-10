@@ -1,5 +1,5 @@
-/.idea
-/.vscode
+.idea/
+.vscode/
 
 /Config/Games/*
 !/Config/Games/*.example.*
@@ -13,6 +13,7 @@
 
 /Scripts/*
 !/Scripts/_Lib.sh
+!/Scripts/Arknights.sh
 !/Scripts/Endfield.sh
 !/Scripts/Honkai3.sh
 !/Scripts/StarRail.sh
@@ -23,12 +24,6 @@
 /Tools/*
 
 !/Tools/nvidia-env.sh
-
-!/Tools/fpsunlock
-!/Tools/xwin-watch
-
-/Tools/fpsunlock/*
-/Tools/xwin-watch/*
 
 !/Tools/fpsunlock/unlocker.c
 !/Tools/xwin-watch/xwin-watch.c

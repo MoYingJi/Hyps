@@ -1,5 +1,5 @@
 #!/hint/bash
-#shellcheck disable=1090,1091,2086,2164
+#shellcheck disable=1090,1091,2086
 # ↑ shellcheck: 我不如烂这算了
 
 # 神秘小脚本
@@ -83,7 +83,7 @@ fi
 [ -z "$GAME_NAME" ] && exit 1
 
 [ -z "$PROJECT_ROOT" ] && PROJECT_ROOT="$(dirname "$(realpath "$0")")/.."
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 [ -f "config.conf" ] && source config.conf
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config}/hypsc"
@@ -391,7 +391,7 @@ check_cached_compile() {
     declare -g "$var_name_sha256_file=$sha256_file"
 
     # 判断是否需要重新编译
-    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ -f "$sha256_file" ]; then 
+    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ -f "$sha256_file" ]; then
         # 读取先前的 sha256
         local cached_sha256
         cached_sha256="$(cat "$sha256_file")"
@@ -404,7 +404,7 @@ check_cached_compile() {
         fi
     fi
 
-    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ ! -f "$sha256_file" ]; then 
+    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ ! -f "$sha256_file" ]; then
         rm -f "$bin_file"
     fi
 }
@@ -417,7 +417,7 @@ check_cached_compile() {
 if [ "$NETWORK_HOSTS" = "y" ]; then
     if [ -z "$NETWORK_HOSTS_DURATION" ] || [ "$NETWORK_HOSTS_DURATION" = "-" ]; then
         XWIN_WATCH="y"
-    fi 
+    fi
 fi
 
 # XWin Watch
@@ -428,7 +428,7 @@ if [ "$XWIN_WATCH" = "y" ]; then
         "$XWIN_WATCH_PATH/xwin-watch" \
         "$XWIN_WATCH_PATH/xwin-watch.c" \
         "$CACHE_DIR/xwin-watch.c.sha256"
-    
+
     if [ -z "$XWIN_WATCH_WINDOW" ]; then
         echo "[xwin-watch] 缺少要监测的窗口名称"
         exit 1
@@ -611,10 +611,10 @@ start_game() {
         gen_script
         WIN_EXECUTABLE="$TEMP_SCRIPT"
     fi
-    
+
     run_prepare
 
-    cd "$GAME_PATH"
+    cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
 
     eval $WRAPPER_CMD $WINE "$WIN_EXECUTABLE" &
     BACKGROUND_PID+=("$!")

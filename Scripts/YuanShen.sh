@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#shellcheck source=_Lib.sh disable=2034,2164
+#shellcheck source=_Lib.sh disable=2034
 
 GAME_NAME="yuanshen"
 

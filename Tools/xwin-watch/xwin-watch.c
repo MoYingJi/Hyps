@@ -232,7 +232,7 @@ static void handle_signal_and_exit(const int signum) {
         printf("\n收到信号 %d，开始清理...\n", signum);
 
         // 保证脚本执行逻辑完整
-        if (signum) {
+        if (g_window_found) {
             if (g_config.window_closed_cmd != nullptr) {
                 printf("执行窗口关闭命令...\n");
                 run_command(g_config.window_closed_cmd);

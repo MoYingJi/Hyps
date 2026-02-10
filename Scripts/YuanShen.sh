@@ -12,7 +12,7 @@ if [ "$FPS_UNLOCK" = "y" ]; then
     check_cached_compile "FPS_UNLOCK" \
         "$FPS_UNLOCK_PATH/unlocker" \
         "$FPS_UNLOCK_PATH/unlocker.c" \
-        "$CACHE_DIR/unlocker.c.sha256"
+        "$CACHE_DIR/unlocker.c.sha256sum"
 
     if [ -n "$FPS_UNLOCK_BIN" ] && [ ! -f "$FPS_UNLOCK_BIN" ] && [ -f "$FPS_UNLOCK_SRC" ]; then
         echo "[fpsunlock] 编译 $FPS_UNLOCK_SRC"

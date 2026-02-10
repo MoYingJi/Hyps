@@ -427,7 +427,7 @@ if [ "$XWIN_WATCH" = "y" ]; then
     check_cached_compile "XWIN_WATCH" \
         "$XWIN_WATCH_PATH/xwin-watch" \
         "$XWIN_WATCH_PATH/xwin-watch.c" \
-        "$CACHE_DIR/xwin-watch.c.sha256"
+        "$CACHE_DIR/xwin-watch.c.sha256sum"
 
     if [ -z "$XWIN_WATCH_WINDOW" ]; then
         echo "[xwin-watch] 缺少要监测的窗口名称"

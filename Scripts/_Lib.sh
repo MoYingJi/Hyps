@@ -144,7 +144,8 @@ if [ -n "$PREFIX" ]; then
                 rm -rf "$PREFIX/pfx"
             else
                 # 将原有的 pfx 移动到 原目录
-                mv "$PREFIX/pfx" "$PREFIX"
+                mv "$PREFIX/pfx/"* "$PREFIX/"
+                mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
             fi
         else
             mkdir -p "$PREFIX/pfx"

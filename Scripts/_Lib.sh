@@ -144,14 +144,16 @@ if [ -n "$PREFIX" ]; then
                 rm -rf "$PREFIX/pfx"
             else
                 # 将原有的 pfx 移动到 原目录
+                mv "$PREFIX/pfx/".* "$PREFIX/"
                 mv "$PREFIX/pfx/"* "$PREFIX/"
-                mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
+                rmdir "$PREFIX/pfx" 2>/dev/null || mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
             fi
-        else
-            mkdir -p "$PREFIX/pfx"
+        elif [ -f "$PREFIX/pfx" ]; then
+            # 处理 pfx 是文件的情况
+            mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
         fi
         # 创建链接
-        ln -s . "$PREFIX/pfx"
+        ln -sf . "$PREFIX/pfx"
     fi
 fi
 

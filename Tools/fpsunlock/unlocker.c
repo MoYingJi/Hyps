@@ -1,7 +1,7 @@
 // 修改自 everything411 的 unlocker.c
 // https://github.com/everything411/fpsunlock
 
-// We will defy this world with a power from beyond. 
+// We will defy this world with a power from beyond.
 // 从世界之外，我们取得否定世界的力量。
 
 // 此代码非常危险！原理是读写内存！
@@ -222,7 +222,7 @@ static uintptr_t find_fps_var_address(const pid_t pid) {
     while (getline(&line, &len, fp) != -1) {
         uintptr_t start, end;
         char perms[5], path[1024] = {0};
-        
+
         if (sscanf(line, "%lx-%lx %4s %*x %*s %*d %1023[^\n]%*c", &start, &end, perms, path) < 3) {
             continue;
         }
@@ -239,7 +239,7 @@ static uintptr_t find_fps_var_address(const pid_t pid) {
         if (last_end != 0 && start != last_end) {
             break;
         }
-            
+
         if (strchr(perms, 'x')) { // Is the section executable?
             setter_call = find_pattern_in_process(pid, start, end - start, pattern, pattern_len);
             if (setter_call) {
@@ -276,7 +276,7 @@ static uintptr_t find_fps_var_address(const pid_t pid) {
 
     int32_t rip_offset;
     memcpy(&rip_offset, &instr_bytes[2], 4);
-    
+
     fps_var_addr = (uintptr_t)(current_addr + 6 + rip_offset);
 
 out_cleanup:

@@ -52,15 +52,38 @@
 
 ## Runner
 
-`RUNNER` 即是你要运行游戏的运行器，默认提供了 `proton-system` 和 `umu-run` 两个运行器，如果你的运行器不在这两个里面，请仿照默认配置自行添加
+`RUNNER` 即是你要运行游戏的运行器，这里提供了一些默认的运行器，如果你的运行器不在这里面，请仿照默认配置自行添加
 
-`proton-system` 对应 `proton-ge` 命令
+<div style="overflow-x: auto; white-space: nowrap;">
+    <table>
+        <thead>
+            <tr>
+                <th>Runner</th>
+                <th>依赖</th>
+                <th>Arch 包</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>proton-system</code></td>
+                <td><code>proton-ge</code></td>
+                <td><code>archlinuxcn/proton-ge-custom-bin</code></td>
+            </tr>
+            <tr>
+                <td><code>umu-cachyos</code></td>
+                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-cachyos-custom/</code></td>
+                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-ge-custom-bin</code></td>
+            </tr>
+            <tr>
+                <td><code>umu-run</code></td>
+                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-ge-custom/</code></td>
+                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-cachyos-slr</code></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
-`umu-run` 对应 `umu-run` 命令，同时指定了 Proton 路径为系统 Proton。
-
-如果你是 Arch Linux，那么安装 `aur/proton-ge-custom-bin` 即可使用 `proton-system`，安装 `umu-launcher` 和 `aur/proton-ge-custom-bin` 即可使用 `umu-run`
-
-一般情况下，我个人会推荐 `proton-system`，如果遇到问题可以改用 `umu-run`
+一般情况下，推荐 `umu-run`
 
 ## 新增游戏适配
 

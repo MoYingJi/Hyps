@@ -171,11 +171,18 @@ export "${PREFIX_VAR_NAME?}"
 
 # is yes
 isy() {
+    [ -z "$1" ] && return 1
+
     if [ "$1" = "y" ] ||
        [ "$1" = "Y" ] ||
        [ "$1" = "yes" ] ||
        [ "$1" = "Yes" ] ||
        [ "$1" = "YES" ] ||
+       [ "$1" = "t" ] ||
+       [ "$1" = "T" ] ||
+       [ "$1" = "true" ] ||
+       [ "$1" = "True" ] ||
+       [ "$1" = "TRUE" ] ||
        [ "$1" = "1" ]
     then
         return 0
@@ -213,6 +220,9 @@ export DXVK_NVAPI_DRS_NGX_DLSSG_MULTI_FRAME_COUNT
 export DXVK_NVAPI_SET_NGX_DEBUG_OPTIONS
 export DXVK_NVAPI_GPU_ARCH
 
+# PROTON NGX UPGRADE
+isy "$PROTON_ENABLE_NGX_UPDATER" && PROTON_ENABLE_NGX_UPDATER=1
+export PROTON_ENABLE_NGX_UPDATER
 
 # PROTON DLSS UPGRADE
 isy "$PROTON_DLSS_UPGRADE" && PROTON_DLSS_UPGRADE=1
@@ -226,7 +236,7 @@ export PROTON_DLSS_INDICATOR
 # PROTON FSR4 UPGRADE
 isy "$PROTON_FSR4_UPGRADE" && PROTON_FSR4_UPGRADE=1
 [ -n "$PROTON_FSR4_VERSION" ] && PROTON_FSR4_UPGRADE="$PROTON_FSR4_VERSION"
-export PROTON_DLSS_UPGRADE
+export PROTON_FSR4_UPGRADE
 
 # PROTON FSR4 INDICATOR
 isy "$PROTON_FSR4_INDICATOR" && PROTON_FSR4_INDICATOR=1

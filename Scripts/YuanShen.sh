@@ -42,7 +42,7 @@ if [ "$FPS_UNLOCK" = "y" ]; then
     fi
 
     [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
-    [ -z "$FPS_UNLCOK_FIFO" ] && FPS_UNLCOK_FIFO="$TEMP_DIR/fpsunlock_fifo"
+    [ -z "$FPS_UNLOCK_FIFO" ] && FPS_UNLOCK_FIFO="$TEMP_DIR/fpsunlock_fifo"
 
     # PID
     if [ -z "$FPS_UNLOCK_PID" ]; then
@@ -55,7 +55,7 @@ if [ "$FPS_UNLOCK" = "y" ]; then
 $XWIN_WATCH_ON_EXISTS
 game_pid="$FPS_UNLOCK_PID"
 echo "[fpsunlock] PID: \$game_pid"
-"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLCOK_FIFO" &
+"$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLOCK_FIFO" &
 EOF
     )"
 fi

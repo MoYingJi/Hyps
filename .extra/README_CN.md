@@ -52,7 +52,7 @@
 
 ## Runner
 
-`RUNNER` 即是你要运行游戏的运行器，这里提供了一些默认的运行器，如果你的运行器不在这里面，请仿照默认配置自行添加
+`RUNNER` 即是你要运行游戏的运行器，这里提供了一些默认的运行器
 
 <div style="overflow-x: auto; white-space: nowrap;">
     <table>
@@ -85,6 +85,8 @@
 
 一般情况下，推荐 `umu-run`
 
+如果要新增 Runner，可以仿照现有配置自行添加。`WINE` 是将会调用的命令；`PREFIX_VAR_NAME` 是 Wine Prefix 的变量名，自定义 Prefix 会存入以此值为变量名的环境变量；`WINESERVER_KILL_CMD` 是用于杀死 wineserver 的命令，我感觉这设计得不好，我已经不用了；`PROTONPATH` 是 umu-run 中用于指定 proton 路径的环境变量
+
 ## 新增游戏适配
 
 其实非常简单，在 `Scripts` 文件夹下新建一个脚本，仿照其他脚本写一下就好了
@@ -113,9 +115,25 @@
 
 对于鸣潮，可能需要[特殊解决方案](https://moyingji.github.io/record/linux-wuwa-launcher)，或者使用 [ww-cli](https://github.com/timetetng/wutheringwaves-cli-manager)
 
-### NVIDIA 出现问题
+### NVIDIA 显卡未被调用
 
-你可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`
+如果在混合模式遇到无法调用 NVIDIA 独立显卡（仅使用了核显），可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`
+
+### NVIDIA DLSS
+
+详见
+ - [Passing driver settings · jp7677/dxvk-nvapi Wiki](https://github.com/jp7677/dxvk-nvapi/wiki/Passing-driver-settings)
+ - [DLSS / Smooth Motion / Reflex — NVIDIA Driver Installation Guide](https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/gaming.html)
+
+总之，可以在配置（包括游戏特定配置和 `_common.conf`）中添加一些<ruby>配置项<rp>（<rt>环境变量<rp>）</ruby>传递驱动设置
+
+```bash
+# 这里是部分常见设置
+PROTON_DLSS_UPGRADE=1 # 自动更新 DLSS
+PROTON_DLSS_INDICATOR=1 # 启用 DLSS 指示器
+DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION=render_preset_m # 设置 DLSS 超分辨率预设
+DXVK_NVAPI_VKREFLEX=1 # 启用 NVIDIA Reflex 的 Vulkan 层
+```
 
 ### Hosts 权限
 

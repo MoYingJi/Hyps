@@ -9,10 +9,10 @@
 
 # 脚本所使用的部分环境变量
 # 推荐填写处的 <runner>.conf 是指运行器配置文件，<game>.conf 填写的是游戏配置文件，<g/c>.conf 是指游戏通用配置文件或游戏配置文件均可
-# 默认值的 <bool y/n> 是指该值只会被以 bool 类型被用到，且这些值要填只能为 y 或 n，<empty> 是指空值
-# 要求的 选必 是指如果启用了某功能就必填
+# 默认值的 <bool y/n> 是指该值只会被以 bool 类型被用到，真假值的判断详见下方 isy 函数；<empty> 是指空值
+# 要求的「选必」是指如果启用了某功能就必填，根据上下文自行判断
 
-# 环境变量              简略描述                   要求   推荐填写处      默认值
+# 环境变量              简略描述                   要求   推荐填写处      默认值/备注
 
 # GAME_NAME             游戏名                     必填   「由脚本提供」
 # CONFIG_DIR            配置目录                   选填   config.conf     $XDG_CONFIG_DIR/hypsc
@@ -196,7 +196,7 @@ if [ -z "$PREFIX" ]; then
 fi
 
 # 将 $PREFIX 的值 赋值给 名为 $PREFIX_VAR_NAME 的值的变量
-# 我怎么感觉没这句注释更好理解呢?
+# 我怎么感觉没这句注释更好理解呢？
 [ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
 
 export "${PREFIX_VAR_NAME?}"
@@ -604,11 +604,12 @@ run_prepare() {
             local flagStart="# $NETWORK_HOSTS_FLAG $GAME_NAME Start"
             local flagEnd="# $NETWORK_HOSTS_FLAG $GAME_NAME End"
 
-            NETWORK_HOSTS_CONTENT="""
+            NETWORK_HOSTS_CONTENT="$(cat << EOF
 $flagStart
 $NETWORK_HOSTS_CONTENT
 $flagEnd
-"""
+EOF
+            )"
             local hosts_temp_file
             hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX")"
             cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
@@ -654,11 +655,14 @@ EOF
 
     # XWin Watch 窗口监测程序
     if isy "$XWIN_WATCH"; then
+        local xwin_watch_set=0
+
         if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
             local file
             file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_EXISTS" > "$file"
             XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"bash $file\""
+            xwin_watch_set=1
         fi
 
         if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
@@ -666,6 +670,7 @@ EOF
             file="$(mktemp "$TEMP_DIR/xwin-watch-on-closed.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_CLOSED" > "$file"
             XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"bash $file\""
+            xwin_watch_set=1
         fi
 
         if [ -n "$XWIN_WATCH_ON_FAILED" ]; then
@@ -673,10 +678,18 @@ EOF
             file="$(mktemp "$TEMP_DIR/xwin-watch-on-failed.XXXXXXX.sh")"
             echo "$XWIN_WATCH_ON_FAILED" > "$file"
             XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"bash $file\""
+
+            if [ "$xwin_watch_set" != "1" ]; then
+                echo "[Hyps] WARN: XWIN_WATCH_ON_EXISTS 和 XWIN_WATCH_ON_CLOSED 均未设置，XWIN_WATCH_ON_FAILED 的内容将不会被执行！"
+            fi
         fi
 
-        ( eval "$XWIN_WATCH_CMD" ) &
-        BACKGROUND_PID+=("$!")
+        if [ "$xwin_watch_set" = "1" ]; then
+            ( eval "$XWIN_WATCH_CMD" ) &
+            BACKGROUND_PID+=("$!")
+        else
+            echo "[Hyps] WARN: XWIN_WATCH 已开启，但没什么要执行的"
+        fi
     fi
 
     # 挂载 OverlayFS

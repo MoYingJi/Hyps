@@ -107,6 +107,58 @@
 `_common.conf` < `<name>.conf` 是能理解的 <br/>
 `<runner>.conf` 最大是因为脚本需要读取前两个文件才能得知需要用哪一个 Runner，因此这个文件最后被读取，会覆盖前面的配置，尽量少而必要地在这里写东西吧
 
+## 功能
+
+这里只介绍部分功能的简单使用，这些功能还有其它用法，本项目也有更多功能，`Scripts/_Lib.sh` 的头部的一大堆注释里有这些功能的选项
+
+### 临时 Hosts 修改
+
+部分游戏需要在启动时修改 `/etc/hosts` 以启动，首先在游戏配置文件里加上
+
+```bash
+NETWORK_HOSTS="y"
+NETWORK_HOSTS_CONTENT="0.0.0.0 example.com" # 替换为自定义内容
+```
+
+默认为调用 [XWin Watch](#xwin-watch) 等待指定窗口出现（需要指定 `XWIN_WATCH_WINDOW`），也可以指定 `NETWORK_HOSTS_DURATION` 为数字来指定秒数
+
+### XWin Watch
+
+用于监视 X11/Xwayland 窗口的小功能
+
+```bash
+XWIN_WATCH_WINDOW="窗口名称" # 替换窗口名称
+
+# 还有一些可选的配置项，一般不动也可以
+
+XWIN_WATCH_SLEEP="5" # 检测窗口出现的间隔 (秒)
+XWIN_WATCH_INTERVAL="5" # 检测窗口消失的间隔 (秒)
+XWIN_WATCH_ATTEMPTS="20" # 检测窗口出现的尝试次数
+
+# 如果不需要执行指定命令，到这里就可以了
+
+XWIN_WATCH_ON_EXISTS="echo 窗口出现"
+XWIN_WATCH_ON_CLOSED="echo 窗口消失"
+XWIN_WATCH_ON_FAILED="echo 检测失败"
+```
+
+程序启动时，会间隔 `XWIN_WATCH_SLEEP` 秒循环检测窗口出现，最多尝试 `XWIN_WATCH_ATTEMPTS` 次，如果没检测到就运行 `XWIN_WATCH_ON_FAILED`，如果检测到了就运行 `XWIN_WATCH_ON_EXISTS`。此时，如果 `XWIN_WATCH_ON_CLOSED` 没东西要执行就立即退出，有东西要执行则程序会间隔 `XWIN_WATCH_INTERVAL` 秒循环检测窗口消失，检测到窗口消失时执行 `XWIN_WATCH_ON_CLOSED`。程序非正常退出前会执行 `XWIN_WATCH_ON_FAILED`
+
+### Overlay
+
+使用 FUSE OverlayFS
+
+overlayfs 是好文明！如果不知道的建议去查阅相关资料。在本项目中，其主要用途是在只读游戏本体的情况下运行游戏。有时，游戏是 NTFS 这种在 Linux 下的灵车文件系统，或者直接是只读的，就需要这项功能
+
+```bash
+OVERLAY="y"
+OVERLAY_LOWER="/path/to/game" # 手动指定一个 lowerdir
+OVERLAY_DIR="/path/to/rw/dir" # 指定一个可读写的目录
+# GAME 选项保持原样，会自动处理
+```
+
+此时，fuse overlayfs 被挂载在 `$OVERLAY_DIR/mount` 里，游戏也真正运行在这里，这里是可读写的，写入都会保存在 `$OVERLAY_DIR/upper` 里而不会真正写到 `$OVERLAY_LOWER`
+
 ## 其他
 
 ### 下载和更新游戏
@@ -154,4 +206,4 @@ sudo chmod g+w /etc/hosts
 
 如果还设置了单独的配置文件夹，也别忘了
 
-本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_DIR/hypsc` 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值
+本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`) 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值；也可以检查下 `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`) 里面有没有东西，目前还没有用到，但后面可能用

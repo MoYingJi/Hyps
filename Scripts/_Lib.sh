@@ -68,6 +68,13 @@
 # XWIN_WATCH_INTERVAL     XWIN_WATCH 检测窗口关闭的间隔 (秒)   选填   <g/c>.conf   $XWIN_WATCH_SLEEP
 # XWIN_WATCH_ATTEMPTS     XWIN_WATCH 检测窗口出现尝试次数      选填   <g/c>.conf   20
 
+# OVERLAY                   是否启用 OverlayFS      选填   <game>.conf   <bool n>
+# OVERLAY_LOWER             OverlayFS lower 目录    选必   <game>.conf   <empty>
+# OVERLAY_DIR               OverlayFS 相关目录      选填   <game>.conf   <empty>「自动创建 mount、upper、work」
+# OVERLAY_MOUNT             OverlayFS 挂载点        选填   <game>.conf   <empty> | $OVERLAY_DIR/mount
+# OVERLAY_UPPER             OverlayFS upper 目录    选填   <game>.conf   <empty> | $OVERLAY_DIR/upper
+# OVERLAY_WORK              OverlayFS work 目录     选填   <game>.conf   <empty> | $OVERLAY_DIR/work
+
 # NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
 # NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
 # NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   -「填入 `-` 则代表调用 XWIN_WATCH 等待窗口出现」
@@ -86,8 +93,9 @@ fi
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 [ -f "config.conf" ] && source config.conf
 
-[ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_DIR:-$HOME/.config}/hypsc"
-[ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_DIR:-$HOME/.cache}/hypsc"
+[ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
+[ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
+[ -z "$DATA_DIR" ] && DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
 [ -z "$TEMP_DIR" ] && TEMP_DIR="/tmp/hypsc"
 
 [ -e "$TEMP_DIR" ] && rm -r "$TEMP_DIR"
@@ -493,12 +501,55 @@ EOF
     )"
 fi
 
+# OverlayFS 预处理
+if [ "$OVERLAY" = "y" ]; then
+    if ! command -v fuse-overlayfs >/dev/null 2>&1; then
+        echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
+        exit 1
+    fi
+
+    if [ -z "$OVERLAY_LOWER" ] || [ ! -d "$OVERLAY_LOWER" ]; then
+        echo "[Hyps] 没有指定 OVERLAY_LOWER 或指定的目录不存在"
+        exit 1
+    fi
+
+    if [ -n "$OVERLAY_DIR" ]; then
+        [ -z "$OVERLAY_MOUNT" ] && OVERLAY_MOUNT="$OVERLAY_DIR/mount"
+        [ -z "$OVERLAY_UPPER" ] && OVERLAY_UPPER="$OVERLAY_DIR/upper"
+        [ -z "$OVERLAY_WORK" ] && OVERLAY_WORK="$OVERLAY_DIR/work"
+    fi
+
+    if [ -z "$OVERLAY_MOUNT" ] || [ -z "$OVERLAY_UPPER" ] || [ -z "$OVERLAY_WORK" ]; then
+        echo "[Hyps] 没有指定 OVERLAY_DIR 也没有分别指定 OVERLAY_MOUNT/UPPER/WORK 的值"
+        exit 1
+    fi
+
+    mkdir -p "$OVERLAY_MOUNT" "$OVERLAY_UPPER" "$OVERLAY_WORK"
+
+    GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME")"
+    GAME_PATH="$(dirname "$GAME")"
+fi
+
+
+
 trap cleanup SIGTERM
 trap cleanup SIGINT
 
 cleanup() {
     # TODO
     echo "[Hyps] 终止"
+
+    # 取消挂载 OverlayFS
+    if [ "$OVERLAY" = "y" ] && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
+        if command -v fusermount; then
+            fusermount -u "$OVERLAY_MOUNT"
+        elif command -v fusermount3; then
+            fusermount3 -u "$OVERLAY_MOUNT"
+        else
+            umount "$OVERLAY_MOUNT"
+        fi
+    fi
+
     exit
 }
 
@@ -553,13 +604,15 @@ $flagStart
 $NETWORK_HOSTS_CONTENT
 $flagEnd
 """
-            cat "$NETWORK_HOSTS_FILE" > "$TEMP_DIR/hosts"
+            local hosts_temp_file
+            hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX")"
+            cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
             echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
 
             NETWORK_HOSTS_REC_CMD="$(cat << EOF
 echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
 
-cat "$TEMP_DIR/hosts" > "$NETWORK_HOSTS_FILE"
+cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
 
 if [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
     echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
@@ -616,6 +669,12 @@ EOF
 
         ( eval "$XWIN_WATCH_CMD" ) &
         BACKGROUND_PID+=("$!")
+    fi
+
+    # 挂载 OverlayFS
+    if [ "$OVERLAY" = "y" ]; then
+        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT"
+        OVERLAY_MOUNTED=1
     fi
 }
 

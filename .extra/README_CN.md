@@ -159,6 +159,8 @@ OVERLAY_DIR="/path/to/rw/dir" # 指定一个可读写的目录
 
 此时，fuse overlayfs 被挂载在 `$OVERLAY_DIR/mount` 里，游戏也真正运行在这里，这里是可读写的，写入都会保存在 `$OVERLAY_DIR/upper` 里而不会真正写到 `$OVERLAY_LOWER`
 
+目前此功能还有些问题，比如无法自动卸载
+
 ## 其他
 
 ### 下载和更新游戏

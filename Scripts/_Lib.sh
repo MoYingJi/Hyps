@@ -76,6 +76,7 @@
 # OVERLAY_WORK              OverlayFS work 目录     选填   <game>.conf   <empty> | $OVERLAY_DIR/work
 # OVERLAY_REBIND_GAME       是否重绑定游戏路径      选填   <game>.conf   <bool y>
 # OVERLAY_REBIND_GAME_PATH  是否重绑定游戏运行路径  选填   <game>.conf   <bool y>
+# OVERLAY_UMOUNT            是否在退出后卸载        选填   <game>.conf   <bool y>
 
 # NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
 # NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
@@ -544,18 +545,25 @@ cleanup() {
     # TODO
     echo "[Hyps] 终止"
 
-    # 取消挂载 OverlayFS
-    if isy "$OVERLAY" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
-        if command -v fusermount; then
-            fusermount -u "$OVERLAY_MOUNT"
-        elif command -v fusermount3; then
-            fusermount3 -u "$OVERLAY_MOUNT"
-        else
-            umount "$OVERLAY_MOUNT"
-        fi
-    fi
+    umount_overlay
 
     exit
+}
+
+umount_overlay() {
+    [ -z "$OVERLAY_UMOUNT" ] && OVERLAY_UMOUNT="y"
+
+    if isy "$OVERLAY" && isy "$OVERLAY_UMOUNT" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
+        if command -v fusermount3 >/dev/null 2>&1; then
+            fusermount3 -u "$OVERLAY_MOUNT"
+        elif command -v fusermount >/dev/null 2>&1; then
+            fusermount -u "$OVERLAY_MOUNT"
+        elif command -v umount >/dev/null 2>&1; then
+            umount "$OVERLAY_MOUNT"
+        else
+            echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
+        fi
+    fi
 }
 
 
@@ -694,7 +702,8 @@ EOF
 
     # 挂载 OverlayFS
     if isy "$OVERLAY"; then
-        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT"
+        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
+            || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
         OVERLAY_MOUNTED=1
     fi
 }

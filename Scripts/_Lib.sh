@@ -126,6 +126,28 @@ source "$RUNNER_CONF"
 [ -z "$WINE" ] && exit 1
 [ -z "$PREFIX_VAR_NAME" ] && PREFIX_VAR_NAME="WINEPREFIX"
 
+# is yes
+isy() {
+    [ -z "$1" ] && return 1
+
+    if [ "$1" = "y" ] ||
+       [ "$1" = "Y" ] ||
+       [ "$1" = "yes" ] ||
+       [ "$1" = "Yes" ] ||
+       [ "$1" = "YES" ] ||
+       [ "$1" = "t" ] ||
+       [ "$1" = "T" ] ||
+       [ "$1" = "true" ] ||
+       [ "$1" = "True" ] ||
+       [ "$1" = "TRUE" ] ||
+       [ "$1" = "1" ]
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # 配置 WINE
 
 # 如果 $PREFIX 为空，就找 名为 $PREFIX_VAR_NAME 的值的变量，赋值过来做些操作
@@ -143,7 +165,7 @@ if [ -n "$PREFIX" ]; then
 
     # 在 PREFIX 创建由 pfx 到 . 的软链接
     # 和一些判断的逻辑
-    if [ "$PROTON_TO_WINE_LINK" = "y" ] && [ ! -L "$PREFIX/pfx" ]; then
+    if isy "$PROTON_TO_WINE_LINK" && [ ! -L "$PREFIX/pfx" ]; then
         # 判断是否原有 pfx
         if [ -d "$PREFIX/pfx" ]; then
             # 判断是否原有 wineprefix
@@ -166,7 +188,7 @@ if [ -n "$PREFIX" ]; then
 fi
 
 if [ -z "$PREFIX" ]; then
-    if [ "$PROTON_TO_WINE_LINK" = "y" ]; then
+    if isy "$PROTON_TO_WINE_LINK"; then
         echo "自动选择 PREFIX 无法也无需开启 PROTON_TO_WINE_LINK"
     fi
 fi
@@ -176,28 +198,6 @@ fi
 [ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
 
 export "${PREFIX_VAR_NAME?}"
-
-# is yes
-isy() {
-    [ -z "$1" ] && return 1
-
-    if [ "$1" = "y" ] ||
-       [ "$1" = "Y" ] ||
-       [ "$1" = "yes" ] ||
-       [ "$1" = "Yes" ] ||
-       [ "$1" = "YES" ] ||
-       [ "$1" = "t" ] ||
-       [ "$1" = "T" ] ||
-       [ "$1" = "true" ] ||
-       [ "$1" = "True" ] ||
-       [ "$1" = "TRUE" ] ||
-       [ "$1" = "1" ]
-    then
-        return 0
-    else
-        return 1
-    fi
-}
 
 # 导出环境变量
 
@@ -282,7 +282,7 @@ export ENABLE_HDR_WSI
 
 
 # GL_SHADER_DISK_CACHE
-if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
+if isy "$GL_SHADER_DISK_CACHE"; then
     [ -z "$GL_SHADER_DISK_CACHE_PATH" ] && GL_SHADER_DISK_CACHE_PATH="$CACHE_DIR/GLShaderCache/$GAME_NAME"
     mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
     GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
@@ -292,7 +292,7 @@ if [ "$GL_SHADER_DISK_CACHE" = "y" ]; then
 fi
 
 # DX_CACHE
-if [ "$DX_CACHE" = "y" ]; then
+if isy "$DX_CACHE"; then
     [ -z "$DX_CACHE_PATH" ] && DX_CACHE_PATH="$CACHE_DIR/DXCache/$GAME_NAME"
     mkdir -p "$DX_CACHE_PATH"
     DX_CACHE_PATH="$(realpath "$DX_CACHE_PATH")"
@@ -302,7 +302,7 @@ if [ "$DX_CACHE" = "y" ]; then
 fi
 
 # Intel CPU 功率可供检测
-if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
+if isy "$INTEL_CPU_POWER_READ"; then
     [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
 
     for file in "${INTEL_CPU_POWER_FILE[@]}"; do
@@ -314,7 +314,7 @@ if [ "$INTEL_CPU_POWER_READ" = "y" ]; then
 fi
 
 # 伪装 Hostname 为 STEAMDECK
-if [ "$HOSTNAME_STEAMDECK" = "y" ]; then
+if isy "$HOSTNAME_STEAMDECK"; then
     [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDECK"
 
     BEFORE_GAME="$(cat << EOF
@@ -327,7 +327,7 @@ fi
 
 # Systemd Inhibit
 # 隐藏的小功能 能用就用吧（
-if [ "$SYSTEMD_INHIBIT" = "y" ]; then
+if isy "$SYSTEMD_INHIBIT"; then
     INHIBIT_WRAPPER="systemd-inhibit"
 
     [ -z "$SYSTEMD_INHIBIT_WHY" ] && SYSTEMD_INHIBIT_WHY="Game-Hyps $GAME_NAME"
@@ -367,13 +367,13 @@ fi
 if [ -n "$JADEITE_PATH" ]; then
     GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
     GAME_ARGS="$JADEITE_ARGS -- $GAME_ARGS"
-elif [ "$FORCE_JADEITE" = "y" ]; then
+elif isy "$FORCE_JADEITE"; then
     echo "[Hyps] 本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
     exit 1
 fi
 
 # Hosts 断网启动检测参数
-if [ "$NETWORK_HOSTS" = "y" ]; then
+if isy "$NETWORK_HOSTS"; then
     if [ -z "$NETWORK_HOSTS_CONTENT" ]; then
         echo "[Hyps] WARN: 检测到 Hosts 断网启动参数，请在 \$NETWORK_HOSTS_CONTENT 填写要在 Hosts 文件附加的内容！"
         exit 1
@@ -439,16 +439,16 @@ check_cached_compile() {
 
 
 # 哪些要用到 XWin Watch
-[ "$KILL_TARGET" = "y" ] && XWIN_WATCH="y"
+isy "$KILL_TARGET" && XWIN_WATCH="y"
 
-if [ "$NETWORK_HOSTS" = "y" ]; then
+if isy "$NETWORK_HOSTS"; then
     if [ -z "$NETWORK_HOSTS_DURATION" ] || [ "$NETWORK_HOSTS_DURATION" = "-" ]; then
         XWIN_WATCH="y"
     fi
 fi
 
 # XWin Watch
-if [ "$XWIN_WATCH" = "y" ]; then
+if isy "$XWIN_WATCH"; then
     [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./Tools/xwin-watch"
 
     check_cached_compile "XWIN_WATCH" \
@@ -493,7 +493,7 @@ if [ "$XWIN_WATCH" = "y" ]; then
 fi
 
 # Kill Target
-if [ "$KILL_TARGET" = "y" ]; then
+if isy "$KILL_TARGET"; then
     XWIN_WATCH_ON_CLOSED="$(cat << EOF
 $XWIN_WATCH_ON_CLOSED
 killall $KILL_TARGET_PROCESS
@@ -502,7 +502,7 @@ EOF
 fi
 
 # OverlayFS 预处理
-if [ "$OVERLAY" = "y" ]; then
+if isy "$OVERLAY"; then
     if ! command -v fuse-overlayfs >/dev/null 2>&1; then
         echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
         exit 1
@@ -540,7 +540,7 @@ cleanup() {
     echo "[Hyps] 终止"
 
     # 取消挂载 OverlayFS
-    if [ "$OVERLAY" = "y" ] && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
+    if isy "$OVERLAY" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
         if command -v fusermount; then
             fusermount -u "$OVERLAY_MOUNT"
         elif command -v fusermount3; then
@@ -577,11 +577,11 @@ EOF
 
 run_prepare() {
     # 准备启动
-    [ "$WINESERVER_KILL" = "y" ] && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
-    [ "$EXE_KILL" = "y" ] && pkill -f "\.exe"
+    isy "$WINESERVER_KILL" && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+    isy "$EXE_KILL" && pkill -f "\.exe"
 
     # Hosts 断网
-    if [ "$NETWORK_HOSTS" = "y" ] && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
+    if isy "$NETWORK_HOSTS" && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
         [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
         [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
         [ -z "$NETWORK_HOSTS_REC_PREM" ] && NETWORK_HOSTS_REC_PREM="y"
@@ -589,7 +589,7 @@ run_prepare() {
 
         if [ -f "$NETWORK_HOSTS_FILE" ]; then
             if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
-                [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
+                isy "$NETWORK_HOSTS_REC_PREM" && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
 
                 echo "[sudo 请求] 使 hosts 文件可被写入 需要 root 权限"
                 sudo chmod a+w "$NETWORK_HOSTS_FILE"
@@ -611,15 +611,18 @@ $flagEnd
 
             NETWORK_HOSTS_REC_CMD="$(cat << EOF
 echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
-
 cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
-
-if [ "$NETWORK_HOSTS_REC_PREM" = "y" ] && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
-    echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
-    sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
-fi
 EOF
             )"
+
+            if isy "$NETWORK_HOSTS_REC_PREM" && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+                NETWORK_HOSTS_REC_CMD="$(cat << EOF
+$NETWORK_HOSTS_REC_CMD
+echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
+sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
+EOF
+                )"
+            fi
 
             if [ "$NETWORK_HOSTS_DURATION" != "-" ]; then
                 (
@@ -645,7 +648,7 @@ EOF
     fi
 
     # XWin Watch 窗口监测程序
-    if [ "$XWIN_WATCH" = "y" ]; then
+    if isy "$XWIN_WATCH"; then
         if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
             local file
             file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
@@ -672,7 +675,7 @@ EOF
     fi
 
     # 挂载 OverlayFS
-    if [ "$OVERLAY" = "y" ]; then
+    if isy "$OVERLAY"; then
         fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT"
         OVERLAY_MOUNTED=1
     fi
@@ -683,7 +686,7 @@ EOF
 start_game() {
     WIN_EXECUTABLE=""
 
-    if [ "$SKIP_SCRIPT" = "y" ]; then
+    if isy "$SKIP_SCRIPT"; then
         WIN_EXECUTABLE="$GAME"
     else
         gen_script

@@ -74,6 +74,8 @@
 # OVERLAY_MOUNT             OverlayFS 挂载点        选填   <game>.conf   <empty> | $OVERLAY_DIR/mount
 # OVERLAY_UPPER             OverlayFS upper 目录    选填   <game>.conf   <empty> | $OVERLAY_DIR/upper
 # OVERLAY_WORK              OverlayFS work 目录     选填   <game>.conf   <empty> | $OVERLAY_DIR/work
+# OVERLAY_REBIND_GAME       是否重绑定游戏路径      选填   <game>.conf   <bool y>
+# OVERLAY_REBIND_GAME_PATH  是否重绑定游戏运行路径  选填   <game>.conf   <bool y>
 
 # NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
 # NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
@@ -526,8 +528,11 @@ if isy "$OVERLAY"; then
 
     mkdir -p "$OVERLAY_MOUNT" "$OVERLAY_UPPER" "$OVERLAY_WORK"
 
-    GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME")"
-    GAME_PATH="$(dirname "$GAME")"
+    [ -z "$OVERLAY_REBIND_GAME" ] && OVERLAY_REBIND_GAME="y"
+    [ -z "$OVERLAY_REBIND_GAME_PATH" ] && OVERLAY_REBIND_GAME_PATH="y"
+
+    isy "$OVERLAY_REBIND_GAME" && GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME")"
+    isy "$OVERLAY_REBIND_GAME_PATH" && GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME_PATH")"
 fi
 
 

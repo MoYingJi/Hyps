@@ -15,8 +15,8 @@
 # 环境变量              简略描述                   要求   推荐填写处      默认值/备注
 
 # GAME_NAME             游戏名                     必填   「由脚本提供」
-# CONFIG_DIR            配置目录                   选填   config.conf     $XDG_CONFIG_DIR/hypsc
-# CACHE_DIR             缓存目录                   选填   config.conf     $XDG_CACHE_DIR/hypsc
+# CONFIG_DIR            配置目录                   选填   config.conf     $XDG_CONFIG_HOME/hypsc
+# CACHE_DIR             缓存目录                   选填   config.conf     $XDG_CACHE_HOME/hypsc
 # COMMON_GAME_CONF      游戏通用配置文件位置       选填   config.conf     $CONFIG_DIR/Games/_common.conf
 
 # WINE                  游戏运行器位置             必填   <runner>.conf
@@ -70,7 +70,7 @@
 
 # OVERLAY                   是否启用 OverlayFS      选填   <game>.conf   <bool n>
 # OVERLAY_LOWER             OverlayFS lower 目录    选必   <game>.conf   <empty>
-# OVERLAY_DIR               OverlayFS 相关目录      选填   <game>.conf   <empty>「自动创建 mount、upper、work」
+# OVERLAY_DIR               OverlayFS 相关目录      选填   <game>.conf   <empty> $DATA_DIR/overlays/$GAME_NAME「自动创建 mount、upper、work」
 # OVERLAY_MOUNT             OverlayFS 挂载点        选填   <game>.conf   <empty> | $OVERLAY_DIR/mount
 # OVERLAY_UPPER             OverlayFS upper 目录    选填   <game>.conf   <empty> | $OVERLAY_DIR/upper
 # OVERLAY_WORK              OverlayFS work 目录     选填   <game>.conf   <empty> | $OVERLAY_DIR/work
@@ -149,6 +149,11 @@ isy() {
     else
         return 1
     fi
+}
+
+# 命令存在
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 # 配置 WINE
@@ -506,7 +511,7 @@ fi
 
 # OverlayFS 预处理
 if isy "$OVERLAY"; then
-    if ! command -v fuse-overlayfs >/dev/null 2>&1; then
+    if ! command_exists fuse-overlayfs; then
         echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
         exit 1
     fi
@@ -515,6 +520,8 @@ if isy "$OVERLAY"; then
         echo "[Hyps] 没有指定 OVERLAY_LOWER 或指定的目录不存在"
         exit 1
     fi
+
+    [ -z "$OVERLAY_DIR" ] && OVERLAY_DIR="$DATA_DIR/overlays/$GAME_NAME"
 
     if [ -n "$OVERLAY_DIR" ]; then
         [ -z "$OVERLAY_MOUNT" ] && OVERLAY_MOUNT="$OVERLAY_DIR/mount"
@@ -527,7 +534,7 @@ if isy "$OVERLAY"; then
         exit 1
     fi
 
-    mkdir -p "$OVERLAY_MOUNT" "$OVERLAY_UPPER" "$OVERLAY_WORK"
+    mkdir -p "$OVERLAY_MOUNT" "$OVERLAY_UPPER" "$OVERLAY_WORK" || { echo "无法创建 OverlayFS 相关目录"; exit 1; }
 
     [ -z "$OVERLAY_REBIND_GAME" ] && OVERLAY_REBIND_GAME="y"
     [ -z "$OVERLAY_REBIND_GAME_PATH" ] && OVERLAY_REBIND_GAME_PATH="y"
@@ -538,8 +545,7 @@ fi
 
 
 
-trap cleanup SIGTERM
-trap cleanup SIGINT
+trap cleanup SIGTERM SIGINT
 
 cleanup() {
     # TODO
@@ -554,11 +560,23 @@ umount_overlay() {
     [ -z "$OVERLAY_UMOUNT" ] && OVERLAY_UMOUNT="y"
 
     if isy "$OVERLAY" && isy "$OVERLAY_UMOUNT" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
-        if command -v fusermount3 >/dev/null 2>&1; then
+        if [ "$OVERLAY_MOUNT_SKIP" = "1" ]; then
+            echo "[Hyps] 跳过卸载 OverlayFS，请手动卸载 $OVERLAY_MOUNT"
+            return
+        fi
+
+        OVERLAY_MOUNT_SKIP=1
+
+        # TODO 实现解除占用后再卸载
+
+        echo "[Hyps] 卸载 OverlayFS（没有实现检测是否占用，先睡 5 秒）"
+        sleep 5
+
+        if command_exists fusermount3; then
             fusermount3 -u "$OVERLAY_MOUNT"
-        elif command -v fusermount >/dev/null 2>&1; then
+        elif command_exists fusermount; then
             fusermount -u "$OVERLAY_MOUNT"
-        elif command -v umount >/dev/null 2>&1; then
+        elif command_exists umount; then
             umount "$OVERLAY_MOUNT"
         else
             echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"

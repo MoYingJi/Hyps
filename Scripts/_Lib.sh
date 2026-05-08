@@ -24,6 +24,7 @@
 # WINESERVER_KILL_CMD   WineServer 退出命令        选填   <runner>.conf   「命令不执行」
 # PROTONPATH            umu 使用的 proton 位置     选填   <runner>.conf   「由 umu 决定，非 umu-run 启动则不适用」
 # GAMEID                umu 的 umu-id              选填   <runner>.conf   umu-default「由 umu 决定，非 umu-run 启动则不适用」
+# SKIP_CUSTOM_BAT       跳过自定义启动脚本         选填   <runner>.conf   <bool n>「跳过后直接运行游戏，无法使用 BEFORE_GAME/AFTER_GAME 等功能」
 
 # RUNNER                游戏的运行器               必填   <game>.conf
 # GAME                  游戏本体位置               必填   <game>.conf
@@ -731,7 +732,7 @@ EOF
 start_game() {
     WIN_EXECUTABLE=""
 
-    if isy "$SKIP_SCRIPT"; then
+    if isy "$SKIP_CUSTOM_BAT"; then
         WIN_EXECUTABLE="$GAME"
     else
         gen_script
@@ -742,8 +743,7 @@ start_game() {
 
     cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
 
-    eval $WRAPPER_CMD $WINE "$WIN_EXECUTABLE" &
-    BACKGROUND_PID+=("$!")
+    $WRAPPER_CMD $WINE "$WIN_EXECUTABLE"
 
     wait
 

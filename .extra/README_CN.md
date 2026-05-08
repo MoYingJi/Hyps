@@ -70,14 +70,19 @@
                 <td><code>archlinuxcn/proton-ge-custom-bin</code></td>
             </tr>
             <tr>
+                <td><code>umu-run</code></td>
+                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-ge-custom/</code></td>
+                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-cachyos-slr</code></td>
+            </tr>
+            <tr>
                 <td><code>umu-cachyos</code></td>
                 <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-cachyos-custom/</code></td>
                 <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-ge-custom-bin</code></td>
             </tr>
             <tr>
-                <td><code>umu-run</code></td>
-                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-ge-custom/</code></td>
-                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-cachyos-slr</code></td>
+                <td><code>umu-dwproton</code></td>
+                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/dwproton/</code></td>
+                <td><code>umu-launcher</code><br/><code>aur/dwproton-bin</code></td>
             </tr>
         </tbody>
     </table>

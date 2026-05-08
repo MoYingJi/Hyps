@@ -10,6 +10,7 @@
 !/Config/Runners/proton-system.conf
 !/Config/Runners/umu-run.conf
 !/Config/Runners/umu-cachyos.conf
+!/Config/Runners/umu-dwproton.conf
 
 /Scripts/*
 !/Scripts/_Lib.sh

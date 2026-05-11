@@ -83,8 +83,8 @@
 # NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
 # NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   -「填入 `-` 则代表调用 XWIN_WATCH 等待窗口出现」
 # NETWOKR_HOSTS_CONTENT    NETWORK_HOSTS 断网规则        选必   <game>.conf
-# NETWORK_HOSTS_REC_PERM   NETWORK_HOSTS 恢复文件权限    选填   <game>.conf   <bool y>
 # NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
+# NETWORK_HOSTS_TGT_PREM   NETWORK_HOSTS 文件目标权限    选填   <game>.conf   a+w
 
 if [ "$UID" -eq 0 ]; then
     echo "你个小天才是怎么想到用 root 运行的（"
@@ -616,15 +616,15 @@ run_prepare() {
     if isy "$NETWORK_HOSTS" && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
         [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
         [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
-        [ -z "$NETWORK_HOSTS_REC_PREM" ] && NETWORK_HOSTS_REC_PREM="y"
+        [ -z "$NETWORK_HOSTS_TGT_PREM" ] && NETWORK_HOSTS_TGT_PREM="a+w"
         NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
 
         if [ -f "$NETWORK_HOSTS_FILE" ]; then
             if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
-                isy "$NETWORK_HOSTS_REC_PREM" && [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$HOSTS_FILE")
+                [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$NETWORK_HOSTS_FILE")
 
-                echo "[sudo 请求] 使 hosts 文件可被写入 需要 root 权限"
-                sudo chmod a+w "$NETWORK_HOSTS_FILE"
+                echo "[sudo 请求] 使 hosts 文件可被写入，需要 root 权限"
+                sudo chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
             fi
 
             [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
@@ -648,10 +648,10 @@ cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
 EOF
             )"
 
-            if isy "$NETWORK_HOSTS_REC_PREM" && [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+            if [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
                 NETWORK_HOSTS_REC_CMD="$(cat << EOF
 $NETWORK_HOSTS_REC_CMD
-echo "[sudo 请求] 恢复 hosts 文件权限 需要 root 权限"
+echo "[sudo 请求] 恢复 hosts 文件权限，需要 root 权限"
 sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
 EOF
                 )"

@@ -570,8 +570,8 @@ umount_overlay() {
 
         # TODO 实现解除占用后再卸载
 
-        echo "[Hyps] 卸载 OverlayFS（没有实现检测是否占用，先睡 5 秒）"
-        sleep 5
+        echo "[Hyps] 卸载 OverlayFS（没有实现检测是否占用，先睡 10 秒）"
+        sleep 10
 
         if command_exists fusermount3; then
             fusermount3 -u "$OVERLAY_MOUNT"
@@ -609,7 +609,13 @@ EOF
 
 run_prepare() {
     # 准备启动
-    isy "$WINESERVER_KILL" && [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD
+    if isy "$WINESERVER_KILL"; then
+        if [ -n "$WINESERVER_KILL_CMD" ]; then
+            $WINESERVER_KILL_CMD
+        else
+            echo "[Hyps] WARN: WINESERVER_KILL 已开启，但没有设置 WINESERVER_KILL_CMD，跳过执行"
+        fi
+    fi
     isy "$EXE_KILL" && pkill -f "\.exe"
 
     # Hosts 断网

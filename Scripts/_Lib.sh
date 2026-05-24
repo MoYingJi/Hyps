@@ -25,6 +25,7 @@
 # PROTONPATH            umu 使用的 proton 位置     选填   <runner>.conf   「由 umu 决定，非 umu-run 启动则不适用」
 # GAMEID                umu 的 umu-id              选填   <runner>.conf   umu-default「由 umu 决定，非 umu-run 启动则不适用」
 # SKIP_CUSTOM_BAT       跳过自定义启动脚本         选填   <runner>.conf   <bool n>「跳过后直接运行游戏，无法使用 BEFORE_GAME/AFTER_GAME 等功能」
+# FORCE_CUSTOM_BAT      强制使用自定义启动脚本     选填   <runner>.conf   <bool n>「强制使用自定义批处理脚本启动，何必多此一举」
 
 # RUNNER                游戏的运行器               必填   <game>.conf
 # GAME                  游戏本体位置               必填   <game>.conf
@@ -85,6 +86,8 @@
 # NETWOKR_HOSTS_CONTENT    NETWORK_HOSTS 断网规则        选必   <game>.conf
 # NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
 # NETWORK_HOSTS_TGT_PREM   NETWORK_HOSTS 文件目标权限    选填   <game>.conf   a+w
+
+# ↑ 我为什么要维护这么一大坨东西（笑哭）
 
 if [ "$UID" -eq 0 ]; then
     echo "你个小天才是怎么想到用 root 运行的（"
@@ -216,7 +219,15 @@ export WINEDLLOVERRIDES
 # umu-launcher
 export PROTONPATH
 export GAMEID
+
+isy "$UMU_USE_STEAM" && UMU_USE_STEAM=1
 export UMU_USE_STEAM
+
+if [[ ! "$WINE" =~ "umu-run" ]]; then
+    [ -n "$PROTONPATH" ] && echo "[Hyps] WARN: PROTONPATH 已设置，但运行器不是 umu-launcher 系列，这项设置没有意义"
+    [ "$UMU_USE_STEAM" = 1 ] && echo "[Hyps] WARN: UMU_USE_STEAM 已启用，但运行器不是 umu-launcher 系列，相关功能将无法使用"
+fi
+
 
 # MangoHud
 export MANGOHUD_CONFIGFILE
@@ -589,8 +600,10 @@ umount_overlay() {
 
 gen_script() {
     # 创建临时的 bat 文件用于启动
-    TEMP_SCRIPT="$TEMP_DIR/start.bat"
-    SCRIPT_CONTENT="$(cat << EOF
+    local script
+    local content
+    script="$(mktemp "$TEMP_DIR/start-game-XXXXXXX.bat")"
+    content="$(cat << EOF
 Z:
 $BEFORE_GAME
 
@@ -602,7 +615,32 @@ $AFTER_GAME
 :: del "%~f0" && exit
 EOF
     )"
-    echo -n "$SCRIPT_CONTENT" > "$TEMP_SCRIPT"
+    echo -n "$content" > "$script"
+    echo "$script"
+}
+
+needs_custom_bat() {
+    [ -n "$BEFORE_GAME" ] && return 0
+    [ -n "$AFTER_GAME" ] && return 0
+    [ -n "$GAME_EXE_PREFIX" ] && return 0
+
+    return 1
+}
+
+use_custom_bat() {
+    if isy "$SKIP_CUSTOM_BAT" && isy "$FORCE_CUSTOM_BAT"; then
+        echo "[Hyps] ERROR: SKIP_CUSTOM_BAT 和 FORCE_CUSTOM_BAT 不能同时启用！"
+        exit 1
+    fi
+
+    isy "$UMU_USE_STEAM" && isy "$FORCE_CUSTOM_BAT" && echo "[Hyps] WARN: 使用自定义启动脚本会导致 UMU_USE_STEAM 无效！"
+    isy "$UMU_USE_STEAM" && needs_custom_bat && echo "[Hyps] WARN: 使用自定义启动脚本会导致 UMU_USE_STEAM 无效，但是当前配置又需要使用自定义启动脚本，可能是某个地方出错了"
+    isy "$SKIP_CUSTOM_BAT" && needs_custom_bat && echo "[Hyps] WARN: 当前已强制跳过启动脚本，但配置又需要使用自定义启动脚本"
+
+    isy "$FORCE_CUSTOM_BAT" && return 0
+    isy "$SKIP_CUSTOM_BAT" && return 1
+    needs_custom_bat && return 0
+    return 1
 }
 
 
@@ -644,7 +682,7 @@ $flagEnd
 EOF
             )"
             local hosts_temp_file
-            hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX")"
+            hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX.bak")"
             cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
             echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
 
@@ -736,20 +774,20 @@ EOF
 
 
 start_game() {
-    WIN_EXECUTABLE=""
-
-    if isy "$SKIP_CUSTOM_BAT"; then
-        WIN_EXECUTABLE="$GAME"
-    else
-        gen_script
-        WIN_EXECUTABLE="$TEMP_SCRIPT"
-    fi
-
     run_prepare
 
-    cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
+    echo "[Hyps] 启动游戏..."
 
-    $WRAPPER_CMD $WINE "$WIN_EXECUTABLE"
+    if use_custom_bat; then
+        local script
+        script="$(gen_script)"
+        echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$script\""
+        $WRAPPER_CMD $WINE "$script"
+    else
+        cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
+        echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$GAME\" $GAME_ARGS"
+        $WRAPPER_CMD $WINE "$GAME" $GAME_ARGS
+    fi
 
     wait
 

@@ -467,6 +467,10 @@ if isy "$NETWORK_HOSTS"; then
     fi
 fi
 
+if [ "$(type -t before_xwin_watch)" = "function" ]; then
+    before_xwin_watch
+fi
+
 # XWin Watch
 if isy "$XWIN_WATCH"; then
     [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./Tools/xwin-watch"
@@ -579,17 +583,12 @@ umount_overlay() {
 
         OVERLAY_MOUNT_SKIP=1
 
-        # TODO 实现解除占用后再卸载
-
-        echo "[Hyps] 卸载 OverlayFS（没有实现检测是否占用，先睡 10 秒）"
-        sleep 10
-
         if command_exists fusermount3; then
-            fusermount3 -u "$OVERLAY_MOUNT"
+            fusermount3 -uz "$OVERLAY_MOUNT"
         elif command_exists fusermount; then
-            fusermount -u "$OVERLAY_MOUNT"
+            fusermount -uz "$OVERLAY_MOUNT"
         elif command_exists umount; then
-            umount "$OVERLAY_MOUNT"
+            umount -l "$OVERLAY_MOUNT"
         else
             echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
         fi

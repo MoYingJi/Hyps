@@ -1,12 +1,15 @@
 #!/usr/bin/bash
 #shellcheck source=_Lib.sh disable=2034
 
+# === 已不受支持 ===
+# 目前能用，但不保证未来能用，方案多变
+
 GAME_NAME="yuanshen"
 
-source _Lib.sh
-
 # FPS 解锁
-if [ "$FPS_UNLOCK" = "y" ]; then
+check_fps_unlock() {
+    [ ! "$FPS_UNLOCK" = "y" ] && return 1
+
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
 
     check_cached_compile "FPS_UNLOCK" \
@@ -58,7 +61,14 @@ echo "[fpsunlock] PID: \$game_pid"
 "$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLOCK_FIFO" &
 EOF
     )"
-fi
+    XWIN_WATCH="y"
+}
+
+before_xwin_watch() {
+    check_fps_unlock
+}
+
+source _Lib.sh
 
 # 启动
 

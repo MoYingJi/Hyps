@@ -252,6 +252,10 @@ export DXVK_NVAPI_DRS_NGX_DLSSG_MULTI_FRAME_COUNT
 export DXVK_NVAPI_SET_NGX_DEBUG_OPTIONS
 export DXVK_NVAPI_GPU_ARCH
 
+# DXVK HDR
+isy "$DXVK_HDR" && DXVK_HDR=1
+export DXVK_HDR
+
 # PROTON NGX UPGRADE
 isy "$PROTON_ENABLE_NGX_UPDATER" && PROTON_ENABLE_NGX_UPDATER=1
 export PROTON_ENABLE_NGX_UPDATER
@@ -655,6 +659,22 @@ run_prepare() {
     fi
     isy "$EXE_KILL" && pkill -f "\.exe"
 
+    # 挂载 OverlayFS
+    if isy "$OVERLAY"; then
+        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
+            || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
+        OVERLAY_MOUNTED=1
+    fi
+
+    # 准备脚本
+    if [ -n "$PREPARE_BATCH" ]; then
+        local script
+        script="$(mktemp "$TEMP_DIR/prepare-XXXXXXX.bat")"
+        echo "$PREPARE_BATCH" > "$script"
+        echo "[Hyps] 执行准备脚本: $PREPARE_BATCH"
+        $WINE "$script"
+    fi
+
     # Hosts 断网
     if isy "$NETWORK_HOSTS" && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
         [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
@@ -755,18 +775,12 @@ EOF
         fi
 
         if [ "$xwin_watch_set" = "1" ]; then
+            echo "[Hyps] 启动 XWin Watch: $XWIN_WATCH_CMD"
             ( eval "$XWIN_WATCH_CMD" ) &
             BACKGROUND_PID+=("$!")
         else
             echo "[Hyps] WARN: XWIN_WATCH 已开启，但没什么要执行的"
         fi
-    fi
-
-    # 挂载 OverlayFS
-    if isy "$OVERLAY"; then
-        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
-            || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
-        OVERLAY_MOUNTED=1
     fi
 }
 
@@ -781,11 +795,15 @@ start_game() {
         local script
         script="$(gen_script)"
         echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$script\""
-        $WRAPPER_CMD $WINE "$script"
+        $WRAPPER_CMD $WINE "$script" &
     else
         cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
         echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$GAME\" $GAME_ARGS"
-        $WRAPPER_CMD $WINE "$GAME" $GAME_ARGS
+        $WRAPPER_CMD $WINE "$GAME" $GAME_ARGS &
+    fi
+
+    if [ "$(type -t after_start_game)" = "function" ]; then
+        after_start_game
     fi
 
     wait

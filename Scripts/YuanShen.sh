@@ -8,7 +8,7 @@ GAME_NAME="yuanshen"
 
 # FPS 解锁
 check_fps_unlock() {
-    [ ! "$FPS_UNLOCK" = "y" ] && return 1
+    [ ! "$FPS_UNLOCK" = "y" ] && return 0
 
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
 
@@ -47,21 +47,38 @@ check_fps_unlock() {
     [ -z "$FPS_UNLOCK_INTERVAL" ] && FPS_UNLOCK_INTERVAL="5000"
     [ -z "$FPS_UNLOCK_FIFO" ] && FPS_UNLOCK_FIFO="$TEMP_DIR/fpsunlock_fifo"
 
-    # PID
-    if [ -z "$FPS_UNLOCK_PID" ]; then
-        [ -z "$FPS_UNLOCK_PROG" ] && FPS_UNLOCK_PROG="YuanShen.exe"
-        FPS_UNLOCK_PID="\$(pgrep -n -u \"$USER\" \"$FPS_UNLOCK_PROG\")"
-    fi
+    [ -z "$FPS_UNLOCK_PROG" ] && FPS_UNLOCK_PROG="YuanShen.exe"
 
-    # 调用 XWin Watch
-    XWIN_WATCH_ON_EXISTS="$(cat << EOF
+    if [ "$FPS_UNLOCK_XWIN_WATCH" = "y" ]; then
+        # PID
+        [ -z "$FPS_UNLOCK_PID" ] && FPS_UNLOCK_PID="\$(pgrep -n -u \"$USER\" \"$FPS_UNLOCK_PROG\")"
+
+        # 调用 XWin Watch
+        XWIN_WATCH_ON_EXISTS="$(cat << EOF
 $XWIN_WATCH_ON_EXISTS
 game_pid="$FPS_UNLOCK_PID"
 echo "[fpsunlock] PID: \$game_pid"
 "$FPS_UNLOCK_BIN" "\$game_pid" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLOCK_FIFO" &
 EOF
-    )"
-    XWIN_WATCH="y"
+        )"
+        XWIN_WATCH="y"
+    fi
+}
+
+after_start_game() {
+    if [ ! "$FPS_UNLOCK" = "y" ] || [ "$FPS_UNLOCK_XWIN_WATCH" = "y" ]; then
+        return 0
+    fi
+
+    if [ -n "$FPS_UNLOCK_SLEEP" ]; then
+        echo "[fpsunlock] 等待 $FPS_UNLOCK_SLEEP 秒以确保游戏已启动"
+        sleep "$FPS_UNLOCK_SLEEP"
+    fi
+
+    [ -z "$FPS_UNLOCK_PID" ] && FPS_UNLOCK_PID="$(pgrep -n -u "$USER" "$FPS_UNLOCK_PROG")"
+
+    echo "[fpsunlock] PID: $FPS_UNLOCK_PID"
+    "$FPS_UNLOCK_BIN" "$FPS_UNLOCK_PID" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLOCK_FIFO" &
 }
 
 before_xwin_watch() {
@@ -69,6 +86,14 @@ before_xwin_watch() {
 }
 
 source _Lib.sh
+
+if isy "$PREPARE_HDR_REG"; then
+    PREPARE_BATCH="$(cat << EOF
+$PREPARE_BATCH
+reg add "HKEY_CURRENT_USER\Software\miHoYo\原神" /v WINDOWS_HDR_ON_h3132281285 /t REG_DWORD /d 1 /f
+EOF
+    )"
+fi
 
 # 启动
 

@@ -72,12 +72,12 @@
             <tr>
                 <td><code>umu-run</code></td>
                 <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-ge-custom/</code></td>
-                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-cachyos-slr</code></td>
+                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-ge-custom-bin</code></td>
             </tr>
             <tr>
                 <td><code>umu-cachyos</code></td>
-                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-cachyos-custom/</code></td>
-                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-ge-custom-bin</code></td>
+                <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-cachyos-slr/</code></td>
+                <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-cachyos-slr</code></td>
             </tr>
             <tr>
                 <td><code>umu-dwproton</code></td>
@@ -88,7 +88,7 @@
     </table>
 </div>
 
-一般情况下，推荐 `umu-run`
+一般情况下，推荐 `umu-run`（部分游戏可以使用 `umu-dwproton`）
 
 如果要新增 Runner，可以仿照现有配置自行添加。`WINE` 是将会调用的命令；`PREFIX_VAR_NAME` 是 Wine Prefix 的变量名，自定义 Prefix 会存入以此值为变量名的环境变量；`WINESERVER_KILL_CMD` 是用于杀死 wineserver 的命令，我感觉这设计得不好，我已经不用了；`PROTONPATH` 是 umu-run 中用于指定 proton 路径的环境变量
 
@@ -172,7 +172,7 @@ OVERLAY_DIR="/path/to/rw/dir" # 指定一个可读写的目录，默认是 `$XDG
 
 我推荐直接使用 Wine 运行官方启动器
 
-对于鸣潮，可能需要[特殊解决方案](https://moyingji.github.io/record/linux-wuwa-launcher)，或者使用 [ww-cli](https://github.com/timetetng/wutheringwaves-cli-manager)
+对于鸣潮，可能需要[特殊解决方案](https://moyingji.github.io/linux/gaming/workarounds/wuwa-launcher)，或者使用 [ww-cli](https://github.com/timetetng/wutheringwaves-cli-manager)
 
 ### NVIDIA 显卡未被调用
 

@@ -255,6 +255,9 @@ export DXVK_NVAPI_GPU_ARCH
 # VKD3D
 export VKD3D_CONFIG
 
+# DXVK
+export DXVK_CONFIG
+
 # DXVK HDR
 isy "$DXVK_HDR" && DXVK_HDR=1
 export DXVK_HDR
@@ -374,8 +377,8 @@ fi
 if [ -n "$GAMESCOPE" ]; then
     if [ -n "$MANGOHUD" ]; then
         if [ "$MANGOHUD" = "mangohud" ]; then
-            GAMESCOPE="$GAMESCOPE --mangohud"
-            echo "[Hyps] 检测到 Gamescope 搭配 MangoHud 使用，换用 \`--mangohud\` 参数"
+            GAMESCOPE="$GAMESCOPE --mangoapp"
+            echo "[Hyps] 检测到 Gamescope 搭配 MangoHud 使用，换用 \`--mangoapp\` 参数"
         else
             echo "[Hyps] WARN: Gamescope 与 MangoHud 不能同时使用！已关闭 MangoHud！"
         fi

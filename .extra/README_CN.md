@@ -202,7 +202,7 @@ DXVK_NVAPI_VKREFLEX=1 # 启用 NVIDIA Reflex 的 Vulkan 层
 
 ```bash
 sudo groupadd hosts
-sudo usermod -aG hosts $(whoami)
+sudo usermod -aG hosts "$USER"
 sudo chgrp hosts /etc/hosts
 sudo chmod g+w /etc/hosts
 ```

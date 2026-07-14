@@ -260,6 +260,11 @@ export VKD3D_CONFIG
 
 # DXVK
 export DXVK_CONFIG
+
+# DXVK HUD
+# 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
+[ -z "${DXVK_HUD+set}" ] && DXVK_HUD=0
+isy "$DXVK_HUD" && DXVK_HUD=1
 export DXVK_HUD
 
 # DXVK HDR

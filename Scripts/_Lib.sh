@@ -569,7 +569,7 @@ if isy "$OVERLAY"; then
     fi
 
     if [ -z "$OVERLAY_MOUNT" ] || [ -z "$OVERLAY_UPPER" ] || [ -z "$OVERLAY_WORK" ]; then
-        echo "[Hyps] 没有指定 OVERLAY_DIR 也没有分别指定 OVERLAY_MOUNT/UPPER/WORK 的值"
+        echo "[Hyps] 没有指定 OVERLAY_DIR 也没有分别指定 OVERLAY_{MOUNT,UPPER,WORK} 的值"
         exit 1
     fi
 
@@ -626,6 +626,7 @@ gen_script() {
     local content
     script="$(mktemp "$TEMP_DIR/start-game-XXXXXXX.bat")"
     content="$(cat << EOF
+chcp 65001
 Z:
 $BEFORE_GAME
 
@@ -637,7 +638,7 @@ $AFTER_GAME
 :: del "%~f0" && exit
 EOF
     )"
-    echo -n "$content" > "$script"
+    echo "$content" > "$script"
     echo "$script"
 }
 
@@ -689,7 +690,8 @@ run_prepare() {
     if [ -n "$PREPARE_BATCH" ]; then
         local script
         script="$(mktemp "$TEMP_DIR/prepare-XXXXXXX.bat")"
-        echo "$PREPARE_BATCH" > "$script"
+        echo "chcp 65001" >> "$script"
+        echo "$PREPARE_BATCH" >> "$script"
         echo "[Hyps] 执行准备脚本: $PREPARE_BATCH"
         $WINE "$script"
     fi

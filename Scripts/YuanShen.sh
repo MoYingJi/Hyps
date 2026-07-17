@@ -88,11 +88,37 @@ before_xwin_watch() {
 source _Lib.sh
 
 if isy "$PREPARE_HDR_REG"; then
-    PREPARE_BATCH="$(cat << EOF
+    [ -z "$PREPARE_HDR_REG_PATH" ] && PREPARE_HDR_REG_PATH="HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
+    [ -z "$PREPARE_HDR_REG_KEY" ] && PREPARE_HDR_REG_KEY="WINDOWS_HDR_ON_h3132281285"
+    [ -z "$PREPARE_HDR_REG_FILE" ] && PREPARE_HDR_REG_FILE="user.reg"
+fi
+
+try_edit_prefix_reg() {
+    if [ ! -r "$PREFIX/$PREPARE_HDR_REG_FILE" ] || [ ! -w "$PREFIX/$PREPARE_HDR_REG_FILE" ]; then
+        echo "[GI-HDR] 无法读取或写入注册表文件"
+        return 1
+    fi
+
+    if [ "$(grep -c "$PREPARE_HDR_REG_KEY\"=dword:" "$PREFIX/$PREPARE_HDR_REG_FILE")" -eq 0 ]; then
+        echo "[GI-HDR] 注册表文件中未找到目标键值"
+        return 1
+    fi
+
+    sed -i "s/\"$PREPARE_HDR_REG_KEY\"=dword:00000000/\"$PREPARE_HDR_REG_KEY\"=dword:00000001/g" "$PREFIX/$PREPARE_HDR_REG_FILE"
+}
+
+if isy "$PREPARE_HDR_REG"; then
+    if try_edit_prefix_reg; then
+        echo "[GI-HDR] 已设置注册表"
+    else
+        echo "[GI-HDR] 设置注册表失败，将在尝试在游戏启动前通过 wine reg 设置注册表（若第一次使用此功能，这是正常情况）"
+
+        PREPARE_BATCH="$(cat << EOF
 $PREPARE_BATCH
-reg add "HKEY_CURRENT_USER\Software\miHoYo\原神" /v WINDOWS_HDR_ON_h3132281285 /t REG_DWORD /d 1 /f
+reg add "$PREPARE_HDR_REG_PATH" /v "$PREPARE_HDR_REG_KEY" /t REG_DWORD /d 1 /f
 EOF
-    )"
+        )"
+    fi
 fi
 
 # 启动

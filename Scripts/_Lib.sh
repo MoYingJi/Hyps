@@ -59,6 +59,9 @@
 # NVIDIA_SMOOTH_MOTION        NVIDIA AI 插帧 (旧称 Smooth Motion)   选填   <g/c>.conf   <bool n>
 # NVIDIA_REFLEX               NVIDIA Reflex 低延迟                  选填   <g/c>.conf   <bool n>
 
+# TIME_RECORD              是否启用记录游戏时间          选填   <g/c>.conf    <bool y>
+# TIME_RECORD_MIN_SEC      记录游戏时间的最小秒数        选填   <g/c>.conf    60
+
 # HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
 # HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
 
@@ -812,6 +815,17 @@ start_game() {
 
     echo "[Hyps] 启动游戏..."
 
+    [ -z "$TIME_RECORD" ] && TIME_RECORD="y"
+    if isy "$TIME_RECORD"; then
+        [ -z "$TIME_RECORD_DATA_DIR" ] && TIME_RECORD_DATA_DIR="$DATA_DIR/time/$GAME_NAME"
+        [ -z "$TIME_RECORD_MIN_SEC" ] && TIME_RECORD_MIN_SEC=60
+        mkdir -p "$TIME_RECORD_DATA_DIR"
+        local current_start
+        local current_end
+        local current_dur
+        current_start="$(date +%s)"
+    fi
+
     if use_custom_bat; then
         local script
         script="$(gen_script)"
@@ -828,6 +842,22 @@ start_game() {
     fi
 
     wait
+
+    if isy "$TIME_RECORD"; then
+        current_end="$(date +%s)"
+        current_dur="$((current_end - current_start))"
+        if [ "$current_dur" -lt "$TIME_RECORD_MIN_SEC" ]; then
+            echo "[Hyps] 游戏时间过短 ($((current_end - current_start)) 秒 < $TIME_RECORD_MIN_SEC 秒)，不记录"
+            TIME_RECORD="n"
+        fi
+    fi
+    if isy "$TIME_RECORD"; then
+        local total_dur
+        echo "[Hyps] 本次游戏时长 $current_dur 秒"
+        printf "%s\t%s\n" "$current_start" "$current_end" >> "$TIME_RECORD_DATA_DIR/history"
+        total_dur="$(cat "$TIME_RECORD_DATA_DIR/total-dur" 2>/dev/null || echo 0)"
+        echo "$((total_dur + current_dur))" > "$TIME_RECORD_DATA_DIR/total-dur"
+    fi
 
     cleanup
 }

@@ -8,7 +8,7 @@
 
 米家
 - [x] 崩坏三
-- [x] 原神 (解决方案多变，最后测试月之八)
+- [x] 原神 (解决方案多变，最后测试 7.0)
 - [x] 崩坏：星穹铁道
 - [x] 绝区零
 - [ ] 崩坏：因缘精灵 (如果可能的话)
@@ -28,11 +28,12 @@
 - [x] 修改 NVIDIA DLSS (DXVK NVAPI) 相关设置
 - [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
 - [x] 使用 FUSE OverlayFS 分离游戏运行时产生的数据或缓存
+- [x] 记录游玩时间和历史
 - [x] 【部分游戏/通用】通过临时修改 Hosts 断网启动
 - [x] 【原神/通用】通过注册表伪装 Hostname
 - [x] 【原神/通用】游戏窗口关闭时杀死进程
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
-- [ ] 【崩坏：星穹铁道】注册表解锁帧率
+- [x] 【崩坏：星穹铁道】注册表解锁帧率
 
 目前 **不支持** 的功能：
 
@@ -50,6 +51,17 @@
 4. 到配置文件夹的 `Games.examples` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `Games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `RUNNER` 和一些路径
 
 5. 运行 `Scripts` 文件夹下对应游戏的脚本
+
+## 依赖
+
+ - `bash`: 主要的脚本用它编写
+ - 一些基础的工具，如 `coreutils`、`grep`、`awk`、`sed`、`pkill`、`pgrep`、`sudo` 等
+ - 下面列出的 Runner 中的依赖。主要就是一些版本的 Proton 和 umu-launcher
+ - `gcc`、`sha256sum`: 两个用 C 写的小工具（`sha256sum` 用来校验源代码以重新编译）
+    - `Tools/fpsunlock/unlocker.c`（还额外需要 `setcap`、`getcap`）
+    - `Tools/xwin-watch/xwin-watch.c`
+ - `python3`: 一个用 python3 写的小工具
+    - `Tools/starrail-fps.py`
 
 ## Runner
 
@@ -214,4 +226,4 @@ sudo chmod g+w /etc/hosts
 
 如果还设置了单独的配置文件夹，也别忘了
 
-本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`) 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值；也可以检查下 `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`) 里面有没有东西，一些功能会在此处保留一些数据（如 [Overlay](#overlay) 的默认配置下）
+本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`) 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值；也可以检查下 `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`) 里面有没有东西，一些功能会在此处保留一些数据（如 [Overlay](#overlay) 的默认配置下，还有记录的游玩时间和历史）

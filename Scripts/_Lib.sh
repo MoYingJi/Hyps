@@ -585,13 +585,51 @@ if isy "$OVERLAY"; then
     isy "$OVERLAY_REBIND_GAME_PATH" && GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME_PATH")"
 fi
 
+time_record_start() {
+    [ -z "$TIME_RECORD" ] && TIME_RECORD="y"
+    isy "$TIME_RECORD" || return 0
+
+    [ -z "$TIME_RECORD_DATA_DIR" ] && TIME_RECORD_DATA_DIR="$DATA_DIR/time/$GAME_NAME"
+    [ -z "$TIME_RECORD_MIN_SEC" ] && TIME_RECORD_MIN_SEC=60
+    mkdir -p "$TIME_RECORD_DATA_DIR"
+    TIME_RECORD_CURRENT_START="$(date +%s)"
+}
+
+time_record_end() {
+    isy "$TIME_RECORD" || return 0
+
+    local current_start="$TIME_RECORD_CURRENT_START"
+    local current_end
+    local current_dur
+    local total_dur
+
+    if [ -z "$current_start" ]; then
+        echo "[Hyps] 游戏未开始，无法记录游戏时间"
+        return 0
+    fi
+
+    current_end="$(date +%s)"
+    current_dur="$((current_end - current_start))"
+    if [ "$current_dur" -lt "$TIME_RECORD_MIN_SEC" ]; then
+        echo "[Hyps] 游戏时间过短 ($((current_end - current_start)) 秒 < $TIME_RECORD_MIN_SEC 秒)，不记录"
+        return 0
+    fi
+
+    echo "[Hyps] 本次游戏时长 $current_dur 秒"
+    printf "%s\t%s\n" "$current_start" "$current_end" >> "$TIME_RECORD_DATA_DIR/history"
+    total_dur="$(cat "$TIME_RECORD_DATA_DIR/total-dur" 2>/dev/null || echo 0)"
+    echo "$((total_dur + current_dur))" > "$TIME_RECORD_DATA_DIR/total-dur"
+}
 
 
-trap cleanup SIGTERM SIGINT
+
+trap cleanup EXIT
 
 cleanup() {
     # TODO
     echo "[Hyps] 终止"
+
+    time_record_end
 
     umount_overlay
 
@@ -815,16 +853,7 @@ start_game() {
 
     echo "[Hyps] 启动游戏..."
 
-    [ -z "$TIME_RECORD" ] && TIME_RECORD="y"
-    if isy "$TIME_RECORD"; then
-        [ -z "$TIME_RECORD_DATA_DIR" ] && TIME_RECORD_DATA_DIR="$DATA_DIR/time/$GAME_NAME"
-        [ -z "$TIME_RECORD_MIN_SEC" ] && TIME_RECORD_MIN_SEC=60
-        mkdir -p "$TIME_RECORD_DATA_DIR"
-        local current_start
-        local current_end
-        local current_dur
-        current_start="$(date +%s)"
-    fi
+    time_record_start
 
     if use_custom_bat; then
         local script
@@ -842,22 +871,4 @@ start_game() {
     fi
 
     wait
-
-    if isy "$TIME_RECORD"; then
-        current_end="$(date +%s)"
-        current_dur="$((current_end - current_start))"
-        if [ "$current_dur" -lt "$TIME_RECORD_MIN_SEC" ]; then
-            echo "[Hyps] 游戏时间过短 ($((current_end - current_start)) 秒 < $TIME_RECORD_MIN_SEC 秒)，不记录"
-            TIME_RECORD="n"
-        fi
-    fi
-    if isy "$TIME_RECORD"; then
-        local total_dur
-        echo "[Hyps] 本次游戏时长 $current_dur 秒"
-        printf "%s\t%s\n" "$current_start" "$current_end" >> "$TIME_RECORD_DATA_DIR/history"
-        total_dur="$(cat "$TIME_RECORD_DATA_DIR/total-dur" 2>/dev/null || echo 0)"
-        echo "$((total_dur + current_dur))" > "$TIME_RECORD_DATA_DIR/total-dur"
-    fi
-
-    cleanup
 }

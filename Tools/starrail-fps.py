@@ -3,7 +3,11 @@ import re
 import sys
 import json
 
-REG_PATH = sys.argv[1] if len(sys.argv) > 1 else "/home/kb/Games/starrail-prefix/user.reg"
+if len(sys.argv) > 1:
+    REG_PATH = sys.argv[1]
+else:
+    raise ValueError("请提供注册表文件路径")
+
 TARGET_FPS = int(sys.argv[2]) if len(sys.argv) > 2 else 120
 
 with open(REG_PATH, encoding="utf-8") as f:

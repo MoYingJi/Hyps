@@ -418,14 +418,6 @@ elif isy "$FORCE_JADEITE"; then
     exit 1
 fi
 
-# Hosts 断网启动检测参数
-if isy "$NETWORK_HOSTS"; then
-    if [ -z "$NETWORK_HOSTS_CONTENT" ]; then
-        echo "[Hyps] WARN: 检测到 Hosts 断网启动参数，请在 \$NETWORK_HOSTS_CONTENT 填写要在 Hosts 文件附加的内容！"
-        exit 1
-    fi
-fi
-
 
 
 set_executable() {
@@ -484,20 +476,107 @@ check_cached_compile() {
 
 
 
-# 哪些要用到 XWin Watch
-isy "$KILL_TARGET" && XWIN_WATCH="y"
+# Kill Target
+if isy "$KILL_TARGET"; then
+    XWIN_WATCH="y"
+
+    XWIN_WATCH_ON_CLOSED="$(cat << EOF
+$XWIN_WATCH_ON_CLOSED
+killall $KILL_TARGET_PROCESS
+EOF
+    )"
+fi
+
+# Hosts 断网启动
 
 if isy "$NETWORK_HOSTS"; then
     if [ -z "$NETWORK_HOSTS_DURATION" ] || [ "$NETWORK_HOSTS_DURATION" = "-" ]; then
         XWIN_WATCH="y"
     fi
+
+    if [ -z "$NETWORK_HOSTS_CONTENT" ]; then
+        echo "[Hyps] WARN: 检测到 Hosts 断网启动参数，请在 \$NETWORK_HOSTS_CONTENT 填写要在 Hosts 文件附加的内容！"
+        exit 1
+    fi
 fi
+
+run_network_hosts() {
+    isy "$NETWORK_HOSTS" || return 0
+    [ -n "$NETWORK_HOSTS_CONTENT" ] || return 0 # 前面检测过了
+
+    [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
+    [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
+    [ -z "$NETWORK_HOSTS_TGT_PREM" ] && NETWORK_HOSTS_TGT_PREM="a+w"
+    NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
+
+    [ -f "$NETWORK_HOSTS_FILE" ] || { echo "[Hyps] WARN: Hosts 文件不存在，无法进行断网启动"; return 0; }
+
+
+    if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
+        [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$NETWORK_HOSTS_FILE")
+
+        echo "[sudo 请求] 使 hosts 文件可被写入，需要 root 权限"
+        sudo chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
+    fi
+
+    [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
+    local flagStart="# $NETWORK_HOSTS_FLAG $GAME_NAME Start"
+    local flagEnd="# $NETWORK_HOSTS_FLAG $GAME_NAME End"
+
+    NETWORK_HOSTS_CONTENT="$(cat << EOF
+$flagStart
+$NETWORK_HOSTS_CONTENT
+$flagEnd
+EOF
+    )"
+    local hosts_temp_file
+    hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX.bak")"
+    cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
+    echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
+
+    NETWORK_HOSTS_REC_CMD="$(cat << EOF
+echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
+cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
+EOF
+    )"
+
+    if [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
+        NETWORK_HOSTS_REC_CMD="$(cat << EOF
+$NETWORK_HOSTS_REC_CMD
+echo "[sudo 请求] 恢复 hosts 文件权限，需要 root 权限"
+sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
+EOF
+        )"
+    fi
+
+    if [ "$NETWORK_HOSTS_DURATION" != "-" ]; then
+        (
+            # 后台运行部分
+            sleep "$NETWORK_HOSTS_DURATION"
+            eval "$NETWORK_HOSTS_REC_CMD"
+        ) &
+        BACKGROUND_PID+=("$!")
+    else
+        # 调用 XWin Watch
+        XWIN_WATCH_ON_EXISTS="$(cat << EOF
+$XWIN_WATCH_ON_EXISTS
+$NETWORK_HOSTS_REC_CMD
+EOF
+        )"
+        XWIN_WATCH_ON_FAILED="$(cat << EOF
+$XWIN_WATCH_ON_FAILED
+$NETWORK_HOSTS_REC_CMD
+EOF
+        )"
+    fi
+}
+
+# XWin Watch
 
 if [ "$(type -t before_xwin_watch)" = "function" ]; then
     before_xwin_watch
 fi
 
-# XWin Watch
 if isy "$XWIN_WATCH"; then
     [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./Tools/xwin-watch"
 
@@ -542,14 +621,45 @@ if isy "$XWIN_WATCH"; then
     [[ "$XWIN_WATCH_INTERVAL" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -i $XWIN_WATCH_INTERVAL"
 fi
 
-# Kill Target
-if isy "$KILL_TARGET"; then
-    XWIN_WATCH_ON_CLOSED="$(cat << EOF
-$XWIN_WATCH_ON_CLOSED
-killall $KILL_TARGET_PROCESS
-EOF
-    )"
-fi
+run_xwin_watch() {
+    isy "$XWIN_WATCH" || return 0
+    local xwin_watch_set=0
+
+    if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
+        local file
+        file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
+        echo "$XWIN_WATCH_ON_EXISTS" > "$file"
+        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"bash $file\""
+        xwin_watch_set=1
+    fi
+
+    if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
+        local file
+        file="$(mktemp "$TEMP_DIR/xwin-watch-on-closed.XXXXXXX.sh")"
+        echo "$XWIN_WATCH_ON_CLOSED" > "$file"
+        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"bash $file\""
+        xwin_watch_set=1
+    fi
+
+    if [ -n "$XWIN_WATCH_ON_FAILED" ]; then
+        local file
+        file="$(mktemp "$TEMP_DIR/xwin-watch-on-failed.XXXXXXX.sh")"
+        echo "$XWIN_WATCH_ON_FAILED" > "$file"
+        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"bash $file\""
+
+        if [ "$xwin_watch_set" != "1" ]; then
+            echo "[Hyps] WARN: XWIN_WATCH_ON_EXISTS 和 XWIN_WATCH_ON_CLOSED 均未设置，XWIN_WATCH_ON_FAILED 的内容将不会被执行！"
+        fi
+    fi
+
+    if [ "$xwin_watch_set" = "1" ]; then
+        echo "[Hyps] 启动 XWin Watch: $XWIN_WATCH_CMD"
+        ( eval "$XWIN_WATCH_CMD" ) &
+        BACKGROUND_PID+=("$!")
+    else
+        echo "[Hyps] WARN: XWIN_WATCH 已开启，但没什么要执行的"
+    fi
+}
 
 # OverlayFS 预处理
 if isy "$OVERLAY"; then
@@ -585,6 +695,39 @@ if isy "$OVERLAY"; then
     isy "$OVERLAY_REBIND_GAME_PATH" && GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME_PATH")"
 fi
 
+mount_overlay() {
+    isy "$OVERLAY" || return 0
+
+    fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
+        || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
+    OVERLAY_MOUNTED=1
+}
+
+umount_overlay() {
+    [ -z "$OVERLAY_UMOUNT" ] && OVERLAY_UMOUNT="y"
+
+    if isy "$OVERLAY" && isy "$OVERLAY_UMOUNT" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
+        if [ "$OVERLAY_MOUNT_SKIP" = "1" ]; then
+            echo "[Hyps] 跳过卸载 OverlayFS，请手动卸载 $OVERLAY_MOUNT"
+            return
+        fi
+
+        OVERLAY_MOUNT_SKIP=1
+
+        if command_exists fusermount3; then
+            fusermount3 -uz "$OVERLAY_MOUNT"
+        elif command_exists fusermount; then
+            fusermount -uz "$OVERLAY_MOUNT"
+        elif command_exists umount; then
+            umount -l "$OVERLAY_MOUNT"
+        else
+            echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
+        fi
+    fi
+}
+
+# 游玩时间和历史
+
 time_record_start() {
     [ -z "$TIME_RECORD" ] && TIME_RECORD="y"
     isy "$TIME_RECORD" || return 0
@@ -619,44 +762,6 @@ time_record_end() {
     printf "%s\t%s\n" "$current_start" "$current_end" >> "$TIME_RECORD_DATA_DIR/history"
     total_dur="$(cat "$TIME_RECORD_DATA_DIR/total-dur" 2>/dev/null || echo 0)"
     echo "$((total_dur + current_dur))" > "$TIME_RECORD_DATA_DIR/total-dur"
-}
-
-
-
-trap cleanup EXIT
-
-cleanup() {
-    # TODO
-    echo "[Hyps] 终止"
-
-    time_record_end
-
-    umount_overlay
-
-    exit
-}
-
-umount_overlay() {
-    [ -z "$OVERLAY_UMOUNT" ] && OVERLAY_UMOUNT="y"
-
-    if isy "$OVERLAY" && isy "$OVERLAY_UMOUNT" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
-        if [ "$OVERLAY_MOUNT_SKIP" = "1" ]; then
-            echo "[Hyps] 跳过卸载 OverlayFS，请手动卸载 $OVERLAY_MOUNT"
-            return
-        fi
-
-        OVERLAY_MOUNT_SKIP=1
-
-        if command_exists fusermount3; then
-            fusermount3 -uz "$OVERLAY_MOUNT"
-        elif command_exists fusermount; then
-            fusermount -uz "$OVERLAY_MOUNT"
-        elif command_exists umount; then
-            umount -l "$OVERLAY_MOUNT"
-        else
-            echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
-        fi
-    fi
 }
 
 
@@ -721,11 +826,7 @@ run_prepare() {
     isy "$EXE_KILL" && pkill -f "\.exe"
 
     # 挂载 OverlayFS
-    if isy "$OVERLAY"; then
-        fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
-            || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
-        OVERLAY_MOUNTED=1
-    fi
+    mount_overlay
 
     # 准备脚本
     if [ -n "$PREPARE_BATCH" ]; then
@@ -738,117 +839,17 @@ run_prepare() {
     fi
 
     # Hosts 断网
-    if isy "$NETWORK_HOSTS" && [ -n "$NETWORK_HOSTS_CONTENT" ]; then
-        [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
-        [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
-        [ -z "$NETWORK_HOSTS_TGT_PREM" ] && NETWORK_HOSTS_TGT_PREM="a+w"
-        NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
-
-        if [ -f "$NETWORK_HOSTS_FILE" ]; then
-            if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
-                [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$NETWORK_HOSTS_FILE")
-
-                echo "[sudo 请求] 使 hosts 文件可被写入，需要 root 权限"
-                sudo chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
-            fi
-
-            [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
-            local flagStart="# $NETWORK_HOSTS_FLAG $GAME_NAME Start"
-            local flagEnd="# $NETWORK_HOSTS_FLAG $GAME_NAME End"
-
-            NETWORK_HOSTS_CONTENT="$(cat << EOF
-$flagStart
-$NETWORK_HOSTS_CONTENT
-$flagEnd
-EOF
-            )"
-            local hosts_temp_file
-            hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX.bak")"
-            cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
-            echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
-
-            NETWORK_HOSTS_REC_CMD="$(cat << EOF
-echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
-cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
-EOF
-            )"
-
-            if [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
-                NETWORK_HOSTS_REC_CMD="$(cat << EOF
-$NETWORK_HOSTS_REC_CMD
-echo "[sudo 请求] 恢复 hosts 文件权限，需要 root 权限"
-sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
-EOF
-                )"
-            fi
-
-            if [ "$NETWORK_HOSTS_DURATION" != "-" ]; then
-                (
-                    # 后台运行部分
-                    sleep "$NETWORK_HOSTS_DURATION"
-                    eval "$NETWORK_HOSTS_REC_CMD"
-                ) &
-                BACKGROUND_PID+=("$!")
-            else
-                # 调用 XWin Watch
-                XWIN_WATCH_ON_EXISTS="$(cat << EOF
-$XWIN_WATCH_ON_EXISTS
-$NETWORK_HOSTS_REC_CMD
-EOF
-                )"
-                XWIN_WATCH_ON_FAILED="$(cat << EOF
-$XWIN_WATCH_ON_FAILED
-$NETWORK_HOSTS_REC_CMD
-EOF
-                )"
-            fi
-        fi
-    fi
+    run_network_hosts
 
     # XWin Watch 窗口监测程序
-    if isy "$XWIN_WATCH"; then
-        local xwin_watch_set=0
-
-        if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
-            local file
-            file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
-            echo "$XWIN_WATCH_ON_EXISTS" > "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"bash $file\""
-            xwin_watch_set=1
-        fi
-
-        if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
-            local file
-            file="$(mktemp "$TEMP_DIR/xwin-watch-on-closed.XXXXXXX.sh")"
-            echo "$XWIN_WATCH_ON_CLOSED" > "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"bash $file\""
-            xwin_watch_set=1
-        fi
-
-        if [ -n "$XWIN_WATCH_ON_FAILED" ]; then
-            local file
-            file="$(mktemp "$TEMP_DIR/xwin-watch-on-failed.XXXXXXX.sh")"
-            echo "$XWIN_WATCH_ON_FAILED" > "$file"
-            XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"bash $file\""
-
-            if [ "$xwin_watch_set" != "1" ]; then
-                echo "[Hyps] WARN: XWIN_WATCH_ON_EXISTS 和 XWIN_WATCH_ON_CLOSED 均未设置，XWIN_WATCH_ON_FAILED 的内容将不会被执行！"
-            fi
-        fi
-
-        if [ "$xwin_watch_set" = "1" ]; then
-            echo "[Hyps] 启动 XWin Watch: $XWIN_WATCH_CMD"
-            ( eval "$XWIN_WATCH_CMD" ) &
-            BACKGROUND_PID+=("$!")
-        else
-            echo "[Hyps] WARN: XWIN_WATCH 已开启，但没什么要执行的"
-        fi
-    fi
+    run_xwin_watch
 }
 
 
 
 start_game() {
+    trap cleanup EXIT
+
     run_prepare
 
     echo "[Hyps] 启动游戏..."
@@ -871,4 +872,14 @@ start_game() {
     fi
 
     wait
+}
+
+cleanup() {
+    echo "[Hyps] 终止"
+
+    time_record_end
+
+    umount_overlay
+
+    exit
 }

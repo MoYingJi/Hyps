@@ -3,22 +3,28 @@
 
 GAME_NAME="starrail"
 
-# 现在 Jadeite 是可选的
-#FORCE_JADEITE="y"
-
 source _Lib.sh
 
 # 注册表解锁帧率 (修改 GraphicsSettings_Model 中的 FPS)
 if isy "$STARRAIL_REG_FPS"; then
     [ -z "$STARRAIL_REG_FPS_VAL" ] && STARRAIL_REG_FPS_VAL="120"
     [ -z "$STARRAIL_REG_FPS_SCRIPT" ] && STARRAIL_REG_FPS_SCRIPT="./Tools/starrail-fps.py"
-    # 先确保 wineserver 停止 (内存注册表写回磁盘后再修改)
-    [ -n "$WINESERVER_KILL_CMD" ] && $WINESERVER_KILL_CMD 2>/dev/null
-    sleep 1
-    if [ -r "$PREFIX/user.reg" ] && [ -w "$PREFIX/user.reg" ]; then
-        python3 "$STARRAIL_REG_FPS_SCRIPT" "$PREFIX/user.reg" "$STARRAIL_REG_FPS_VAL"
+
+    ensure_no_wineserver "$PREFIX" "error" "STARRAIL_REG_FPS 需要编辑注册表"
+
+    if [ -f "$PREFIX/user.reg" ]; then
+        USER_REG_FILE="$PREFIX/user.reg"
+    elif [ -f "$PREFIX/pfx/user.reg" ]; then
+        USER_REG_FILE="$PREFIX/pfx/user.reg"
     else
-        echo "[fps-reg] 无法读写 $PREFIX/user.reg"
+        echo "[fps-reg] 无法找到注册表文件"
+        return 1
+    fi
+
+    if [ -r "$USER_REG_FILE" ] && [ -w "$USER_REG_FILE" ]; then
+        python3 "$STARRAIL_REG_FPS_SCRIPT" "$USER_REG_FILE" "$STARRAIL_REG_FPS_VAL"
+    else
+        echo "[fps-reg] 无法读写注册表文件 $USER_REG_FILE"
     fi
 fi
 

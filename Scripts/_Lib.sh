@@ -21,7 +21,6 @@
 
 # WINE                  游戏运行器位置             必填   <runner>.conf
 # PREFIX_VAR_NAME       PREFIX 存储变量名          选填   <runner>.conf   WINEPREFIX
-# WINESERVER_KILL_CMD   WineServer 退出命令        选填   <runner>.conf   「命令不执行」
 # PROTONPATH            umu 使用的 proton 位置     选填   <runner>.conf   「由 umu 决定，非 umu-run 启动则不适用」
 # GAMEID                umu 的 umu-id              选填   <runner>.conf   umu-default「由 umu 决定，非 umu-run 启动则不适用」
 # SKIP_CUSTOM_BAT       跳过自定义启动脚本         选填   <runner>.conf   <bool n>「跳过后直接运行游戏，无法使用 BEFORE_GAME/AFTER_GAME 等功能」
@@ -397,13 +396,10 @@ fi
 [ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
 [ -n "$GAMESCOPE" ] && WINE="$GAMESCOPE -- $WINE"
 
-# Jadeite Patch
+# 某个已经退役的补丁
 if [ -n "$JADEITE_PATH" ]; then
     GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
     GAME_ARGS="$JADEITE_ARGS -- $GAME_ARGS"
-elif isy "$FORCE_JADEITE"; then
-    echo "[Hyps] 本游戏强制使用 Jadeite! 请填写 Jadeite 路径!"
-    exit 1
 fi
 
 
@@ -802,6 +798,42 @@ try_link_dir() {
     ln -sn "$src" "$dst"
 }
 
+# 保证 wineserver 没有运行
+
+ensure_no_wineserver() {
+    local prefix="$1"
+    local action="$2" # kill | error
+    local why="$3"
+
+    # 逻辑：反正你早晚都要杀，不如现在就杀了而不报错
+    [ "$action" = "error" ] && isy "$EXE_KILL" && action="kill"
+
+    local pid
+    local current_prefix
+
+    for pid in $(pgrep wineserver); do
+        current_prefix="$(cat "/proc/$pid/environ" 2>/dev/null | tr '\0' '\n' | grep '^WINEPREFIX=' | cut -d= -f2)"
+        [ "$current_prefix" -ef "$prefix" ] || [ "$current_prefix" -ef "$prefix/pfx" ] || continue
+
+        case "$action" in
+            kill)
+                echo "[Hyps] 检测到 wineserver 正在运行，尝试杀死它 (PID: $pid)"
+                echo "[Hyps]     原因: $why"
+                WINEPREFIX="$prefix" "/proc/$pid/exe" --kill
+                ;;
+            error)
+                echo "[Hyps] ERROR: 检测到 wineserver 正在运行 (PID: $pid)，请先关闭它再继续"
+                echo "[Hyps]     原因: $why"
+                exit 1
+                ;;
+            *)
+                echo "[Hyps] ERROR: ensure_no_wineserver 未知的 action '$action'"
+                exit 1
+                ;;
+        esac
+    done
+}
+
 # 游玩时间和历史
 
 time_record_start() {
@@ -895,6 +927,7 @@ run_prepare() {
     if isy "$INTEL_CPU_POWER_READ"; then
         [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
 
+        local file
         for file in "${INTEL_CPU_POWER_FILE[@]}"; do
             if [ -f "$file" ] && [ ! -r "$file" ]; then
                 echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
@@ -907,14 +940,8 @@ run_prepare() {
     run_userdata_link
 
     # 准备启动
-    if isy "$WINESERVER_KILL"; then
-        if [ -n "$WINESERVER_KILL_CMD" ]; then
-            $WINESERVER_KILL_CMD
-        else
-            echo "[Hyps] WARN: WINESERVER_KILL 已开启，但没有设置 WINESERVER_KILL_CMD，跳过执行"
-        fi
-    fi
-    isy "$EXE_KILL" && pkill -f "\.exe"
+    isy "$WINESERVER_KILL" && ensure_no_wineserver "$PREFIX" "kill" "WINESERVER_KILL 已开启"
+    isy "$EXE_KILL" && pkill -f '.*\.exe$' # deprecated
 
     # 挂载 OverlayFS
     mount_overlay

@@ -93,21 +93,34 @@ source _Lib.sh
 if isy "$PREPARE_HDR_REG"; then
     [ -z "$PREPARE_HDR_REG_PATH" ] && PREPARE_HDR_REG_PATH="HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
     [ -z "$PREPARE_HDR_REG_KEY" ] && PREPARE_HDR_REG_KEY="WINDOWS_HDR_ON_h3132281285"
+
+    # 仅在直接用 sed 编辑时有效，第一次还是要走 wine
     [ -z "$PREPARE_HDR_REG_FILE" ] && PREPARE_HDR_REG_FILE="user.reg"
 fi
 
 try_edit_prefix_reg() {
-    if [ ! -r "$PREFIX/$PREPARE_HDR_REG_FILE" ] || [ ! -w "$PREFIX/$PREPARE_HDR_REG_FILE" ]; then
-        echo "[GI-HDR] 无法读取或写入注册表文件"
+    local file
+    if [ -f "$PREFIX/user.reg" ]; then
+        file="$PREFIX/user.reg"
+    elif [ -f "$PREFIX/pfx/user.reg" ]; then
+        file="$PREFIX/pfx/user.reg"
+    else
+        echo "[GI-HDR] 无法找到注册表文件"
         return 1
     fi
 
-    if [ "$(grep -c "$PREPARE_HDR_REG_KEY\"=dword:" "$PREFIX/$PREPARE_HDR_REG_FILE")" -eq 0 ]; then
+    if [ ! -r "$file" ] || [ ! -w "$file" ]; then
+        echo "[GI-HDR] 无法读写注册表文件 $file"
+        return 1
+    fi
+
+    if [ "$(grep -c "$PREPARE_HDR_REG_KEY\"=dword:" "$file")" -eq 0 ]; then
         echo "[GI-HDR] 注册表文件中未找到目标键值"
         return 1
     fi
 
-    sed -i "s/\"$PREPARE_HDR_REG_KEY\"=dword:00000000/\"$PREPARE_HDR_REG_KEY\"=dword:00000001/g" "$PREFIX/$PREPARE_HDR_REG_FILE"
+    ensure_no_wineserver "$PREFIX" "error" "PREPARE_HDR_REG 需要修改注册表"
+    sed -i "s/\"$PREPARE_HDR_REG_KEY\"=dword:00000000/\"$PREPARE_HDR_REG_KEY\"=dword:00000001/g" "$file"
 }
 
 if isy "$PREPARE_HDR_REG"; then

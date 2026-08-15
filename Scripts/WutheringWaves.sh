@@ -3,9 +3,6 @@
 
 GAME_NAME="wuwa"
 
-# 现在 Jadeite 是可选的
-#FORCE_JADEITE="y"
-
 source _Lib.sh
 
 start_game

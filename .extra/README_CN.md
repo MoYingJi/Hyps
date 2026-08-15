@@ -103,7 +103,7 @@
 
 一般情况下，推荐 `umu-run`（部分游戏可以使用 `umu-dwproton`）
 
-如果要新增 Runner，可以仿照现有配置自行添加。`WINE` 是将会调用的命令；`PREFIX_VAR_NAME` 是 Wine Prefix 的变量名，自定义 Prefix 会存入以此值为变量名的环境变量；`WINESERVER_KILL_CMD` 是用于杀死 wineserver 的命令，我感觉这设计得不好，我已经不用了；`PROTONPATH` 是 umu-run 中用于指定 proton 路径的环境变量
+如果要新增 Runner，可以仿照现有配置自行添加。`WINE` 是将会调用的命令；`PREFIX_VAR_NAME` 是 Wine Prefix 的变量名，自定义 Prefix 会存入以此值为变量名的环境变量；`PROTONPATH` 是 umu-run 中用于指定 proton 路径的环境变量
 
 ## 新增游戏适配
 

@@ -93,9 +93,6 @@ source _Lib.sh
 if isy "$PREPARE_HDR_REG"; then
     [ -z "$PREPARE_HDR_REG_PATH" ] && PREPARE_HDR_REG_PATH="HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
     [ -z "$PREPARE_HDR_REG_KEY" ] && PREPARE_HDR_REG_KEY="WINDOWS_HDR_ON_h3132281285"
-
-    # 仅在直接用 sed 编辑时有效，第一次还是要走 wine
-    [ -z "$PREPARE_HDR_REG_FILE" ] && PREPARE_HDR_REG_FILE="user.reg"
 fi
 
 try_edit_prefix_reg() {

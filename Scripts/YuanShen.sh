@@ -7,6 +7,7 @@
 GAME_NAME="yuanshen"
 
 # FPS 解锁
+
 check_fps_unlock() {
     [ ! "$FPS_UNLOCK" = "y" ] && return 0
 
@@ -87,6 +88,8 @@ before_xwin_watch() {
 
 source _Lib.sh
 
+# 改注册表开启隐藏的 HDR
+
 if isy "$PREPARE_HDR_REG"; then
     [ -z "$PREPARE_HDR_REG_PATH" ] && PREPARE_HDR_REG_PATH="HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
     [ -z "$PREPARE_HDR_REG_KEY" ] && PREPARE_HDR_REG_KEY="WINDOWS_HDR_ON_h3132281285"
@@ -120,6 +123,13 @@ EOF
         )"
     fi
 fi
+
+# 用户数据链接
+
+userdata_link() {
+    local game_exe="$3"
+    try_link_dir "$USERDATA_LINK_SCREENSHOTS/YuanShen" "$(dirname "$game_exe")/ScreenShot"
+}
 
 # 启动
 

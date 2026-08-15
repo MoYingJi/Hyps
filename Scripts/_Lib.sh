@@ -347,18 +347,6 @@ if isy "$DX_CACHE"; then
     export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
 fi
 
-# Intel CPU 功率可供检测
-if isy "$INTEL_CPU_POWER_READ"; then
-    [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
-
-    for file in "${INTEL_CPU_POWER_FILE[@]}"; do
-        if [ -f "$file" ] && [ ! -r "$file" ]; then
-            echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
-            sudo chmod a+r "$file"
-        fi
-    done
-fi
-
 # 伪装 Hostname 为 STEAMDECK
 if isy "$HOSTNAME_STEAMDECK"; then
     [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDECK"
@@ -477,6 +465,7 @@ check_cached_compile() {
 
 
 # Kill Target
+
 if isy "$KILL_TARGET"; then
     XWIN_WATCH="y"
 
@@ -661,7 +650,8 @@ run_xwin_watch() {
     fi
 }
 
-# OverlayFS 预处理
+# OverlayFS
+
 if isy "$OVERLAY"; then
     if ! command_exists fuse-overlayfs; then
         echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
@@ -691,8 +681,15 @@ if isy "$OVERLAY"; then
     [ -z "$OVERLAY_REBIND_GAME" ] && OVERLAY_REBIND_GAME="y"
     [ -z "$OVERLAY_REBIND_GAME_PATH" ] && OVERLAY_REBIND_GAME_PATH="y"
 
-    isy "$OVERLAY_REBIND_GAME" && GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME")"
-    isy "$OVERLAY_REBIND_GAME_PATH" && GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$GAME_PATH")"
+    if isy "$OVERLAY_REBIND_GAME"; then
+        OVERLAY_ORIGINAL_GAME="$GAME"
+        GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME")"
+    fi
+
+    if isy "$OVERLAY_REBIND_GAME_PATH"; then
+        OVERLAY_ORIGINAL_GAME_PATH="$GAME_PATH"
+        GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME_PATH")"
+    fi
 fi
 
 mount_overlay() {
@@ -724,6 +721,85 @@ umount_overlay() {
             echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
         fi
     fi
+}
+
+# 用户数据链接
+
+[ -z "$USERDATA_LINK_SCREENSHOTS" ] && USERDATA_LINK_SCREENSHOTS="$(xdg-user-dir PICTURES)/HypsScreenshots"
+
+run_userdata_link() {
+    isy "$USERDATA_LINK" || return 1
+    [ "$(type -t userdata_link)" = "function" ] || return 0
+
+    local drive_c
+    local userprofile
+    local game_exe
+
+    if [ -d "$PREFIX/drive_c" ]; then
+        drive_c="$PREFIX/drive_c"
+    elif [ -d "$PREFIX/pfx/drive_c" ]; then
+        drive_c="$PREFIX/pfx/drive_c"
+    else
+        echo "[Hyps] WARN: $PREFIX/drive_c 不存在"
+        return 1
+    fi
+
+    if [ -d "$drive_c/users/steamuser" ]; then
+        userprofile="$drive_c/users/steamuser"
+    elif [ -d "$drive_c/users/$USER" ]; then
+        userprofile="$drive_c/users/$USER"
+    else
+        echo "[Hyps] WARN: $drive_c/users/$USER 不存在"
+        return 1
+    fi
+
+    game_exe="$GAME"
+    if isy "$OVERLAY" && isy "$OVERLAY_REBIND_GAME"; then
+        # overlayfs 开启时游戏截图会被保存到 upper 中，这里直接编辑 upper
+        game_exe="$OVERLAY_UPPER/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME")"
+    fi
+
+    userdata_link "$drive_c" "$userprofile" "$game_exe"
+}
+
+try_link_dir() {
+    local src="$1"
+    local dst="$2"
+
+    echo "[Hyps] 尝试创建链接: $dst -> $src"
+
+    if [ ! -d "$src" ]; then
+        if [ -e "$src" ]; then
+            echo "[Hyps] WARN: 源目录 '$src' 不是目录，无法创建链接"
+            return 1
+        else
+            mkdir -p "$src"
+        fi
+    fi
+
+    if [ -L "$dst" ]; then
+        if [ "$(readlink -f "$dst")" = "$(readlink -f "$src")" ]; then
+            return 0
+        else
+            echo "[Hyps] WARN: '$dst' -> '$(readlink -f "$dst")' 已存在，指向错误的目标"
+            echo "[Hyps] WARN: '$dst' -> '$src' 修复到期望的目标"
+            ln -sf "$src" "$dst" || echo "[Hyps] WARN: 无法修复 '$dst' 的链接"
+            return 0
+        fi
+    fi
+
+    if [ -d "$dst" ] && [ ! -L "$dst" ]; then
+        if [ "$(ls -A "$dst")" ]; then
+            shopt -s dotglob
+            mv "$dst"/* "$src"/ || echo "[Hyps] WARN: 无法移动 '$dst' 中的内容到 '$src'"
+            shopt -u dotglob
+        fi
+
+        rmdir "$dst"
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+    ln -sn "$src" "$dst"
 }
 
 # 游玩时间和历史
@@ -815,6 +891,21 @@ use_custom_bat() {
 
 
 run_prepare() {
+    # Intel CPU 功率可供检测
+    if isy "$INTEL_CPU_POWER_READ"; then
+        [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
+
+        for file in "${INTEL_CPU_POWER_FILE[@]}"; do
+            if [ -f "$file" ] && [ ! -r "$file" ]; then
+                echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
+                sudo chmod a+r "$file"
+            fi
+        done
+    fi
+
+    # 用户数据链接
+    run_userdata_link
+
     # 准备启动
     if isy "$WINESERVER_KILL"; then
         if [ -n "$WINESERVER_KILL_CMD" ]; then

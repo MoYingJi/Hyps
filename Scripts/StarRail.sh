@@ -22,4 +22,10 @@ if isy "$STARRAIL_REG_FPS"; then
     fi
 fi
 
+# 用户数据链接
+userdata_link() {
+    local game_exe="$3"
+    try_link_dir "$USERDATA_LINK_SCREENSHOTS/StarRail" "$(dirname "$game_exe")/StarRail_Data/ScreenShots"
+}
+
 start_game

@@ -1,9 +1,10 @@
 #!/usr/bin/bash
-#shellcheck source=_Lib.sh disable=2034
+#shellcheck disable=2034
 
 GAME_NAME="starrail"
 
-source _Lib.sh
+#shellcheck source=../Lib/Common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
 
 # 注册表解锁帧率 (修改 GraphicsSettings_Model 中的 FPS)
 if isy "$STARRAIL_REG_FPS"; then

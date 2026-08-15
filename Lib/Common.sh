@@ -99,8 +99,11 @@ fi
 
 [ -z "$GAME_NAME" ] && exit 1
 
-[ -z "$PROJECT_ROOT" ] && PROJECT_ROOT="$(dirname "$(realpath "$0")")/.."
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
+
 [ -f "config.conf" ] && source config.conf
 
 [ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
@@ -781,7 +784,7 @@ try_link_dir() {
         else
             echo "[Hyps] WARN: '$dst' -> '$(readlink -f "$dst")' 已存在，指向错误的目标"
             echo "[Hyps] WARN: '$dst' -> '$src' 修复到期望的目标"
-            ln -sf "$src" "$dst" || echo "[Hyps] WARN: 无法修复 '$dst' 的链接"
+            ln -sfn "$src" "$dst" || echo "[Hyps] WARN: 无法修复 '$dst' 的链接"
             return 0
         fi
     fi

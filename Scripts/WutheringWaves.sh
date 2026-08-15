@@ -1,9 +1,10 @@
 #!/usr/bin/bash
-#shellcheck source=_Lib.sh disable=2034
+#shellcheck disable=2034
 
 GAME_NAME="wuwa"
 
-source _Lib.sh
+#shellcheck source=../Lib/Common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
 
 userdata_link() {
     local game_exe="$3"

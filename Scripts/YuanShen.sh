@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#shellcheck source=_Lib.sh disable=2034
+#shellcheck disable=2034
 
 # === 已不受支持 ===
 # 目前能用，但不保证未来能用，方案多变
@@ -86,7 +86,8 @@ before_xwin_watch() {
     check_fps_unlock
 }
 
-source _Lib.sh
+#shellcheck source=../Lib/Common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
 
 # 改注册表开启隐藏的 HDR
 

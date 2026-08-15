@@ -30,7 +30,8 @@
 # GAME                  游戏本体位置               必填   <game>.conf
 # GAME_PATH             游戏运行路径               选填   <game>.conf     $(dirname "$GAME")
 # GAME_ARGS             游戏启动参数               选填   <game>.conf
-# PREFIX                游戏运行的 PREFIX          选填   <game>.conf     「由 runner 决定」
+# PREFIX                游戏运行的 PREFIX          选填   <game>.conf     $PREFIX_DEFAULT_DIR/$GAME_NAME
+# PREFIX_DEFAULT_DIR    默认 PREFIX 位置           选填   <game>.conf     $DATA_DIR/prefixes
 
 # PROTON_TO_WINE_LINK         创建 Proton 前缀的软链接   选填   <g/c>.conf   <bool n>
 # WINESERVER_KILL             游戏启动前运行杀死命令     选填   <g/c>.conf   <bool n>
@@ -166,10 +167,15 @@ command_exists() {
 
 # 如果 $PREFIX 为空，就找 名为 $PREFIX_VAR_NAME 的值的变量，赋值过来做些操作
 # $PREFIX_VAR_NAME 就是 Runner 中定义的 存储 PREFIX 路径 的变量名
-# Wine 中 PREFIX_VAR_NAME=WINEPREFIX
+# Wine/UMU 中 PREFIX_VAR_NAME=WINEPREFIX
 # Proton 中 PREFIX_VAR_NAME=STEAM_COMPAT_DATA_PATH
 if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
     PREFIX="${!PREFIX_VAR_NAME}"
+fi
+
+if [ -z "$PREFIX" ]; then
+    [ -z "$PREFIX_DEFAULT_DIR" ] && PREFIX_DEFAULT_DIR="$DATA_DIR/prefixes"
+    PREFIX="$PREFIX_DEFAULT_DIR/$GAME_NAME"
 fi
 
 if [ -n "$PREFIX" ]; then
@@ -178,14 +184,16 @@ if [ -n "$PREFIX" ]; then
     mkdir -p "$PREFIX"
 
     # 在 PREFIX 创建由 pfx 到 . 的软链接
+    # （STEAM_COMPAT_DATA_PATH 下的 pfx 是 WINEPREFIX）
     # 和一些判断的逻辑
+    # 这个可以关掉了吧，umu 都提供了
     if isy "$PROTON_TO_WINE_LINK" && [ ! -L "$PREFIX/pfx" ]; then
         # 判断是否原有 pfx
         if [ -d "$PREFIX/pfx" ]; then
             # 判断是否原有 wineprefix
             if [ -d "$PREFIX/dosdevices" ]; then
-                # 使用原有 wineprefix 而删除 pfx
-                rm -rf "$PREFIX/pfx"
+                # 使用原有 wineprefix
+                mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
             else
                 # 将原有的 pfx 移动到 原目录
                 mv "$PREFIX/pfx/".* "$PREFIX/"
@@ -198,12 +206,6 @@ if [ -n "$PREFIX" ]; then
         fi
         # 创建链接
         ln -sf . "$PREFIX/pfx"
-    fi
-fi
-
-if [ -z "$PREFIX" ]; then
-    if isy "$PROTON_TO_WINE_LINK"; then
-        echo "自动选择 PREFIX 无法也无需开启 PROTON_TO_WINE_LINK"
     fi
 fi
 

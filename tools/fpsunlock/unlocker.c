@@ -83,7 +83,9 @@ int main(const int argc, char **argv) {
             printf("Current FPS limit: %-5d\r", current_fps);
             fflush(stdout);
         } else {
-            if (!write_process_memory(pid, fps_addr, &target_fps, sizeof(target_fps))) break;
+            if (current_fps != target_fps) {
+                if (!write_process_memory(pid, fps_addr, &target_fps, sizeof(target_fps))) break;
+            }
         }
 
         usleep(interval * 1000);

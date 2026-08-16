@@ -1,31 +1,33 @@
 .idea/
 .vscode/
 
-/Config/Games/*
-!/Config/Games/*.example.*
-!/Config/Games/.gitkeep
+/config/games/*
+!/config/games/*.example.*
+!/config/games/.gitkeep
 
-/Config/Runners/*
-!/Config/Runners/*.example.*
-!/Config/Runners/proton-system.conf
-!/Config/Runners/umu-run.conf
-!/Config/Runners/umu-cachyos.conf
-!/Config/Runners/umu-dwproton.conf
+/config/runners/*
+!/config/runners/*.example.*
+!/config/runners/proton-system.conf
+!/config/runners/umu-run.conf
+!/config/runners/umu-cachyos.conf
+!/config/runners/umu-dwproton.conf
 
-/Scripts/*
-!/Scripts/_Lib.sh
-!/Scripts/Arknights.sh
-!/Scripts/Endfield.sh
-!/Scripts/Honkai3.sh
-!/Scripts/StarRail.sh
-!/Scripts/WutheringWaves.sh
-!/Scripts/Yuanshen.sh
-!/Scripts/ZenlessZoneZero.sh
+/scripts/*
+!/scripts/_Lib.sh
+!/scripts/Arknights.sh
+!/scripts/Endfield.sh
+!/scripts/Honkai3.sh
+!/scripts/StarRail.sh
+!/scripts/WutheringWaves.sh
+!/scripts/YuanShen.sh
+!/scripts/ZenlessZoneZero.sh
 
-/Tools/*
+/tools/*
+!/tools/*/
+/tools/*/*
 
-!/Tools/nvidia-env.sh
+!/tools/nvidia-env.sh
 
-!/Tools/fpsunlock/unlocker.c
-!/Tools/xwin-watch/xwin-watch.c
-!/Tools/starrail-fps.py
+!/tools/fpsunlock/unlocker.c
+!/tools/xwin-watch/xwin-watch.c
+!/tools/starrail-fps.py

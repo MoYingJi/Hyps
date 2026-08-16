@@ -3,8 +3,8 @@
 
 GAME_NAME="wuwa"
 
-#shellcheck source=../Lib/Common.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
+#shellcheck source=../lib/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 userdata_link() {
     local game_exe="$3"

@@ -3,13 +3,13 @@
 
 GAME_NAME="starrail"
 
-#shellcheck source=../Lib/Common.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
+#shellcheck source=../lib/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 # 注册表解锁帧率 (修改 GraphicsSettings_Model 中的 FPS)
 if isy "$STARRAIL_REG_FPS"; then
     [ -z "$STARRAIL_REG_FPS_VAL" ] && STARRAIL_REG_FPS_VAL="120"
-    [ -z "$STARRAIL_REG_FPS_SCRIPT" ] && STARRAIL_REG_FPS_SCRIPT="./Tools/starrail-fps.py"
+    [ -z "$STARRAIL_REG_FPS_SCRIPT" ] && STARRAIL_REG_FPS_SCRIPT="./tools/starrail-fps.py"
 
     ensure_no_wineserver "$PREFIX" "error" "STARRAIL_REG_FPS 需要编辑注册表"
 

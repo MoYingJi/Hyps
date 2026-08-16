@@ -44,13 +44,13 @@
 
 1. clone 本项目
 
-2. 你可以选择在本项目的 `config.conf` 中修改配置文件的路径，默认路径就是本项目的 `./Config` 文件夹，所以你也可以选择不改
+2. 你可以选择在本项目的 `config.conf` 中修改配置文件的路径，默认路径就是本项目的 `./config` 文件夹，所以你也可以选择不改
 
-3. 到配置文件夹的 `Games.examples` 目录下，找到 `_common.example.conf`，复制文件到配置文件夹的 `Games` 下，重命名为 `_common.conf` 并修改里面的配置。很多功能默认都被注释掉了，如有需要可以将其打开
+3. 到配置文件夹的 `games.examples` 目录下，找到 `_common.example.conf`，复制文件到配置文件夹的 `games` 下，重命名为 `_common.conf` 并修改里面的配置。很多功能默认都被注释掉了，如有需要可以将其打开
 
-4. 到配置文件夹的 `Games.examples` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `Games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `RUNNER` 和一些路径
+4. 到配置文件夹的 `games.examples` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `RUNNER` 和一些路径
 
-5. 运行 `Scripts` 文件夹下对应游戏的脚本
+5. 运行 `scripts` 文件夹下对应游戏的脚本
 
 ## 依赖
 
@@ -58,10 +58,10 @@
  - 一些基础的工具，如 `coreutils`、`grep`、`awk`、`sed`、`pkill`、`pgrep`、`sudo` 等
  - 下面列出的 Runner 中的依赖。主要就是一些版本的 Proton 和 umu-launcher
  - `gcc`、`sha256sum`: 两个用 C 写的小工具（`sha256sum` 用来校验源代码以重新编译）
-    - `Tools/fpsunlock/unlocker.c`（还额外需要 `setcap`、`getcap`）
-    - `Tools/xwin-watch/xwin-watch.c`
+    - `tools/fpsunlock/unlocker.c`（还额外需要 `setcap`、`getcap`）
+    - `tools/xwin-watch/xwin-watch.c`
  - `python3`: 一个用 python3 写的小工具
-    - `Tools/starrail-fps.py`
+    - `tools/starrail-fps.py`
 
 ## Runner
 
@@ -107,19 +107,19 @@
 
 ## 新增游戏适配
 
-其实非常简单，在 `Scripts` 文件夹下新建一个脚本，仿照其他脚本写一下就好了
+其实非常简单，在 `scripts` 文件夹下新建一个脚本，仿照其他脚本写一下就好了
 
-`GAME_NAME` 就是决定了配置文件 `Games/${GAME_NAME}.conf` 的名字的，同时也会决定 DXVK/VKD3D 或 NVIDIA 的缓存路径
+`GAME_NAME` 就是决定了配置文件 `games/${GAME_NAME}.conf` 的名字的，同时也会决定 DXVK/VKD3D 或 NVIDIA 的缓存路径
 
 个人觉得，最好抄绝区零的配置，相对简单一点，配置文件里只留基础的 `RUNNER`、`GAME` 就能运行了，不过最好还是写一下 `PREFIX`，个人习惯隔离运行环境
 
 ## 配置原理
 
-运行游戏时，此脚本会读取 `Games` 下的 `_common.conf`，然后根据游戏名读取游戏特定配置 `<name>.conf`，最后读取 `Runners` 文件夹中的 `<runner>.conf`
+运行游戏时，此脚本会读取 `games` 下的 `_common.conf`，然后根据游戏名读取游戏特定配置 `<name>.conf`，最后读取 `runners` 文件夹中的 `<runner>.conf`
 
 读取操作其实就是 `source`，在配置中定义一些变量，就可以在脚本中引用，也因此，大多数配置是不关心你写在什么位置的，你既可以在 `_common.conf` 里写，也可以在 `<name>.conf` 里写，甚至是在 `<runner>.conf` 里写！
 
-大多数可以设置的变量已经写在了 [`_Lib.sh`](../Scripts/_Lib.sh) 文件最前面的注释中，也给出了推荐填写处，不过在这里的东西大多在示例里都有
+大多数可以设置的变量已经写在了 [`common.sh`](../lib/common.sh) 文件最前面的注释中，也给出了推荐填写处，不过在这里的东西大多在示例里都有
 
 这几个配置的优先级从小到大是 `_common.conf` < `<name>.conf` < `<runner>.conf` <br/>
 `_common.conf` < `<name>.conf` 是能理解的 <br/>
@@ -127,7 +127,7 @@
 
 ## 功能
 
-这里只介绍部分功能的简单使用，这些功能还有其它用法，本项目也有更多功能，`Scripts/_Lib.sh` 的头部的一大堆注释里有这些功能的选项
+这里只介绍部分功能的简单使用，这些功能还有其它用法，本项目也有更多功能，`lib/common.sh` 的头部的一大堆注释里有这些功能的选项
 
 ### 临时 Hosts 修改
 
@@ -189,7 +189,7 @@ OVERLAY_DIR="/path/to/rw/dir" # 指定一个可读写的目录，默认是 `$XDG
 
 ### NVIDIA 显卡未被调用
 
-如果在混合模式遇到无法调用 NVIDIA 独立显卡（仅使用了核显），可以尝试 `./Tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./Tools/nvidia-env.sh`
+如果在混合模式遇到无法调用 NVIDIA 独立显卡（仅使用了核显），可以尝试 `./tools/nvidia-env.sh`，使用方法是在对应游戏的配置文件中加上一行 `source ./tools/nvidia-env.sh`
 
 ### NVIDIA DLSS
 

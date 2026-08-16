@@ -11,7 +11,7 @@ GAME_NAME="yuanshen"
 check_fps_unlock() {
     [ ! "$FPS_UNLOCK" = "y" ] && return 0
 
-    [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./Tools/fpsunlock"
+    [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./tools/fpsunlock"
 
     check_cached_compile "FPS_UNLOCK" \
         "$FPS_UNLOCK_PATH/unlocker" \
@@ -86,8 +86,8 @@ before_xwin_watch() {
     check_fps_unlock
 }
 
-#shellcheck source=../Lib/Common.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../Lib/Common.sh"
+#shellcheck source=../lib/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 
 # 改注册表开启隐藏的 HDR
 

@@ -104,8 +104,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 
-#shellcheck source=Utils.sh
-source "$SCRIPT_DIR/Utils.sh"
+#shellcheck source=utils.sh
+source "$SCRIPT_DIR/utils.sh"
 
 [ -f "config.conf" ] && source config.conf
 
@@ -121,12 +121,12 @@ mkdir -p "$TEMP_DIR"
 
 [ -f "$CONFIG_DIR/config.conf" ] && source "$CONFIG_DIR/config.conf"
 
-[ -z "$COMMON_GAME_CONF" ] && COMMON_GAME_CONF="$CONFIG_DIR/Games/_common.conf"
+[ -z "$COMMON_GAME_CONF" ] && COMMON_GAME_CONF="$CONFIG_DIR/games/_common.conf"
 [ -f "$COMMON_GAME_CONF" ] && source "$COMMON_GAME_CONF"
 
 # 读取游戏配置
 
-GAME_CONF="$CONFIG_DIR/Games/$GAME_NAME.conf"
+[ -z "$GAME_CONF" ] && GAME_CONF="$CONFIG_DIR/games/$GAME_NAME.conf"
 [ ! -f "$GAME_CONF" ] && exit 1
 source "$GAME_CONF"
 
@@ -136,7 +136,7 @@ source "$GAME_CONF"
 
 # 读取 RUNNER 配置
 
-RUNNER_CONF="$CONFIG_DIR/Runners/$RUNNER.conf"
+RUNNER_CONF="$CONFIG_DIR/runners/$RUNNER.conf"
 source "$RUNNER_CONF"
 
 [ -z "$WINE" ] && exit 1
@@ -356,18 +356,14 @@ fi
 # Gamescope
 if [ -n "$GAMESCOPE" ]; then
     if [ -n "$MANGOHUD" ]; then
-        if [ "$MANGOHUD" = "mangohud" ]; then
-            GAMESCOPE="$GAMESCOPE --mangoapp"
+        if [ "$MANGOHUD" = "mangohud" ] && [ "$GAMESCOPE" = "gamescope" ]; then
+            GAMESCOPE_ARGS+=("--mangoapp")
             echo "[Hyps] 检测到 Gamescope 搭配 MangoHud 使用，换用 \`--mangoapp\` 参数"
         else
             echo "[Hyps] WARN: Gamescope 与 MangoHud 不能同时使用！已关闭 MangoHud！"
         fi
 
-        MANGOHUD=""
-    fi
-
-    if [ "${#GAMESCOPE_ARGS[@]}" -gt 0 ]; then
-        GAMESCOPE="$GAMESCOPE ${GAMESCOPE_ARGS[*]}"
+        unset MANGOHUD
     fi
 fi
 
@@ -480,7 +476,7 @@ if [ "$(type -t before_xwin_watch)" = "function" ]; then
 fi
 
 if isy "$XWIN_WATCH"; then
-    [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./Tools/xwin-watch"
+    [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./tools/xwin-watch"
 
     check_cached_compile "XWIN_WATCH" \
         "$XWIN_WATCH_PATH/xwin-watch" \
@@ -765,29 +761,31 @@ build_game_command() {
     local -a cmd=()
     cmd+=("$WINE")
 
-    [ -n "$MANGOHUD" ] && {
+    if [ -n "$MANGOHUD" ]; then
         local -a mangohud_args
         readarray -t mangohud_args < <(xargs -n1 <<< "$MANGOHUD")
         cmd=("${mangohud_args[@]}" "${cmd[@]}")
-    }
-    [ -n "$TASKSET" ]   && {
+    fi
+
+    if [ -n "$TASKSET" ]; then
         local -a taskset_args
         readarray -t taskset_args < <(xargs -n1 <<< "$TASKSET")
         cmd=("${taskset_args[@]}" "${cmd[@]}")
-    }
-    [ -n "$GAMEMODE" ]  && {
+    fi
+
+    if [ -n "$GAMEMODE" ]; then
         local -a gamemode_args
         readarray -t gamemode_args < <(xargs -n1 <<< "$GAMEMODE")
         cmd=("${gamemode_args[@]}" "${cmd[@]}")
-    }
-    [ -n "$GAMESCOPE" ] && {
-        local -a gamescope_args
-        readarray -t gamescope_args < <(xargs -n1 <<< "$GAMESCOPE")
-        cmd=("${gamescope_args[@]}" -- "${cmd[@]}")
-    }
-    [ "${#WRAPPER_CMD[@]}" -gt 0 ] && {
+    fi
+
+    if [ -n "$GAMESCOPE" ]; then
+        cmd=("$GAMESCOPE" "${GAMESCOPE_ARGS[@]}" -- "${cmd[@]}")
+    fi
+
+    if [ "${#WRAPPER_CMD[@]}" -gt 0 ]; then
         cmd=("${WRAPPER_CMD[@]}" "${cmd[@]}")
-    }
+    fi
 
     if use_custom_bat; then
         cmd+=("$(gen_script)")

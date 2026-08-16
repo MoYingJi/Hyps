@@ -1,13 +1,6 @@
 // 修改自 everything411 的 unlocker.c
 // https://github.com/everything411/fpsunlock
 
-// We will defy this world with a power from beyond.
-// 从世界之外，我们取得否定世界的力量。
-
-// 此代码非常危险！原理是读写内存！
-// 同时也不要在其他地方公开提及！
-// 仅在 Linux 上运行！
-
 // unlocker.c - FPS unlocker refactored for native linux.
 //
 // To compile:
@@ -56,10 +49,11 @@ int main(const int argc, char **argv) {
     const char *fifo_path = nullptr;
     int fifo_fd = -1;
     bool use_fifo = false;
+    bool is_dry_run = false;
 
     const pid_t pid = atoi(argv[1]);
     target_fps = atoi(argv[2]);
-    const int is_dry_run = target_fps < 1;
+    is_dry_run = target_fps < 1;
     if (argc >= 4) interval = atol(argv[3]);
     if (argc == 5) fifo_path = argv[4];
 
@@ -73,55 +67,47 @@ int main(const int argc, char **argv) {
         return 1;
     }
 
-    if (setup_fifo(fifo_path)) {
+    if (fifo_path != nullptr && setup_fifo(fifo_path)) {
         fifo_fd = open(fifo_path, O_RDONLY | O_NONBLOCK);
         if (fifo_fd != -1) {
             use_fifo = true;
         }
     }
 
-    if (is_dry_run) {
+    do {
         int32_t current_fps;
-        if (interval > 0) {
-            while (read_process_memory(pid, fps_addr, &current_fps, sizeof(current_fps))) {
-                printf("\rCurrent FPS limit: %-5d", current_fps);
-                fflush(stdout);
-                usleep(interval * 1000);
-            }
-            printf("\n");
-        }
-    } else {
-        if (!write_process_memory(pid, fps_addr, &target_fps, sizeof(target_fps))) {
-            close_fifo(fifo_fd, fifo_path);
-            return 1;
+
+        if (!read_process_memory(pid, fps_addr, &current_fps, sizeof(current_fps))) break;
+
+        if (is_dry_run) {
+            printf("Current FPS limit: %-5d\r", current_fps);
+            fflush(stdout);
+        } else {
+            if (!write_process_memory(pid, fps_addr, &target_fps, sizeof(target_fps))) break;
         }
 
-        if (interval > 0) {
-            while (write_process_memory(pid, fps_addr, &target_fps, sizeof(target_fps))) {
-                if (use_fifo) {
-                    char buffer[32];
-                    const ssize_t bytes_read = read(fifo_fd, buffer, sizeof(buffer) - 1);
-                    if (bytes_read > 0) {
-                        buffer[bytes_read] = '\0';
-                        const int new_fps = atoi(buffer);
-                        if (new_fps > 0) {
-                            target_fps = new_fps;
-                            printf("Updated FPS limit to: %d\n", target_fps);
-                        }
-                    }
+        usleep(interval * 1000);
+
+        if (use_fifo) {
+            char buffer[32];
+            const ssize_t bytes_read = read(fifo_fd, buffer, sizeof(buffer) - 1);
+            if (bytes_read > 0) {
+                buffer[bytes_read] = '\0';
+                const int new_fps = atoi(buffer);
+                if (new_fps >= 0) {
+                    target_fps = new_fps;
+                    is_dry_run = target_fps < 1;
+                    printf("Updated FPS limit to: %d\n", target_fps);
                 }
-
-                usleep(interval * 1000);
             }
         }
-    }
+    } while (interval > 0);
 
     close_fifo(fifo_fd, fifo_path);
     return 0;
 }
 
 static bool setup_fifo(const char* fifo_path) {
-    // 创建命名管道
     if (mkfifo(fifo_path, 0666) == -1) {
         if (errno != EEXIST) {
             perror("mkfifo");
@@ -139,9 +125,9 @@ static void close_fifo(const int fifo_fd, const char* fifo_path) {
 }
 
 static bool read_process_memory(const pid_t pid, const uintptr_t addr, void* buf, const size_t size) {
-    struct iovec local = { .iov_base = buf, .iov_len = size };
-    struct iovec remote = { .iov_base = (void*)addr, .iov_len = size };
-    ssize_t bytes_read = process_vm_readv(pid, &local, 1, &remote, 1, 0);
+    const struct iovec local = { .iov_base = buf, .iov_len = size };
+    const struct iovec remote = { .iov_base = (void*)addr, .iov_len = size };
+    const ssize_t bytes_read = process_vm_readv(pid, &local, 1, &remote, 1, 0);
     if (bytes_read == -1) {
         fprintf(stderr, "Error: Read %zu bytes at %p failed: %s\n", size, (void*)addr, strerror(errno));
         return false;
@@ -173,7 +159,7 @@ static void* find_pattern_in_process(const pid_t pid, const uintptr_t start, con
             if (found) return remote + i + j;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 static int ends_with(const char *str, const char *suffix) {
@@ -201,10 +187,10 @@ static int verify_process(const pid_t pid) {
 
 static uintptr_t find_fps_var_address(const pid_t pid) {
     char maps_path[64];
-    FILE *fp = NULL;
-    char *line = NULL;
+    FILE *fp = nullptr;
+    char *line = nullptr;
     size_t len = 0;
-    uint8_t *setter_call = NULL;
+    uint8_t *setter_call = nullptr;
     uintptr_t fps_var_addr = 0; // Default return value is 0 (failure)
 
     constexpr int16_t pattern[] = { 0xB9, 0x3C, 0x00, 0x00, 0x00, 0xE8, ANY_, ANY_, ANY_, ANY_, 0x80 };

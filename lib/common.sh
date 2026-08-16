@@ -74,7 +74,8 @@
 # XWIN_WATCH_ATTEMPTS     XWIN_WATCH 检测窗口出现尝试次数      选填   <g/c>.conf   20
 
 # OVERLAY                   是否启用 OverlayFS      选填   <game>.conf   <bool n>
-# OVERLAY_LOWER             OverlayFS lower 目录    选必   <game>.conf   <empty>
+# OVERLAY_LOWER_AUTO        自动选择 lower 目录     选必   <game>.conf   <bool n> 「会根据每个游戏的情况检测 lower 目录」
+# OVERLAY_LOWER             OverlayFS lower 目录    选必   <game>.conf   <empty>  「若同时启用则覆盖前者」
 # OVERLAY_DIR               OverlayFS 相关目录      选填   <game>.conf   <empty> $DATA_DIR/overlays/$GAME_NAME「自动创建 mount、upper、work」
 # OVERLAY_MOUNT             OverlayFS 挂载点        选填   <game>.conf   <empty> | $OVERLAY_DIR/mount
 # OVERLAY_UPPER             OverlayFS upper 目录    选填   <game>.conf   <empty> | $OVERLAY_DIR/upper
@@ -471,11 +472,9 @@ EOF
 
 # XWin Watch
 
-if [ "$(type -t before_xwin_watch)" = "function" ]; then
-    before_xwin_watch
-fi
+prepare_xwin_watch() {
+    isy "$XWIN_WATCH" || return 0
 
-if isy "$XWIN_WATCH"; then
     [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./tools/xwin-watch"
 
     check_cached_compile "XWIN_WATCH" \
@@ -517,10 +516,11 @@ if isy "$XWIN_WATCH"; then
 
     [[ "$XWIN_WATCH_ATTEMPTS" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -a $XWIN_WATCH_ATTEMPTS"
     [[ "$XWIN_WATCH_INTERVAL" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -i $XWIN_WATCH_INTERVAL"
-fi
+}
 
 run_xwin_watch() {
     isy "$XWIN_WATCH" || return 0
+
     local xwin_watch_set=0
 
     if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
@@ -561,10 +561,21 @@ run_xwin_watch() {
 
 # OverlayFS
 
-if isy "$OVERLAY"; then
+prepare_overlay() {
+    isy "$OVERLAY" || return 0
+
     if ! command_exists fuse-overlayfs; then
         echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
         exit 1
+    fi
+
+    if [ -z "$OVERLAY_LOWER" ] && isy "$OVERLAY_LOWER_AUTO"; then
+        if [ "$(type -t overlay_auto_lower)" = "function" ]; then
+            OVERLAY_LOWER="$(overlay_auto_lower "$GAME")"
+        else
+            echo "[Hyps] ERROR: 游戏没有定义 overlay_auto_lower 函数，无法自动选择 lower 目录"
+            exit 1
+        fi
     fi
 
     if [ -z "$OVERLAY_LOWER" ] || [ ! -d "$OVERLAY_LOWER" ]; then
@@ -599,7 +610,7 @@ if isy "$OVERLAY"; then
         OVERLAY_ORIGINAL_GAME_PATH="$GAME_PATH"
         GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME_PATH")"
     fi
-fi
+}
 
 mount_overlay() {
     isy "$OVERLAY" || return 0
@@ -817,6 +828,12 @@ run_prepare() {
             fi
         done
     fi
+
+    # 准备 XWin Watch
+    prepare_xwin_watch
+
+    # 准备 OverlayFS
+    prepare_overlay
 
     # 用户数据链接
     run_userdata_link

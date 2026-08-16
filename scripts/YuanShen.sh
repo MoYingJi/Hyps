@@ -6,10 +6,13 @@
 
 GAME_NAME="yuanshen"
 
+#shellcheck source=../lib/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
+
 # FPS 解锁
 
-check_fps_unlock() {
-    [ ! "$FPS_UNLOCK" = "y" ] && return 0
+prepare_fps_unlock() {
+    isy "$FPS_UNLOCK" || return 0
 
     [ -z "$FPS_UNLOCK_PATH" ] && FPS_UNLOCK_PATH="./tools/fpsunlock"
 
@@ -82,12 +85,7 @@ after_start_game() {
     "$FPS_UNLOCK_BIN" "$FPS_UNLOCK_PID" "$FPS_UNLOCK_FPS" "$FPS_UNLOCK_INTERVAL" "$FPS_UNLOCK_FIFO" &
 }
 
-before_xwin_watch() {
-    check_fps_unlock
-}
-
-#shellcheck source=../lib/common.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
+prepare_fps_unlock
 
 # 改注册表开启隐藏的 HDR
 
@@ -134,6 +132,13 @@ EOF
         )"
     fi
 fi
+
+# Overlay
+
+overlay_auto_lower() {
+    local game_exe="$1"
+    dirname "$game_exe"
+}
 
 # 用户数据链接
 

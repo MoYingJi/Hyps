@@ -29,6 +29,12 @@ if isy "$STARRAIL_REG_FPS"; then
     fi
 fi
 
+# Overlay
+overlay_auto_lower() {
+    local game_exe="$1"
+    dirname "$game_exe"
+}
+
 # 用户数据链接
 userdata_link() {
     local game_exe="$3"

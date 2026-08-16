@@ -342,15 +342,15 @@ fi
 # Systemd Inhibit
 # 隐藏的小功能 能用就用吧（
 if isy "$SYSTEMD_INHIBIT"; then
-    INHIBIT_WRAPPER="systemd-inhibit"
+    INHIBIT_WRAPPER=("systemd-inhibit")
 
     [ -z "$SYSTEMD_INHIBIT_WHY" ] && SYSTEMD_INHIBIT_WHY="Game-Hyps $GAME_NAME"
     [ -z "$SYSTEMD_INHIBIT_WHAT" ] && SYSTEMD_INHIBIT_WHAT="idle:sleep"
 
-    INHIBIT_WRAPPER="$INHIBIT_WRAPPER --why=$SYSTEMD_INHIBIT_WHY"
-    INHIBIT_WRAPPER="$INHIBIT_WRAPPER --what=$SYSTEMD_INHIBIT_WHAT"
+    INHIBIT_WRAPPER+=("--why=$SYSTEMD_INHIBIT_WHY")
+    INHIBIT_WRAPPER+=("--what=$SYSTEMD_INHIBIT_WHAT")
 
-    WRAPPER_CMD="$INHIBIT_WRAPPER $WRAPPER_CMD"
+    WRAPPER_CMD=("${INHIBIT_WRAPPER[@]}" -- "${WRAPPER_CMD[@]}")
 fi
 
 # Gamescope
@@ -370,12 +370,6 @@ if [ -n "$GAMESCOPE" ]; then
         GAMESCOPE="$GAMESCOPE ${GAMESCOPE_ARGS[*]}"
     fi
 fi
-
-# MangoHud / Gamemode
-[ -n "$MANGOHUD" ] && WINE="$MANGOHUD $WINE"
-[ -n "$TASKSET" ] && WINE="$TASKSET $WINE"
-[ -n "$GAMEMODE" ] && WINE="$GAMEMODE $WINE"
-[ -n "$GAMESCOPE" ] && WINE="$GAMESCOPE -- $WINE"
 
 # 某个已经退役的补丁
 if [ -n "$JADEITE_PATH" ]; then
@@ -767,6 +761,49 @@ use_custom_bat() {
     return 1
 }
 
+build_game_command() {
+    local -a cmd=()
+    cmd+=("$WINE")
+
+    [ -n "$MANGOHUD" ] && {
+        local -a mangohud_args
+        readarray -t mangohud_args < <(xargs -n1 <<< "$MANGOHUD")
+        cmd=("${mangohud_args[@]}" "${cmd[@]}")
+    }
+    [ -n "$TASKSET" ]   && {
+        local -a taskset_args
+        readarray -t taskset_args < <(xargs -n1 <<< "$TASKSET")
+        cmd=("${taskset_args[@]}" "${cmd[@]}")
+    }
+    [ -n "$GAMEMODE" ]  && {
+        local -a gamemode_args
+        readarray -t gamemode_args < <(xargs -n1 <<< "$GAMEMODE")
+        cmd=("${gamemode_args[@]}" "${cmd[@]}")
+    }
+    [ -n "$GAMESCOPE" ] && {
+        local -a gamescope_args
+        readarray -t gamescope_args < <(xargs -n1 <<< "$GAMESCOPE")
+        cmd=("${gamescope_args[@]}" -- "${cmd[@]}")
+    }
+    [ "${#WRAPPER_CMD[@]}" -gt 0 ] && {
+        cmd=("${WRAPPER_CMD[@]}" "${cmd[@]}")
+    }
+
+    if use_custom_bat; then
+        cmd+=("$(gen_script)")
+    else
+        cmd+=("$GAME")
+
+        if [ -n "$GAME_ARGS" ]; then
+            local -a args
+            readarray -t args < <(xargs -n1 <<< "$GAME_ARGS")
+            cmd+=("${args[@]}")
+        fi
+    fi
+
+    GAME_COMMAND=("${cmd[@]}")
+}
+
 
 
 run_prepare() {
@@ -821,16 +858,11 @@ start_game() {
 
     time_record_start
 
-    if use_custom_bat; then
-        local script
-        script="$(gen_script)"
-        echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$script\""
-        $WRAPPER_CMD $WINE "$script" &
-    else
-        cd "$GAME_PATH" || { echo "找不到或无法切换到游戏目录"; exit 1; }
-        echo "[Hyps] 执行命令: $WRAPPER_CMD $WINE \"$GAME\" $GAME_ARGS"
-        $WRAPPER_CMD $WINE "$GAME" $GAME_ARGS &
-    fi
+    cd "$GAME_PATH" || { echo "[Hyps] 找不到或无法切换到游戏目录"; exit 1; }
+    build_game_command
+    echo -n "[Hyps] 执行命令: "
+    quote_args "${GAME_COMMAND[@]}"
+    "${GAME_COMMAND[@]}" &
 
     if [ "$(type -t after_start_game)" = "function" ]; then
         after_start_game

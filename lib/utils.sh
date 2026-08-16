@@ -154,15 +154,15 @@ ensure_no_wineserver() {
 }
 
 quote_args() {
-  local arg
-  for arg in "$@"; do
-    # 匹配安全字符：字母数字下划线点斜杠横杠
-    if [[ "$arg" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
-      printf '%s ' "$arg"
-    else
-      # 将参数中的单引号 ' 替换为 '\''（结束引号、转义单引号、重新开始引号）
-      printf "'%s' " "${arg//\'/\'\\\'\'}"
-    fi
-  done
-  echo  # 最后换行
+    local arg
+    for arg in "$@"; do
+        # 匹配安全字符：字母数字下划线点斜杠横杠
+        if [[ "$arg" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+            printf '%s ' "$arg"
+        else
+            # 将参数中的单引号 ' 替换为 '\''（结束引号、转义单引号、重新开始引号）
+            printf "'%s' " "${arg//\'/\'\\\'\'}"
+        fi
+    done
+    echo # 最后换行
 }

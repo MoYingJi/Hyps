@@ -414,8 +414,7 @@ run_network_hosts() {
     if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
         [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$NETWORK_HOSTS_FILE")
 
-        echo "[sudo 请求] 使 hosts 文件可被写入，需要 root 权限"
-        sudo chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
+        sudo_request "使 hosts 文件可被写入" chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
     fi
 
     [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
@@ -442,8 +441,8 @@ EOF
     if [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
         NETWORK_HOSTS_REC_CMD="$(cat << EOF
 $NETWORK_HOSTS_REC_CMD
-echo "[sudo 请求] 恢复 hosts 文件权限，需要 root 权限"
-sudo chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
+[ "\$(type -t sudo_request)" = "function" ] || source "$SCRIPT_DIR/utils.sh"
+sudo_request "恢复 hosts 文件权限" chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
 EOF
         )"
     fi
@@ -823,8 +822,7 @@ run_prepare() {
         local file
         for file in "${INTEL_CPU_POWER_FILE[@]}"; do
             if [ -f "$file" ] && [ ! -r "$file" ]; then
-                echo "[sudo 请求] 使 Intel CPU 能量消耗可被所有人读取 需要 root 权限"
-                sudo chmod a+r "$file"
+                sudo_request "使 Intel CPU 能量消耗可被所有人读取" chmod a+r "$file"
             fi
         done
     fi

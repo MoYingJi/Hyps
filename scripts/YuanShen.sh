@@ -38,8 +38,7 @@ prepare_fps_unlock() {
 
     # 权限
     if [[ ! "$(getcap "$FPS_UNLOCK_BIN")" =~ cap_sys_ptrace=ep  ]]; then
-        echo "[sudo 请求] 赋予读写进程内存权限 需要 root 权限"
-        sudo setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"
+        sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"
     fi
 
     # 参数

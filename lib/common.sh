@@ -202,6 +202,10 @@ export XCURSOR_SIZE
 # Wine
 export WINEDLLOVERRIDES
 
+# Spritz
+export WINE_ENABLE_TIMEOUT_FIX
+export WINE_ENABLE_STEAM_STUB
+
 # umu-launcher
 export PROTONPATH
 export GAMEID
@@ -224,7 +228,6 @@ export SteamDeck
 export SteamOS
 
 # Steam
-export WINE_ENABLE_STEAM_STUB
 export STEAM_COMPAT_CLIENT_INSTALL_PATH
 
 # DXVK NVAPI

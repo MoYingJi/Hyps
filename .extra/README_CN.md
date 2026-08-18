@@ -226,6 +226,12 @@ sudo chgrp hosts /etc/hosts
 sudo chmod g+w /etc/hosts
 ```
 
+### MangoHud 读取不到 Intel CPU 功耗
+
+可以在 `_common.conf` 中打开 `INTEL_CPU_POWER_READ`，这样会在每次游戏运行前向你索要 sudo 以设置权限
+
+或查看 [此处](https://github.com/MoYingJi/moyingji.github.io/blob/main/docs/linux/gaming/index.md#读取功耗) 以寻求永久解决方案
+
 ## 删除
 
 删掉本项目的文件夹即可

@@ -73,7 +73,7 @@
 
 `RUNNER` 即是你要运行游戏的运行器，这里提供了一些默认的运行器
 
-<div style="overflow-x: auto; white-space: nowrap;">
+<div>
     <table>
         <thead>
             <tr>

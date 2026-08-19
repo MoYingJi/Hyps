@@ -407,7 +407,7 @@ static bool wl_init() {
     return true;
 }
 
-// 遍历 Wayland toplevel 列表，标题包含目标字符串即认为窗口存在
+// 遍历 Wayland toplevel 列表
 static bool check_wl_windows(const char *target_window) {
     // dispatch_pending 只派发已读入队列的事件，不会读 socket；
     // roundtrip 会读取并处理 socket 中的事件 (合成器应答 sync 为毫秒级)
@@ -431,7 +431,7 @@ static bool check_wl_windows(const char *target_window) {
             free(dead);
             continue;
         }
-        if (!found && node->title && strstr(node->title, target_window)) {
+        if (!found && node->title && strcmp(node->title, target_window) == 0) {
             found = true;
         }
         prev = node;
@@ -454,7 +454,7 @@ static bool check_wl_windows(const char *target_window) {
             free(dead);
             continue;
         }
-        if (!found && e_node->title && strstr(e_node->title, target_window)) {
+        if (!found && e_node->title && strcmp(e_node->title, target_window) == 0) {
             found = true;
         }
         e_prev = e_node;
@@ -477,7 +477,7 @@ static bool check_wl_windows(const char *target_window) {
             free(dead);
             continue;
         }
-        if (!found && p_node->title && strstr(p_node->title, target_window)) {
+        if (!found && p_node->title && strcmp(p_node->title, target_window) == 0) {
             found = true;
         }
         p_prev = p_node;
@@ -783,7 +783,7 @@ static bool check_window_exists_x11(Display *display, const char *target_window)
             char **list = nullptr;
             int count = 0;
             if (Xutf8TextPropertyToTextList(display, &text_prop, &list, &count) == Success) {
-                if (count > 0 && list[0] && strstr(list[0], target_window)) {
+                if (count > 0 && list[0] && strcmp(list[0], target_window) == 0) {
                     found = true;
                 }
                 XFreeStringList(list);

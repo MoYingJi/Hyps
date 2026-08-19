@@ -83,7 +83,7 @@ gi_fps_unlock_prepare() {
         xwin_watch_on exists gi_fps_unlock_start
     fi
 
-    register_hook cleanup gi_fps_unlock_cleanup
+    # register_hook cleanup gi_fps_unlock_cleanup
 }
 
 gi_fps_unlock_post_start() {
@@ -112,12 +112,27 @@ gi_fps_unlock_start() {
     GI_FPS_UNLOCK_PID="$!"
 }
 
-gi_fps_unlock_cleanup() {
-    if [ -n "$GI_FPS_UNLOCK_PID" ]; then
-        log_debug gi-fps-unlock "终止 FPS 解锁进程 $GI_FPS_UNLOCK_PID"
-        kill "$GI_FPS_UNLOCK_PID" 2>/dev/null
-    fi
-}
+# gi_fps_unlock_cleanup() {
+#     if [ -n "$GI_FPS_UNLOCK_PID" ]; then
+#         log_debug gi-fps-unlock "终止 FPS 解锁进程 $GI_FPS_UNLOCK_PID"
+#         kill "$GI_FPS_UNLOCK_PID" 2>/dev/null
+#         return 0
+#     fi
+
+#     local sleep
+#     sleep="$(config_get gi.fps_unlock.sleep)"
+#     if [[ "$sleep" = "-" ]]; then
+#         log_debug gi-fps-unlock "尝试终止 FPS 解锁进程 (通过 pgrep 检测)"
+#         local fps interval fifo
+#         fps="$(config_get gi.fps_unlock.val)"
+#         interval="$(config_get gi.fps_unlock.interval)"
+#         fifo="$(config_get gi.fps_unlock.fifo)"
+#         for pid in $(pgrep -u "$USER" -f "$FPS_UNLOCK_BIN .* $fps $interval $fifo"); do
+#             log_debug gi-fps-unlock "尝试终止 FPS 解锁进程 $pid (通过 pgrep 检测)"
+#             kill "$pid" 2>/dev/null
+#         done
+#     fi
+# }
 
 # 注册表 HDR
 

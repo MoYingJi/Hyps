@@ -152,6 +152,11 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+pack_declare() {
+    declare -p | grep -v '^declare -[a-zA-Z]*r'
+    declare -f
+}
+
 ensure_executable() {
     local file="$1"
     local module="${2:-utils}"

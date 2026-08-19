@@ -15,7 +15,7 @@ source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
 feat_xwin_watch_kill_load_config() {
     isy "$(config_get features.xwin_watch_kill)" || return 0
     config_set features.xwin_watch.enabled true
-    xwin_watch_on closed "feat_xwin_watch_kill_on_closed"
+    xwin_watch_on closed feat_xwin_watch_kill_on_closed
 }
 
 register_hook load_config feat_xwin_watch_kill_load_config 50 before:feat_xwin_watch_load_config

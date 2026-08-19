@@ -16,4 +16,4 @@ userdata_link() {
     try_link_dir "$USERDATA_LINK_SCREENSHOTS/ZenlessZoneZero" "$(dirname "$game_exe")/ScreenShot"
 }
 
-start_game
+hyps_main

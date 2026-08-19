@@ -17,4 +17,4 @@ userdata_link() {
     try_link_dir "$USERDATA_LINK_SCREENSHOTS/Honkai3" "$userprofile/Pictures/bh3rd"
 }
 
-start_game
+hyps_main

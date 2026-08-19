@@ -26,4 +26,4 @@ userdata_link() {
     try_link_dir "$USERDATA_LINK_SCREENSHOTS/WutheringWaves" "$game_dir/Client/Saved/ScreenShot"
 }
 
-start_game
+hyps_main

@@ -1,0 +1,142 @@
+#!/hint/bash
+
+[[ -n "${__ENVIRONMENT_SH_LOADED:-}" ]] && return 0
+__ENVIRONMENT_SH_LOADED=1
+
+#shellcheck source=lifecycle.sh
+source "${SCRIPT_DIR:-.}/lifecycle.sh"
+#shellcheck source=config.sh
+source "${SCRIPT_DIR:-.}/config.sh"
+#shellcheck source=utils.sh
+source "${SCRIPT_DIR:-.}/utils.sh"
+#shellcheck source=log.sh
+source "${SCRIPT_DIR:-.}/log.sh"
+
+declare -a ENV_EXPORTS=(
+    # Spritz
+    "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
+    "env.WINE_ENABLE_STEAM_STUB|WINE_ENABLE_STEAM_STUB|bool_to_01"
+    # DXVK
+    "env.DXVK_HUD|DXVK_HUD|bool_to_01"
+    "env.DXVK_HDR|DXVK_HDR|bool_to_01"
+    "env.DXVK_CONFIG|DXVK_CONFIG|string"
+    # VKD3D
+    "env.VKD3D_CONFIG|VKD3D_CONFIG|string"
+    # UMU
+    "runner.protonpath|PROTONPATH|path_dir"
+    "env.PROTONPATH|PROTONPATH|path_dir"
+    "env.GAMEID|GAMEID|string"
+    # Proton
+    "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
+    "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
+    "env.PROTON_DLSS_INDICATOR|PROTON_DLSS_INDICATOR|bool_to_01"
+    "env.PROTON_FSR4_INDICATOR|PROTON_FSR4_INDICATOR|bool_to_01"
+    "env.PROTON_PREFER_SDL|PROTON_PREFER_SDL|bool_to_01"
+    "env.PROTON_ENABLE_WAYLAND|PROTON_ENABLE_WAYLAND|bool_to_01"
+    "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
+    # MangoHud
+    "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
+    "env.MANGOHUD_CONFIGFILE|MANGOHUD_CONFIGFILE|path_file"
+    # NVIDIA
+    "env.NVPRESENT_ENABLE_SMOOTH_MOTION|NVPRESENT_ENABLE_SMOOTH_MOTION|bool_to_01"
+    # 我是 Steam Deck 别杀我 ✋😭🤚
+    "env.STEAMDECK|STEAMDECK|bool_to_01"
+    "env.SteamDeck|SteamDeck|bool_to_01"
+    "env.SteamOS|SteamOS|bool_to_01"
+)
+
+env_load_config() {
+    # 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
+    config_default env.DXVK_HUD false >/dev/null
+
+    # prefix 变量导出
+    ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")
+}
+
+register_hook load_config env_load_config
+
+export_env_vars() {
+    local key raw_value final_value env_name
+
+    for entry in "${ENV_EXPORTS[@]}"; do
+        IFS='|' read -r conf_key env_name transform <<< "$entry"
+        raw_value="${CONFIG[$conf_key]:-}"
+        [[ -z "$raw_value" ]] && continue
+        final_value="$("env_transform_$transform" "$raw_value")"
+        export "${env_name}=${final_value}"
+        log_debug environment "[显式] export $env_name=$final_value"
+    done
+
+    for key in "${!CONFIG[@]}"; do
+        [[ "$key" != env.* ]] && continue
+        local already_handled=false
+        for entry in "${ENV_EXPORTS[@]}"; do
+            IFS='|' read -r conf_key _ <<< "$entry"
+            [[ "$conf_key" == "$key" ]] && already_handled=true && break
+        done
+        $already_handled && continue
+        raw_value="${CONFIG[$key]}"
+        env_name="${key#env.}"
+        export "${env_name}=${raw_value}"
+        log_debug environment "[自动] export $env_name=$raw_value"
+    done
+}
+
+declare -a ENV_MKDIRS=()
+
+env_mkdirs() {
+    local dir
+    for dir in "${ENV_MKDIRS[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            mkdir -p "$dir" || die 1 environment "无法创建目录: '$dir'"
+        fi
+    done
+}
+
+register_hook prepare env_mkdirs
+
+
+
+env_transform_string() {
+    local value="$1"
+    echo "$value"
+}
+
+env_transform_bool_to_01() {
+    local value="$1"
+    isy "$value" && echo "1" || echo "0"
+    return 0
+}
+
+env_transform_path_dir() {
+    local dir_path="$1"
+    if [[ -d "$dir_path" ]]; then
+        realpath "$dir_path"
+    else
+        die 1 environment "目录不存在: '$dir_path'"
+    fi
+}
+
+env_transform_path_mkdir() {
+    local dir_path="$1"
+    if [[ -d "$dir_path" ]]; then
+        realpath "$dir_path"
+        return 0
+    elif [[ -e "$dir_path" ]]; then
+        die 1 environment "路径已存在但不是目录: '$dir_path'"
+    else
+        dir_path="$(realpath -m "$dir_path")"
+        ENV_MKDIRS+=("$dir_path")
+        log_debug environment "目录待创建: '$dir_path'"
+        return 0
+    fi
+}
+
+env_transform_path_file() {
+    local file_path="$1"
+    if [[ -f "$file_path" ]]; then
+        realpath "$file_path"
+    else
+        die 1 environment "文件不存在: '$file_path'"
+    fi
+}

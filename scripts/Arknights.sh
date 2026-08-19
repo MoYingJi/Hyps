@@ -11,4 +11,4 @@ overlay_auto_lower() {
     dirname "$game_exe"
 }
 
-start_game
+hyps_main

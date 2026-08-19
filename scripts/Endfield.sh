@@ -16,4 +16,4 @@ userdata_link() {
     try_link_dir "$USERDATA_LINK_SCREENSHOTS/Endfield" "$userprofile/Pictures/ENDFIELD"
 }
 
-start_game
+hyps_main

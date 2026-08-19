@@ -1,16 +1,21 @@
 .idea/
 .vscode/
 
+/config/*
+
+!/config/games/
 /config/games/*
 !/config/games/*.example.*
 !/config/games/.gitkeep
 
+!/config/games.examples/
+
+!/config/runners/
 /config/runners/*
 !/config/runners/*.example.*
-!/config/runners/proton-system.conf
-!/config/runners/umu-run.conf
 !/config/runners/umu-cachyos.conf
 !/config/runners/umu-dwproton.conf
+!/config/runners/umu-ge-proton.conf
 
 /scripts/*
 !/scripts/_Lib.sh

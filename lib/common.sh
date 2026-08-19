@@ -1,905 +1,147 @@
 #!/hint/bash
-#shellcheck disable=1090,1091,2086
-# ↑ shellcheck: 我不如烂这算了
 
-# 神秘小脚本
-
-# 神秘小脚本内所使用的都是全局变量，且对于 conf 文件都是直接 source
-# 所以在 conf 文件中添加其他变量可能会造成奇奇怪怪的效果
-
-# 脚本所使用的部分环境变量
-# 推荐填写处的 <runner>.conf 是指运行器配置文件，<game>.conf 填写的是游戏配置文件，<g/c>.conf 是指游戏通用配置文件或游戏配置文件均可
-# 默认值的 <bool y/n> 是指该值只会被以 bool 类型被用到，真假值的判断详见下方 isy 函数；<empty> 是指空值
-# 要求的「选必」是指如果启用了某功能就必填，根据上下文自行判断
-
-# 环境变量              简略描述                   要求   推荐填写处      默认值/备注
-
-# GAME_NAME             游戏名                     必填   「由脚本提供」
-# CONFIG_DIR            配置目录                   选填   config.conf     $XDG_CONFIG_HOME/hypsc
-# CACHE_DIR             缓存目录                   选填   config.conf     $XDG_CACHE_HOME/hypsc
-# COMMON_GAME_CONF      游戏通用配置文件位置       选填   config.conf     $CONFIG_DIR/Games/_common.conf
-
-# WINE                  游戏运行器位置             必填   <runner>.conf
-# PREFIX_VAR_NAME       PREFIX 存储变量名          选填   <runner>.conf   WINEPREFIX
-# PROTONPATH            umu 使用的 proton 位置     选填   <runner>.conf   「由 umu 决定，非 umu-run 启动则不适用」
-# GAMEID                umu 的 umu-id              选填   <runner>.conf   umu-default「由 umu 决定，非 umu-run 启动则不适用」
-# SKIP_CUSTOM_BAT       跳过自定义启动脚本         选填   <runner>.conf   <bool n>「跳过后直接运行游戏，无法使用 BEFORE_GAME/AFTER_GAME 等功能」
-# FORCE_CUSTOM_BAT      强制使用自定义启动脚本     选填   <runner>.conf   <bool n>「强制使用自定义批处理脚本启动，何必多此一举」
-
-# RUNNER                游戏的运行器               必填   <game>.conf
-# GAME                  游戏本体位置               必填   <game>.conf
-# GAME_PATH             游戏运行路径               选填   <game>.conf     $(dirname "$GAME")
-# GAME_ARGS             游戏启动参数               选填   <game>.conf
-# PREFIX                游戏运行的 PREFIX          选填   <game>.conf     $PREFIX_DEFAULT_DIR/$GAME_NAME
-# PREFIX_DEFAULT_DIR    默认 PREFIX 位置           选填   <game>.conf     $DATA_DIR/prefixes
-
-# PROTON_TO_WINE_LINK         创建 Proton 前缀的软链接   选填   <g/c>.conf   <bool n>
-# WINESERVER_KILL             游戏启动前运行杀死命令     选填   <g/c>.conf   <bool n>
-# EXE_KILL                    游戏启动前杀死所有 exe     选填   <g/c>.conf   <bool n>
-# MANGOHUD                    Wine 的包装 (mangohud)     选填   <g/c>.conf   <empty>
-# GAMEMODE                    Wine 的包装 (gamemoderun)  选填   <g/c>.conf   <empty>
-# TASKSET                     Wine 的包装 (taskset)      选填   <g/c>.conf   <empty>
-# GAMESCOPE                   Wine 的包装 (gamescope)    选填   <g/c>.conf   <empty>
-# GAMESCOPE_ARGS              Gamescope 启动参数         选填   <g/c>.conf   <array empty>
-# INTEL_CPU_POWER_READ        Intel CPU 能耗文件可读     选填   <g/c>.conf   <bool n>
-# INTEL_CPU_POWER_FILE        Intel CPU 能耗文件         选填   <g/c>.conf   <array /sys/class/powercap/intel-rapl:0/energy_uj>
-# GL_SHADER_DISK_CACHE        NVIDIA 缓存 是否启用       选填   <g/c>.conf   <bool n>
-# GL_SHADER_DISK_CACHE_PATH   NVIDIA 缓存 路径           选填   <g/c>.conf   $CACHE_DIR/GLShaderCache/$GAME_NAME
-# DX_CACHE                    DXVK/VKD3D 缓存 是否启用   选填   <g/c>.conf   <bool n>
-# DX_CACHE_PATH               DXVK/VKD3D 缓存 路径       选填   <g/c>.conf   $CACHE_DIR/DXCache/$GAME_NAME
-# MANGOHUD_CONFIGFILE         MangoHud 配置文件位置      选填   <g/c>.conf   「由 MangoHud 决定，未启用 MangoHud 则不适用」
-
-# PROTON_DLSS_UPGRADE         自动升级 DLSS 有关的 dll 文件         选填   <g/c>.conf   <bool n>
-# PROTON_DLSS_VERSION         升级的 DLSS 版本                      选填   <g/c>.conf   <empty>
-# PROTON_DLSS_INDICATOR       启用 DLSS 叠加层                      选填   <g/c>.conf   <bool n>
-# PROTON_FSR4_UPGRADE         自动升级 FSR4 有关的 dll 文件         选填   <g/c>.conf   <bool n>
-# PROTON_FSR4_VERSION         升级的 FSR4 版本                      选填   <g/c>.conf   <empty>
-# PROTON_FSR4_INDICATOR       启用 FSR4 叠加层                      选填   <g/c>.conf   <bool n>
-# PROTON_PREFER_SDL          【不知道 和手柄有关的 开了更好】       选填   <g/c>.conf   <bool n>
-# NVIDIA_SMOOTH_MOTION        NVIDIA AI 插帧 (旧称 Smooth Motion)   选填   <g/c>.conf   <bool n>
-# NVIDIA_REFLEX               NVIDIA Reflex 低延迟                  选填   <g/c>.conf   <bool n>
-
-# TIME_RECORD              是否启用记录游戏时间          选填   <g/c>.conf    <bool y>
-# TIME_RECORD_MIN_SEC      记录游戏时间的最小秒数        选填   <g/c>.conf    60
-
-# HOSTNAME_STEAMDECK       伪装 Hostname                 选填   <game>.conf   <bool n>
-# HOSTNAME_STEAMDECK_NAME  要伪装的 Hostname             选填   <game>.conf   STEAMDECK
-
-# KILL_TARGET              游戏窗口关闭时杀死进程        选填   <game>.conf   <bool n>
-# KILL_TARGET_PROCESS      KILL_TARGET 要杀死的进程      选必   <game>.conf
-
-# XWIN_WATCH_WINDOW       XWIN_WATCH 要检测可窗口              选必   <g/c>.conf
-# XWIN_WATCH_SLEEP        XWIN_WATCH 检测窗口出现的间隔 (秒)   选填   <g/c>.conf   5
-# XWIN_WATCH_INTERVAL     XWIN_WATCH 检测窗口关闭的间隔 (秒)   选填   <g/c>.conf   $XWIN_WATCH_SLEEP
-# XWIN_WATCH_ATTEMPTS     XWIN_WATCH 检测窗口出现尝试次数      选填   <g/c>.conf   20
-
-# OVERLAY                   是否启用 OverlayFS      选填   <game>.conf   <bool n>
-# OVERLAY_LOWER_AUTO        自动选择 lower 目录     选必   <game>.conf   <bool n> 「会根据每个游戏的情况检测 lower 目录」
-# OVERLAY_LOWER             OverlayFS lower 目录    选必   <game>.conf   <empty>  「若同时启用则覆盖前者」
-# OVERLAY_DIR               OverlayFS 相关目录      选填   <game>.conf   <empty> $DATA_DIR/overlays/$GAME_NAME「自动创建 mount、upper、work」
-# OVERLAY_MOUNT             OverlayFS 挂载点        选填   <game>.conf   <empty> | $OVERLAY_DIR/mount
-# OVERLAY_UPPER             OverlayFS upper 目录    选填   <game>.conf   <empty> | $OVERLAY_DIR/upper
-# OVERLAY_WORK              OverlayFS work 目录     选填   <game>.conf   <empty> | $OVERLAY_DIR/work
-# OVERLAY_REBIND_GAME       是否重绑定游戏路径      选填   <game>.conf   <bool y>
-# OVERLAY_REBIND_GAME_PATH  是否重绑定游戏运行路径  选填   <game>.conf   <bool y>
-# OVERLAY_UMOUNT            是否在退出后卸载        选填   <game>.conf   <bool y>
-
-# NETWORK_HOSTS            基于 Hosts 文件断网启动       选填   <game>.conf   <bool n>
-# NETWORK_HOSTS_FILE       NETWORK_HOSTS 文件路径        选填   <game>.conf   /etc/hosts
-# NETWORK_HOSTS_DURATION   NETWORK_HOSTS 断网时长 (秒)   选填   <game>.conf   -「填入 `-` 则代表调用 XWIN_WATCH 等待窗口出现」
-# NETWOKR_HOSTS_CONTENT    NETWORK_HOSTS 断网规则        选必   <game>.conf
-# NETWORK_HOSTS_ORI_PERM   NETWORK_HOSTS 文件原始权限    选填   <game>.conf   「默认修改前自动读取」
-# NETWORK_HOSTS_TGT_PREM   NETWORK_HOSTS 文件目标权限    选填   <game>.conf   a+w
-
-# ↑ 我为什么要维护这么一大坨东西（笑哭）
-
-if [ "$UID" -eq 0 ]; then
-    echo "你个小天才是怎么想到用 root 运行的（"
-    exit 1
-fi
-
-[ -z "$GAME_NAME" ] && exit 1
+[ "$UID" -ne 0 ] || { echo "你个小天才是怎么想到用 root 运行的（"; exit 1; }
+[ -n "$GAME_NAME" ] || { echo "请在运行前设置环境变量 GAME_NAME"; exit 1; }
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 
+SCRIPT_START_NANOSECONDS="$(date +%s%N)"
+
+
+#shellcheck source=log.sh
+source "$SCRIPT_DIR/log.sh"
 #shellcheck source=utils.sh
 source "$SCRIPT_DIR/utils.sh"
-
-[ -f "config.conf" ] && source config.conf
-
-[ -z "$CONFIG_DIR" ] && CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
-[ -z "$CACHE_DIR" ] && CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
-[ -z "$DATA_DIR" ] && DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
-[ -z "$TEMP_DIR" ] && TEMP_DIR="/tmp/hypsc"
-
-[ -e "$TEMP_DIR" ] && rm -r "$TEMP_DIR"
-mkdir -p "$TEMP_DIR"
-
-# 读取通用配置
-
-[ -f "$CONFIG_DIR/config.conf" ] && source "$CONFIG_DIR/config.conf"
-
-[ -z "$COMMON_GAME_CONF" ] && COMMON_GAME_CONF="$CONFIG_DIR/games/_common.conf"
-[ -f "$COMMON_GAME_CONF" ] && source "$COMMON_GAME_CONF"
-
-# 读取游戏配置
-
-[ -z "$GAME_CONF" ] && GAME_CONF="$CONFIG_DIR/games/$GAME_NAME.conf"
-[ ! -f "$GAME_CONF" ] && exit 1
-source "$GAME_CONF"
-
-[ -z "$RUNNER" ] && exit 1
-[ -z "$GAME" ] && exit 1
-[ -z "$GAME_PATH" ] && GAME_PATH="$(dirname "$GAME")"
-
-# 读取 RUNNER 配置
-
-RUNNER_CONF="$CONFIG_DIR/runners/$RUNNER.conf"
-source "$RUNNER_CONF"
-
-[ -z "$WINE" ] && exit 1
-[ -z "$PREFIX_VAR_NAME" ] && PREFIX_VAR_NAME="WINEPREFIX"
-
-# 配置 WINE
-
-# 如果 $PREFIX 为空，就找 名为 $PREFIX_VAR_NAME 的值的变量，赋值过来做些操作
-# $PREFIX_VAR_NAME 就是 Runner 中定义的 存储 PREFIX 路径 的变量名
-# Wine/UMU 中 PREFIX_VAR_NAME=WINEPREFIX
-# Proton 中 PREFIX_VAR_NAME=STEAM_COMPAT_DATA_PATH
-if [ -z "$PREFIX" ] && [ -n "$PREFIX_VAR_NAME" ] && [ -n "${!PREFIX_VAR_NAME}" ]; then
-    PREFIX="${!PREFIX_VAR_NAME}"
-fi
-
-if [ -z "$PREFIX" ]; then
-    [ -z "$PREFIX_DEFAULT_DIR" ] && PREFIX_DEFAULT_DIR="$DATA_DIR/prefixes"
-    PREFIX="$PREFIX_DEFAULT_DIR/$GAME_NAME"
-fi
-
-if [ -n "$PREFIX" ]; then
-    PREFIX="$(realpath "$PREFIX")"
-
-    mkdir -p "$PREFIX"
-
-    # 在 PREFIX 创建由 pfx 到 . 的软链接
-    # （STEAM_COMPAT_DATA_PATH 下的 pfx 是 WINEPREFIX）
-    # 和一些判断的逻辑
-    # 这个可以关掉了吧，umu 都提供了
-    if isy "$PROTON_TO_WINE_LINK" && [ ! -L "$PREFIX/pfx" ]; then
-        # 判断是否原有 pfx
-        if [ -d "$PREFIX/pfx" ]; then
-            # 判断是否原有 wineprefix
-            if [ -d "$PREFIX/dosdevices" ]; then
-                # 使用原有 wineprefix
-                mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
-            else
-                # 将原有的 pfx 移动到 原目录
-                mv "$PREFIX/pfx/".* "$PREFIX/"
-                mv "$PREFIX/pfx/"* "$PREFIX/"
-                rmdir "$PREFIX/pfx" 2>/dev/null || mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
-            fi
-        elif [ -f "$PREFIX/pfx" ]; then
-            # 处理 pfx 是文件的情况
-            mv "$PREFIX/pfx" "$PREFIX/pfx.bak"
-        fi
-        # 创建链接
-        ln -sf . "$PREFIX/pfx"
-    fi
-fi
-
-# 将 $PREFIX 的值 赋值给 名为 $PREFIX_VAR_NAME 的值的变量
-# 我怎么感觉没这句注释更好理解呢？
-[ -n "$PREFIX" ] && declare -x "$PREFIX_VAR_NAME=$PREFIX"
-
-export "${PREFIX_VAR_NAME?}"
-
-# 导出环境变量
-
-export XCURSOR_SIZE
-
-# Wine
-export WINEDLLOVERRIDES
-
-# Spritz
-export WINE_ENABLE_TIMEOUT_FIX
-export WINE_ENABLE_STEAM_STUB
-
-# umu-launcher
-export PROTONPATH
-export GAMEID
-
-isy "$UMU_USE_STEAM" && UMU_USE_STEAM=1
-export UMU_USE_STEAM
-
-if [[ ! "$WINE" =~ "umu-run" ]]; then
-    [ -n "$PROTONPATH" ] && echo "[Hyps] WARN: PROTONPATH 已设置，但运行器不是 umu-launcher 系列，这项设置没有意义"
-    [ "$UMU_USE_STEAM" = 1 ] && echo "[Hyps] WARN: UMU_USE_STEAM 已启用，但运行器不是 umu-launcher 系列，相关功能将无法使用"
-fi
-
-
-# MangoHud
-export MANGOHUD_CONFIGFILE
-
-# SteamDeck
-export STEAMDECK
-export SteamDeck
-export SteamOS
-
-# Steam
-export STEAM_COMPAT_CLIENT_INSTALL_PATH
-
-# DXVK NVAPI
-export DXVK_NVAPI_DRS_SETTINGS
-export DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE
-export DXVK_NVAPI_DRS_NGX_DLSS_RR_OVERRIDE
-export DXVK_NVAPI_DRS_NGX_DLSS_FG_OVERRIDE
-export DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION
-export DXVK_NVAPI_DRS_NGX_DLSS_RR_OVERRIDE_RENDER_PRESET_SELECTION
-export DXVK_NVAPI_DRS_NGX_DLSS_FG_OVERRIDE_RENDER_PRESET_SELECTION
-export DXVK_NVAPI_DRS_NGX_DLSSG_MULTI_FRAME_COUNT
-export DXVK_NVAPI_SET_NGX_DEBUG_OPTIONS
-export DXVK_NVAPI_GPU_ARCH
-
-# VKD3D
-export VKD3D_CONFIG
-
-# DXVK
-export DXVK_CONFIG
-
-# DXVK HUD
-# 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
-[ -z "${DXVK_HUD+set}" ] && DXVK_HUD=0
-isy "$DXVK_HUD" && DXVK_HUD=1
-export DXVK_HUD
-
-# DXVK HDR
-isy "$DXVK_HDR" && DXVK_HDR=1
-export DXVK_HDR
-
-# PROTON NGX UPGRADE
-isy "$PROTON_ENABLE_NGX_UPDATER" && PROTON_ENABLE_NGX_UPDATER=1
-export PROTON_ENABLE_NGX_UPDATER
-
-# PROTON DLSS UPGRADE
-isy "$PROTON_DLSS_UPGRADE" && PROTON_DLSS_UPGRADE=1
-[ -n "$PROTON_DLSS_VERSION" ] && PROTON_DLSS_UPGRADE="$PROTON_DLSS_VERSION"
-export PROTON_DLSS_UPGRADE
-
-# PROTON DLSS INDICATOR
-isy "$PROTON_DLSS_INDICATOR" && PROTON_DLSS_INDICATOR=1
-export PROTON_DLSS_INDICATOR
-
-# PROTON FSR4 UPGRADE
-isy "$PROTON_FSR4_UPGRADE" && PROTON_FSR4_UPGRADE=1
-[ -n "$PROTON_FSR4_VERSION" ] && PROTON_FSR4_UPGRADE="$PROTON_FSR4_VERSION"
-export PROTON_FSR4_UPGRADE
-
-# PROTON FSR4 INDICATOR
-isy "$PROTON_FSR4_INDICATOR" && PROTON_FSR4_INDICATOR=1
-export PROTON_FSR4_INDICATOR
-
-# NVIDIA REFLEX 低延迟
-isy "$DXVK_NVAPI_VKREFLEX" && DXVK_NVAPI_VKREFLEX=1
-isy "$NVIDIA_REFLEX" && DXVK_NVAPI_VKREFLEX=1
-export DXVK_NVAPI_VKREFLEX
-
-# NVIDIA Smooth Motion (AI 插帧)
-isy "$NVPRESENT_ENABLE_SMOOTH_MOTION" && NVPRESENT_ENABLE_SMOOTH_MOTION=1
-isy "$NVIDIA_SMOOTH_MOTION" && NVPRESENT_ENABLE_SMOOTH_MOTION=1
-export NVPRESENT_ENABLE_SMOOTH_MOTION
-
-# Proton 手柄问题
-isy "$PROTON_PREFER_SDL" && PROTON_PREFER_SDL=1
-export PROTON_PREFER_SDL
-
-# Proton Wayland
-isy "$PROTON_ENABLE_WAYLAND" && PROTON_ENABLE_WAYLAND=1
-export PROTON_ENABLE_WAYLAND
-
-# Proton HDR
-isy "$PROTON_ENABLE_HDR" && PROTON_ENABLE_HDR=1
-export PROTON_ENABLE_HDR
-
-# Proton VKD3D Heap
-isy "$PROTON_VKD3D_HEAP" && PROTON_VKD3D_HEAP=1
-export PROTON_VKD3D_HEAP
-
-# Vulkan HDR WSI
-isy "$ENABLE_HDR_WSI" && ENABLE_HDR_WSI=1
-export ENABLE_HDR_WSI
-
-
-# GL_SHADER_DISK_CACHE
-if isy "$GL_SHADER_DISK_CACHE"; then
-    [ -z "$GL_SHADER_DISK_CACHE_PATH" ] && GL_SHADER_DISK_CACHE_PATH="$CACHE_DIR/GLShaderCache/$GAME_NAME"
-    mkdir -p "$GL_SHADER_DISK_CACHE_PATH"
-    GL_SHADER_DISK_CACHE_PATH="$(realpath "$GL_SHADER_DISK_CACHE_PATH")"
-
-    export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
-    export __GL_SHADER_DISK_CACHE_PATH="$GL_SHADER_DISK_CACHE_PATH"
-fi
-
-# DX_CACHE
-if isy "$DX_CACHE"; then
-    [ -z "$DX_CACHE_PATH" ] && DX_CACHE_PATH="$CACHE_DIR/DXCache/$GAME_NAME"
-    mkdir -p "$DX_CACHE_PATH"
-    DX_CACHE_PATH="$(realpath "$DX_CACHE_PATH")"
-
-    export DXVK_STATE_CACHE_PATH="$DX_CACHE_PATH"
-    export VKD3D_SHADER_CACHE_PATH="$DX_CACHE_PATH"
-fi
-
-# 伪装 Hostname 为 STEAMDECK
-if isy "$HOSTNAME_STEAMDECK"; then
-    [ -z "$HOSTNAME_STEAMDECK_NAME" ] && HOSTNAME_STEAMDECK_NAME="STEAMDECK"
-
-    BEFORE_GAME="$(cat << EOF
-$BEFORE_GAME
-reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName /v ComputerName /t REG_SZ /d $HOSTNAME_STEAMDECK_NAME /f
-reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ComputerName /v ComputerName /t REG_SZ /d $HOSTNAME_STEAMDECK_NAME /f
-EOF
-    )"
-fi
-
-# Systemd Inhibit
-# 隐藏的小功能 能用就用吧（
-if isy "$SYSTEMD_INHIBIT"; then
-    INHIBIT_WRAPPER=("systemd-inhibit")
-
-    [ -z "$SYSTEMD_INHIBIT_WHY" ] && SYSTEMD_INHIBIT_WHY="Game-Hyps $GAME_NAME"
-    [ -z "$SYSTEMD_INHIBIT_WHAT" ] && SYSTEMD_INHIBIT_WHAT="idle:sleep"
-
-    INHIBIT_WRAPPER+=("--why=$SYSTEMD_INHIBIT_WHY")
-    INHIBIT_WRAPPER+=("--what=$SYSTEMD_INHIBIT_WHAT")
-
-    WRAPPER_CMD=("${INHIBIT_WRAPPER[@]}" -- "${WRAPPER_CMD[@]}")
-fi
-
-# Gamescope
-if [ -n "$GAMESCOPE" ]; then
-    if [ -n "$MANGOHUD" ]; then
-        if [ "$MANGOHUD" = "mangohud" ] && [ "$GAMESCOPE" = "gamescope" ]; then
-            GAMESCOPE_ARGS+=("--mangoapp")
-            echo "[Hyps] 检测到 Gamescope 搭配 MangoHud 使用，换用 \`--mangoapp\` 参数"
-        else
-            echo "[Hyps] WARN: Gamescope 与 MangoHud 不能同时使用！已关闭 MangoHud！"
-        fi
-
-        unset MANGOHUD
-    fi
-fi
-
-# 某个已经退役的补丁
-if [ -n "$JADEITE_PATH" ]; then
-    GAME_EXE_PREFIX="$GAME_EXE_PREFIX \"Z:\\$JADEITE_PATH\""
-    GAME_ARGS="$JADEITE_ARGS -- $GAME_ARGS"
-fi
-
-# Kill Target
-
-if isy "$KILL_TARGET"; then
-    XWIN_WATCH="y"
-
-    XWIN_WATCH_ON_CLOSED="$(cat << EOF
-$XWIN_WATCH_ON_CLOSED
-killall $KILL_TARGET_PROCESS
-EOF
-    )"
-fi
-
-# Hosts 断网启动
-
-if isy "$NETWORK_HOSTS"; then
-    if [ -z "$NETWORK_HOSTS_DURATION" ] || [ "$NETWORK_HOSTS_DURATION" = "-" ]; then
-        XWIN_WATCH="y"
-    fi
-
-    if [ -z "$NETWORK_HOSTS_CONTENT" ]; then
-        echo "[Hyps] WARN: 检测到 Hosts 断网启动参数，请在 \$NETWORK_HOSTS_CONTENT 填写要在 Hosts 文件附加的内容！"
-        exit 1
-    fi
-fi
-
-run_network_hosts() {
-    isy "$NETWORK_HOSTS" || return 0
-    [ -n "$NETWORK_HOSTS_CONTENT" ] || return 0 # 前面检测过了
-
-    [ -z "$NETWORK_HOSTS_FILE" ] && NETWORK_HOSTS_FILE="/etc/hosts"
-    [ -z "$NETWORK_HOSTS_DURATION" ] && NETWORK_HOSTS_DURATION="-"
-    [ -z "$NETWORK_HOSTS_TGT_PREM" ] && NETWORK_HOSTS_TGT_PREM="a+w"
-    NETWORK_HOSTS_FILE="$(realpath "$NETWORK_HOSTS_FILE")"
-
-    [ -f "$NETWORK_HOSTS_FILE" ] || { echo "[Hyps] WARN: Hosts 文件不存在，无法进行断网启动"; return 0; }
-
-
-    if [ ! -w "$NETWORK_HOSTS_FILE" ]; then
-        [ -z "$NETWORK_HOSTS_ORI_PERM" ] && NETWORK_HOSTS_ORI_PERM=$(stat -c "%a" "$NETWORK_HOSTS_FILE")
-
-        sudo_request "使 hosts 文件可被写入" chmod "$NETWORK_HOSTS_TGT_PREM" "$NETWORK_HOSTS_FILE"
-    fi
-
-    [ -z "$NETWORK_HOSTS_FLAG" ] && NETWORK_HOSTS_FLAG="Hyps Gaming Network Hosts"
-    local flagStart="# $NETWORK_HOSTS_FLAG $GAME_NAME Start"
-    local flagEnd="# $NETWORK_HOSTS_FLAG $GAME_NAME End"
-
-    NETWORK_HOSTS_CONTENT="$(cat << EOF
-$flagStart
-$NETWORK_HOSTS_CONTENT
-$flagEnd
-EOF
-    )"
-    local hosts_temp_file
-    hosts_temp_file="$(mktemp "$TEMP_DIR/hosts.XXXXXXX.bak")"
-    cat "$NETWORK_HOSTS_FILE" > "$hosts_temp_file"
-    echo -n "$NETWORK_HOSTS_CONTENT" >> "$NETWORK_HOSTS_FILE"
-
-    NETWORK_HOSTS_REC_CMD="$(cat << EOF
-echo "[\$(date +%H:%M:%S)] 恢复 Hosts"
-cat "$hosts_temp_file" > "$NETWORK_HOSTS_FILE"
-EOF
-    )"
-
-    if [ -n "$NETWORK_HOSTS_ORI_PERM" ]; then
-        NETWORK_HOSTS_REC_CMD="$(cat << EOF
-$NETWORK_HOSTS_REC_CMD
-[ "\$(type -t sudo_request)" = "function" ] || source "$SCRIPT_DIR/utils.sh"
-sudo_request "恢复 hosts 文件权限" chmod "$NETWORK_HOSTS_ORI_PERM" "$NETWORK_HOSTS_FILE"
-EOF
-        )"
-    fi
-
-    if [ "$NETWORK_HOSTS_DURATION" != "-" ]; then
-        (
-            # 后台运行部分
-            sleep "$NETWORK_HOSTS_DURATION"
-            eval "$NETWORK_HOSTS_REC_CMD"
-        ) &
-        BACKGROUND_PID+=("$!")
+#shellcheck source=lifecycle.sh
+source "$SCRIPT_DIR/lifecycle.sh"
+#shellcheck source=config.sh
+source "$SCRIPT_DIR/config.sh"
+#shellcheck source=environment.sh
+source "$SCRIPT_DIR/environment.sh"
+
+#shellcheck source=./features/custom_batch.sh
+source "$SCRIPT_DIR/features/custom_batch.sh"
+#shellcheck source=./features/dxvk_nvapi_env.sh
+source "$SCRIPT_DIR/features/dxvk_nvapi_env.sh"
+#shellcheck source=./features/hosts_disconnect.sh
+source "$SCRIPT_DIR/features/hosts_disconnect.sh"
+#shellcheck source=./features/intel_rapl_read.sh
+source "$SCRIPT_DIR/features/intel_rapl_read.sh"
+#shellcheck source=./features/jade_patch.sh
+source "$SCRIPT_DIR/features/jade_patch.sh"
+#shellcheck source=./features/kill_wineserver.sh
+source "$SCRIPT_DIR/features/kill_wineserver.sh"
+#shellcheck source=./features/mod_reg_hostname.sh
+source "$SCRIPT_DIR/features/mod_reg_hostname.sh"
+#shellcheck source=./features/overlay.sh
+source "$SCRIPT_DIR/features/overlay.sh"
+#shellcheck source=./features/pfx_link.sh
+source "$SCRIPT_DIR/features/pfx_link.sh"
+#shellcheck source=./features/program_cache.sh
+source "$SCRIPT_DIR/features/program_cache.sh"
+#shellcheck source=./features/time_record.sh
+source "$SCRIPT_DIR/features/time_record.sh"
+#shellcheck source=./features/userdata_link.sh
+source "$SCRIPT_DIR/features/userdata_link.sh"
+#shellcheck source=./features/wrappers.sh
+source "$SCRIPT_DIR/features/wrappers.sh"
+#shellcheck source=./features/xwin_watch_kill.sh
+source "$SCRIPT_DIR/features/xwin_watch_kill.sh"
+#shellcheck source=./features/xwin_watch.sh
+source "$SCRIPT_DIR/features/xwin_watch.sh"
+
+
+hyps_main() {
+    load_config
+    run_hooks load_config || exit $?
+    export_env_vars
+
+    trap cleanup EXIT
+
+    mkdir -p "$TEMP_DIR" || die 1 lifecycle "无法创建临时目录: '$TEMP_DIR'"
+    run_hooks prepare
+    build_game_command
+    run_hooks pre_start
+    start_game_process
+    run_hooks post_start
+    wait "$GAME_PID"
+}
+
+cleanup() {
+    log_info lifecycle "终止"
+    kill "$GAME_PID" 2>/dev/null
+    run_hooks cleanup
+
+    isy "$DEBUG_SKIP_REMOVE_TEMP" || rm -rf "$TEMP_DIR"
+}
+
+load_config() {
+    local game_config_file
+    local runner_name
+
+    config_parse_file "$PROJECT_ROOT/config.conf"
+
+    config_read_realpath path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
+
+    config_parse_file "$CONFIG_DIR/config.conf"
+
+    config_read_realpath path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
+    config_read_realpath path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
+    config_read_realpath path.temp TEMP_DIR "/tmp/hypsc"
+
+    config_parse_file "$CONFIG_DIR/games/_common.conf"
+
+    game_config_file="$CONFIG_DIR/games/${GAME_NAME}.conf"
+    [ -f "$game_config_file" ] || die 1 config "游戏配置文件不存在：$game_config_file"
+
+    if config_has runner.name; then
+        # 如果已经有 runner，直接读
+        config_read runner.name runner_name
+        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
+        config_parse_file "$game_config_file"
     else
-        # 调用 XWin Watch
-        XWIN_WATCH_ON_EXISTS="$(cat << EOF
-$XWIN_WATCH_ON_EXISTS
-$NETWORK_HOSTS_REC_CMD
-EOF
-        )"
-        XWIN_WATCH_ON_FAILED="$(cat << EOF
-$XWIN_WATCH_ON_FAILED
-$NETWORK_HOSTS_REC_CMD
-EOF
-        )"
-    fi
-}
-
-# XWin Watch
-
-prepare_xwin_watch() {
-    isy "$XWIN_WATCH" || return 0
-
-    [ -z "$XWIN_WATCH_PATH" ] && XWIN_WATCH_PATH="./tools/xwin-watch"
-
-    check_cached_compile "XWIN_WATCH" \
-        "$XWIN_WATCH_PATH/xwin-watch" \
-        "$XWIN_WATCH_PATH/xwin-watch.c" \
-        "$CACHE_DIR/xwin-watch.c.sha256sum"
-
-    if [ -z "$XWIN_WATCH_WINDOW" ]; then
-        echo "[xwin-watch] 缺少要监测的窗口名称"
-        exit 1
+        # 为了保证优先级 runner < games
+        # 先从 games 读 runner，再读 runner 配置，然后将 games 配置合并上去
+        config_parse_to_temp "$game_config_file"
+        config_read runner.name runner_name "" TEMP_CONFIG
+        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
+        config_merge_temp
     fi
 
-    # 如果程序不存在 但源文件存在 则尝试编译
-    if [ ! -f "$XWIN_WATCH_BIN" ] && [ -f "$XWIN_WATCH_SRC" ]; then
-        echo "[xwin-watch] 编译 $XWIN_WATCH_SRC"
-        if pkg-config --exists wayland-client; then
-            # 有 wayland-client 时启用 Wayland 后端 (wlr-foreign-toplevel-management)
-            gcc "$XWIN_WATCH_SRC" "$(dirname "$XWIN_WATCH_SRC")/wlr-foreign-toplevel-management-unstable-v1.c" \
-                -o "$XWIN_WATCH_BIN" -lX11 -lwayland-client \
-                -I"$(dirname "$XWIN_WATCH_SRC")" -DHAVE_WAYLAND
-        else
-            gcc "$XWIN_WATCH_SRC" -o "$XWIN_WATCH_BIN" -lX11
-        fi
-    fi
+    config_require_realpath_exe runner.exe
+    config_require_realpath_file game.exe
 
-    if [ ! -f "$XWIN_WATCH_BIN" ]; then
-        echo "[xwin-watch] 编译失败或源文件不存在"
-        exit 1
-    else
-        sha256sum "$XWIN_WATCH_SRC" | awk '{print $1}' > "$XWIN_WATCH_SHA256_FILE"
-    fi
+    config_realpath game.prefix "$DATA_DIR/prefixes/${GAME_NAME}" >/dev/null
 
-    # 确保可执行
-    set_executable "$XWIN_WATCH_BIN"
-
-    [ -z "$XWIN_WATCH_SLEEP" ] && XWIN_WATCH_SLEEP="5"
-    [ -z "$XWIN_WATCH_INTERVAL" ] && XWIN_WATCH_INTERVAL="$XWIN_WATCH_SLEEP"
-    [ -z "$XWIN_WATCH_ATTEMPTS" ] && XWIN_WATCH_ATTEMPTS="20"
-
-    if [[ "$XWIN_WATCH_SLEEP" =~ [^0-9] ]]; then
-        echo "[xwin-watch] 错误: XWIN_WATCH_SLEEP 必须为数字"
-        exit 1
-    fi
-
-    XWIN_WATCH_CMD="$XWIN_WATCH_BIN -w $XWIN_WATCH_WINDOW -s $XWIN_WATCH_SLEEP"
-
-    [[ "$XWIN_WATCH_ATTEMPTS" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -a $XWIN_WATCH_ATTEMPTS"
-    [[ "$XWIN_WATCH_INTERVAL" =~ ^[0-9]+$ ]] && XWIN_WATCH_CMD="$XWIN_WATCH_CMD -i $XWIN_WATCH_INTERVAL"
-}
-
-run_xwin_watch() {
-    isy "$XWIN_WATCH" || return 0
-
-    local xwin_watch_set=0
-
-    if [ -n "$XWIN_WATCH_ON_EXISTS" ]; then
-        local file
-        file="$(mktemp "$TEMP_DIR/xwin-watch-on-exists.XXXXXXX.sh")"
-        echo "$XWIN_WATCH_ON_EXISTS" > "$file"
-        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -e \"bash $file\""
-        xwin_watch_set=1
-    fi
-
-    if [ -n "$XWIN_WATCH_ON_CLOSED" ]; then
-        local file
-        file="$(mktemp "$TEMP_DIR/xwin-watch-on-closed.XXXXXXX.sh")"
-        echo "$XWIN_WATCH_ON_CLOSED" > "$file"
-        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -c \"bash $file\""
-        xwin_watch_set=1
-    fi
-
-    if [ -n "$XWIN_WATCH_ON_FAILED" ]; then
-        local file
-        file="$(mktemp "$TEMP_DIR/xwin-watch-on-failed.XXXXXXX.sh")"
-        echo "$XWIN_WATCH_ON_FAILED" > "$file"
-        XWIN_WATCH_CMD="$XWIN_WATCH_CMD -f \"bash $file\""
-
-        if [ "$xwin_watch_set" != "1" ]; then
-            echo "[Hyps] WARN: XWIN_WATCH_ON_EXISTS 和 XWIN_WATCH_ON_CLOSED 均未设置，XWIN_WATCH_ON_FAILED 的内容将不会被执行！"
-        fi
-    fi
-
-    if [ "$xwin_watch_set" = "1" ]; then
-        echo "[Hyps] 启动 XWin Watch: $XWIN_WATCH_CMD"
-        ( eval "$XWIN_WATCH_CMD" ) &
-        BACKGROUND_PID+=("$!")
-    else
-        echo "[Hyps] WARN: XWIN_WATCH 已开启，但没什么要执行的"
-    fi
-}
-
-# OverlayFS
-
-prepare_overlay() {
-    isy "$OVERLAY" || return 0
-
-    if ! command_exists fuse-overlayfs; then
-        echo "[Hyps] 没有安装 fuse-overlayfs，无法使用 Overlay 功能"
-        exit 1
-    fi
-
-    if [ -z "$OVERLAY_LOWER" ] && isy "$OVERLAY_LOWER_AUTO"; then
-        if [ "$(type -t overlay_auto_lower)" = "function" ]; then
-            OVERLAY_LOWER="$(overlay_auto_lower "$GAME")"
-        else
-            echo "[Hyps] ERROR: 游戏没有定义 overlay_auto_lower 函数，无法自动选择 lower 目录"
-            exit 1
-        fi
-    fi
-
-    if [ -z "$OVERLAY_LOWER" ] || [ ! -d "$OVERLAY_LOWER" ]; then
-        echo "[Hyps] 没有指定 OVERLAY_LOWER 或指定的目录不存在"
-        exit 1
-    fi
-
-    [ -z "$OVERLAY_DIR" ] && OVERLAY_DIR="$DATA_DIR/overlays/$GAME_NAME"
-
-    if [ -n "$OVERLAY_DIR" ]; then
-        [ -z "$OVERLAY_MOUNT" ] && OVERLAY_MOUNT="$OVERLAY_DIR/mount"
-        [ -z "$OVERLAY_UPPER" ] && OVERLAY_UPPER="$OVERLAY_DIR/upper"
-        [ -z "$OVERLAY_WORK" ] && OVERLAY_WORK="$OVERLAY_DIR/work"
-    fi
-
-    if [ -z "$OVERLAY_MOUNT" ] || [ -z "$OVERLAY_UPPER" ] || [ -z "$OVERLAY_WORK" ]; then
-        echo "[Hyps] 没有指定 OVERLAY_DIR 也没有分别指定 OVERLAY_{MOUNT,UPPER,WORK} 的值"
-        exit 1
-    fi
-
-    mkdir -p "$OVERLAY_MOUNT" "$OVERLAY_UPPER" "$OVERLAY_WORK" || { echo "无法创建 OverlayFS 相关目录"; exit 1; }
-
-    [ -z "$OVERLAY_REBIND_GAME" ] && OVERLAY_REBIND_GAME="y"
-    [ -z "$OVERLAY_REBIND_GAME_PATH" ] && OVERLAY_REBIND_GAME_PATH="y"
-
-    if isy "$OVERLAY_REBIND_GAME"; then
-        OVERLAY_ORIGINAL_GAME="$GAME"
-        GAME="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME")"
-    fi
-
-    if isy "$OVERLAY_REBIND_GAME_PATH"; then
-        OVERLAY_ORIGINAL_GAME_PATH="$GAME_PATH"
-        GAME_PATH="$OVERLAY_MOUNT/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME_PATH")"
-    fi
-}
-
-mount_overlay() {
-    isy "$OVERLAY" || return 0
-
-    fuse-overlayfs -o lowerdir="$OVERLAY_LOWER",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" "$OVERLAY_MOUNT" \
-        || { echo "[Hyps] ERROR: 无法挂载 OverlayFS"; exit 1; }
-    OVERLAY_MOUNTED=1
-}
-
-umount_overlay() {
-    [ -z "$OVERLAY_UMOUNT" ] && OVERLAY_UMOUNT="y"
-
-    if isy "$OVERLAY" && isy "$OVERLAY_UMOUNT" && [ -d "$OVERLAY_MOUNT" ] && [ "$OVERLAY_MOUNTED" = "1" ]; then
-        if [ "$OVERLAY_MOUNT_SKIP" = "1" ]; then
-            echo "[Hyps] 跳过卸载 OverlayFS，请手动卸载 $OVERLAY_MOUNT"
-            return
-        fi
-
-        OVERLAY_MOUNT_SKIP=1
-
-        if command_exists fusermount3; then
-            fusermount3 -uz "$OVERLAY_MOUNT"
-        elif command_exists fusermount; then
-            fusermount -uz "$OVERLAY_MOUNT"
-        elif command_exists umount; then
-            umount -l "$OVERLAY_MOUNT"
-        else
-            echo "[Hyps] WARN: 没有找到卸载 OverlayFS 的命令，请手动卸载 $OVERLAY_MOUNT"
-        fi
-    fi
-}
-
-# 用户数据链接
-
-[ -z "$USERDATA_LINK_SCREENSHOTS" ] && USERDATA_LINK_SCREENSHOTS="$(xdg-user-dir PICTURES)/HypsScreenshots"
-
-run_userdata_link() {
-    isy "$USERDATA_LINK" || return 1
-    [ "$(type -t userdata_link)" = "function" ] || return 0
-
-    local drive_c
-    local userprofile
-    local game_exe
-
-    if [ -d "$PREFIX/drive_c" ]; then
-        drive_c="$PREFIX/drive_c"
-    elif [ -d "$PREFIX/pfx/drive_c" ]; then
-        drive_c="$PREFIX/pfx/drive_c"
-    else
-        echo "[Hyps] WARN: $PREFIX/drive_c 不存在"
-        return 1
-    fi
-
-    if [ -d "$drive_c/users/steamuser" ]; then
-        userprofile="$drive_c/users/steamuser"
-    elif [ -d "$drive_c/users/$USER" ]; then
-        userprofile="$drive_c/users/$USER"
-    else
-        echo "[Hyps] WARN: $drive_c/users/$USER 不存在"
-        return 1
-    fi
-
-    game_exe="$GAME"
-    if isy "$OVERLAY" && isy "$OVERLAY_REBIND_GAME"; then
-        # overlayfs 开启时游戏截图会被保存到 upper 中，这里直接编辑 upper
-        game_exe="$OVERLAY_UPPER/$(realpath --relative-to="$OVERLAY_LOWER" "$OVERLAY_ORIGINAL_GAME")"
-    fi
-
-    userdata_link "$drive_c" "$userprofile" "$game_exe"
-}
-
-# 游玩时间和历史
-
-time_record_start() {
-    [ -z "$TIME_RECORD" ] && TIME_RECORD="y"
-    isy "$TIME_RECORD" || return 0
-
-    [ -z "$TIME_RECORD_DATA_DIR" ] && TIME_RECORD_DATA_DIR="$DATA_DIR/time/$GAME_NAME"
-    [ -z "$TIME_RECORD_MIN_SEC" ] && TIME_RECORD_MIN_SEC=60
-    mkdir -p "$TIME_RECORD_DATA_DIR"
-    TIME_RECORD_CURRENT_START="$(date +%s)"
-}
-
-time_record_end() {
-    isy "$TIME_RECORD" || return 0
-
-    local current_start="$TIME_RECORD_CURRENT_START"
-    local current_end
-    local current_dur
-    local total_dur
-
-    if [ -z "$current_start" ]; then
-        echo "[Hyps] 游戏未开始，无法记录游戏时间"
-        return 0
-    fi
-
-    current_end="$(date +%s)"
-    current_dur="$((current_end - current_start))"
-    if [ "$current_dur" -lt "$TIME_RECORD_MIN_SEC" ]; then
-        echo "[Hyps] 游戏时间过短 ($((current_end - current_start)) 秒 < $TIME_RECORD_MIN_SEC 秒)，不记录"
-        return 0
-    fi
-
-    echo "[Hyps] 本次游戏时长 $current_dur 秒"
-    printf "%s\t%s\n" "$current_start" "$current_end" >> "$TIME_RECORD_DATA_DIR/history"
-    total_dur="$(cat "$TIME_RECORD_DATA_DIR/total-dur" 2>/dev/null || echo 0)"
-    echo "$((total_dur + current_dur))" > "$TIME_RECORD_DATA_DIR/total-dur"
-}
-
-
-
-gen_script() {
-    # 创建临时的 bat 文件用于启动
-    local script
-    local content
-    script="$(mktemp "$TEMP_DIR/start-game-XXXXXXX.bat")"
-    content="$(cat << EOF
-chcp 65001
-Z:
-$BEFORE_GAME
-
-cd "$GAME_PATH"
-start "" $GAME_EXE_PREFIX "Z:\\$GAME" $GAME_ARGS
-
-$AFTER_GAME
-
-:: del "%~f0" && exit
-EOF
-    )"
-    echo "$content" > "$script"
-    echo "$script"
-}
-
-needs_custom_bat() {
-    [ -n "$BEFORE_GAME" ] && return 0
-    [ -n "$AFTER_GAME" ] && return 0
-    [ -n "$GAME_EXE_PREFIX" ] && return 0
-
-    return 1
-}
-
-use_custom_bat() {
-    if isy "$SKIP_CUSTOM_BAT" && isy "$FORCE_CUSTOM_BAT"; then
-        echo "[Hyps] ERROR: SKIP_CUSTOM_BAT 和 FORCE_CUSTOM_BAT 不能同时启用！"
-        exit 1
-    fi
-
-    isy "$UMU_USE_STEAM" && isy "$FORCE_CUSTOM_BAT" && echo "[Hyps] WARN: 使用自定义启动脚本会导致 UMU_USE_STEAM 无效！"
-    isy "$UMU_USE_STEAM" && needs_custom_bat && echo "[Hyps] WARN: 使用自定义启动脚本会导致 UMU_USE_STEAM 无效，但是当前配置又需要使用自定义启动脚本，可能是某个地方出错了"
-    isy "$SKIP_CUSTOM_BAT" && needs_custom_bat && echo "[Hyps] WARN: 当前已强制跳过启动脚本，但配置又需要使用自定义启动脚本"
-
-    isy "$FORCE_CUSTOM_BAT" && return 0
-    isy "$SKIP_CUSTOM_BAT" && return 1
-    needs_custom_bat && return 0
-    return 1
+    GAME_ARGS=()
+    config_read_array game.args GAME_ARGS
 }
 
 build_game_command() {
     local -a cmd=()
-    cmd+=("$WINE")
 
-    if [ -n "$MANGOHUD" ]; then
-        local -a mangohud_args
-        readarray -t mangohud_args < <(xargs -n1 <<< "$MANGOHUD")
-        cmd=("${mangohud_args[@]}" "${cmd[@]}")
-    fi
+    cmd+=("${RUNNER_WRAPPER[@]}")
+    cmd+=("$(config_get runner.exe)")
 
-    if [ -n "$TASKSET" ]; then
-        local -a taskset_args
-        readarray -t taskset_args < <(xargs -n1 <<< "$TASKSET")
-        cmd=("${taskset_args[@]}" "${cmd[@]}")
-    fi
-
-    if [ -n "$GAMEMODE" ]; then
-        local -a gamemode_args
-        readarray -t gamemode_args < <(xargs -n1 <<< "$GAMEMODE")
-        cmd=("${gamemode_args[@]}" "${cmd[@]}")
-    fi
-
-    if [ -n "$GAMESCOPE" ]; then
-        cmd=("$GAMESCOPE" "${GAMESCOPE_ARGS[@]}" -- "${cmd[@]}")
-    fi
-
-    if [ "${#WRAPPER_CMD[@]}" -gt 0 ]; then
-        cmd=("${WRAPPER_CMD[@]}" "${cmd[@]}")
-    fi
-
-    if use_custom_bat; then
-        cmd+=("$(gen_script)")
+    if isy "$NEEDS_CUSTOM_BATCH"; then
+        cmd+=("$CUSTOM_BATCH_SCRIPT")
     else
-        cmd+=("$GAME")
-
-        if [ -n "$GAME_ARGS" ]; then
-            local -a args
-            readarray -t args < <(xargs -n1 <<< "$GAME_ARGS")
-            cmd+=("${args[@]}")
-        fi
+        cmd+=("$(config_get game.exe)")
+        cmd+=("${GAME_ARGS[@]}")
     fi
 
     GAME_COMMAND=("${cmd[@]}")
 }
 
+start_game_process() {
+    local -a cmd=("${GAME_COMMAND[@]}")
 
-
-run_prepare() {
-    # Intel CPU 功率可供检测
-    if isy "$INTEL_CPU_POWER_READ"; then
-        [ "${#INTEL_CPU_POWER_FILE[@]}" -lt 1 ] && INTEL_CPU_POWER_FILE+=("/sys/class/powercap/intel-rapl:0/energy_uj")
-
-        local file
-        for file in "${INTEL_CPU_POWER_FILE[@]}"; do
-            if [ -f "$file" ] && [ ! -r "$file" ]; then
-                sudo_request "使 Intel CPU 能量消耗可被所有人读取" chmod a+r "$file"
-            fi
-        done
-    fi
-
-    # 准备 XWin Watch
-    prepare_xwin_watch
-
-    # 准备 OverlayFS
-    prepare_overlay
-
-    # 用户数据链接
-    run_userdata_link
-
-    # 准备启动
-    isy "$WINESERVER_KILL" && ensure_no_wineserver "$PREFIX" "kill" "WINESERVER_KILL 已开启"
-    isy "$EXE_KILL" && pkill -f '.*\.exe$' # deprecated
-
-    # 挂载 OverlayFS
-    mount_overlay
-
-    # 准备脚本
-    if [ -n "$PREPARE_BATCH" ]; then
-        local script
-        script="$(mktemp "$TEMP_DIR/prepare-XXXXXXX.bat")"
-        echo "chcp 65001" >> "$script"
-        echo "$PREPARE_BATCH" >> "$script"
-        echo "[Hyps] 执行准备脚本: $PREPARE_BATCH"
-        $WINE "$script"
-    fi
-
-    # Hosts 断网
-    run_network_hosts
-
-    # XWin Watch 窗口监测程序
-    run_xwin_watch
-}
-
-
-
-start_game() {
-    trap cleanup EXIT
-
-    run_prepare
-
-    echo "[Hyps] 启动游戏..."
-
-    time_record_start
-
-    cd "$GAME_PATH" || { echo "[Hyps] 找不到或无法切换到游戏目录"; exit 1; }
-    build_game_command
-    echo -n "[Hyps] 执行命令: "
-    quote_args "${GAME_COMMAND[@]}"
-    "${GAME_COMMAND[@]}" &
-
-    if [ "$(type -t after_start_game)" = "function" ]; then
-        after_start_game
-    fi
-
-    wait
-}
-
-cleanup() {
-    echo "[Hyps] 终止"
-
-    time_record_end
-
-    umount_overlay
-
-    exit
+    log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
+    "${cmd[@]}" &
+    GAME_PID="$!"
+    log_debug lifecycle "游戏进程 PID: $GAME_PID"
+    log_debug lifecycle "本次脚本用时: $(($(date +%s%N) - SCRIPT_START_NANOSECONDS)) 纳秒"
 }

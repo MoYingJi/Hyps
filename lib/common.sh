@@ -489,7 +489,14 @@ prepare_xwin_watch() {
     # 如果程序不存在 但源文件存在 则尝试编译
     if [ ! -f "$XWIN_WATCH_BIN" ] && [ -f "$XWIN_WATCH_SRC" ]; then
         echo "[xwin-watch] 编译 $XWIN_WATCH_SRC"
-        gcc "$XWIN_WATCH_SRC" -o "$XWIN_WATCH_BIN" -lX11
+        if pkg-config --exists wayland-client; then
+            # 有 wayland-client 时启用 Wayland 后端 (wlr-foreign-toplevel-management)
+            gcc "$XWIN_WATCH_SRC" "$(dirname "$XWIN_WATCH_SRC")/wlr-foreign-toplevel-management-unstable-v1.c" \
+                -o "$XWIN_WATCH_BIN" -lX11 -lwayland-client \
+                -I"$(dirname "$XWIN_WATCH_SRC")" -DHAVE_WAYLAND
+        else
+            gcc "$XWIN_WATCH_SRC" -o "$XWIN_WATCH_BIN" -lX11
+        fi
     fi
 
     if [ ! -f "$XWIN_WATCH_BIN" ]; then

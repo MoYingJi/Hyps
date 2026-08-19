@@ -1,7 +1,12 @@
 // 部分代码取自 everything411 的 kill-genshin.c，灵感也来源于此
 // https://gist.github.com/everything411/a4ebb2e3479711bd6529e58bff553a34
 
-// 编译: `gcc xwin-watch.c -o xwin-watch -lX11`
+// 编译: `gcc xwin-watch.c -o xwin-watch -lX11` (仅 X11)
+//       `gcc xwin-watch.c -o xwin-watch -lX11 -lwayland-client -I. -DHAVE_WAYLAND` (X11 + Wayland)
+//
+// 优先通过 Wayland 的 wlr-foreign-toplevel-management 协议检测窗口
+// (Wayland 合成器上生效，如 niri / sway / Hyprland)
+// 检测不到 Wayland 时回退到 X11 的 _NET_CLIENT_LIST (XWayland / X11 会话)
 
 // 已经堆成石山了，将就用吧
 
@@ -17,6 +22,11 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+
+#ifdef HAVE_WAYLAND
+#include <wayland-client.h>
+#include "wlr-foreign-toplevel-management-unstable-v1.h"
+#endif
 
 typedef struct {
     const char *target_window;
@@ -35,12 +45,176 @@ static void print_arguments();
 static void print_current_time();
 static void run_command(const char *command);
 static bool check_window_exists(Display *display, const char *target_window);
+static bool check_window_exists_x11(Display *display, const char *target_window);
+static void close_displays();
 static void handle_signal_and_exit(int signum);
 
 // 全局变量
 static volatile sig_atomic_t g_signal_received = 0;
 static bool g_window_found = false;
 static Display *g_display = nullptr;
+
+#ifdef HAVE_WAYLAND
+// Wayland 后端 (wlr-foreign-toplevel-management)
+typedef struct wl_toplevel {
+    struct wl_toplevel *next;
+    struct zwlr_foreign_toplevel_handle_v1 *handle;
+    char *title;
+    bool dead;
+} wl_toplevel_t;
+
+static struct wl_display *g_wl_display = nullptr;
+static struct zwlr_foreign_toplevel_manager_v1 *g_wl_manager = nullptr;
+static wl_toplevel_t *g_wl_toplevels = nullptr;
+
+static void wl_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
+    (void)handle;
+    wl_toplevel_t *node = (wl_toplevel_t *)data;
+    free(node->title);
+    node->title = strdup(title);
+}
+
+static void wl_noop(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    (void)data;
+    (void)handle;
+}
+
+static void wl_noop_appid(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *value) {
+    (void)data;
+    (void)handle;
+    (void)value;
+}
+
+static void wl_noop_output(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    (void)data;
+    (void)handle;
+    (void)output;
+}
+
+static void wl_noop_state(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state) {
+    (void)data;
+    (void)handle;
+    (void)state;
+}
+
+static void wl_noop_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent) {
+    (void)data;
+    (void)handle;
+    (void)parent;
+}
+
+static void wl_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    (void)handle;
+    wl_toplevel_t *node = (wl_toplevel_t *)data;
+    if (node->handle) {
+        zwlr_foreign_toplevel_handle_v1_destroy(node->handle);
+        node->handle = nullptr;
+    }
+    node->dead = true;
+}
+
+static const struct zwlr_foreign_toplevel_handle_v1_listener wl_handle_listener = {
+    .title = wl_handle_title,
+    .app_id = wl_noop_appid,
+    .output_enter = wl_noop_output,
+    .output_leave = wl_noop_output,
+    .state = wl_noop_state,
+    .done = wl_noop,
+    .closed = wl_handle_closed,
+    .parent = wl_noop_parent,
+};
+
+static void wl_manager_toplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, struct zwlr_foreign_toplevel_handle_v1 *toplevel) {
+    (void)data;
+    (void)manager;
+    wl_toplevel_t *node = calloc(1, sizeof(wl_toplevel_t));
+    node->handle = toplevel;
+    node->next = g_wl_toplevels;
+    g_wl_toplevels = node;
+    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &wl_handle_listener, node);
+}
+
+static void wl_manager_finished(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager) {
+    (void)data;
+    (void)manager;
+}
+
+static const struct zwlr_foreign_toplevel_manager_v1_listener wl_manager_listener = {
+    .toplevel = wl_manager_toplevel,
+    .finished = wl_manager_finished,
+};
+
+static void wl_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
+    (void)data;
+    (void)version;
+    if (strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0 && !g_wl_manager) {
+        g_wl_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(
+            registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 1);
+        zwlr_foreign_toplevel_manager_v1_add_listener(g_wl_manager, &wl_manager_listener, nullptr);
+    }
+}
+
+static const struct wl_registry_listener wl_registry_listener = {
+    .global = wl_registry_global,
+    .global_remove = nullptr,
+};
+
+// 初始化 Wayland 后端，失败时返回 false (回退 X11)
+static bool wl_init() {
+    g_wl_display = wl_display_connect(nullptr);
+    if (!g_wl_display) {
+        return false;
+    }
+
+    struct wl_registry *registry = wl_display_get_registry(g_wl_display);
+    wl_registry_add_listener(registry, &wl_registry_listener, nullptr);
+    wl_display_roundtrip(g_wl_display);
+    wl_registry_destroy(registry);
+
+    if (!g_wl_manager) {
+        wl_display_disconnect(g_wl_display);
+        g_wl_display = nullptr;
+        return false;
+    }
+
+    // 接收已存在的 toplevel 及其标题
+    wl_display_roundtrip(g_wl_display);
+    return true;
+}
+
+// 遍历 Wayland toplevel 列表，标题包含目标字符串即认为窗口存在
+static bool check_wl_windows(const char *target_window) {
+    // dispatch_pending 只派发已读入队列的事件，不会读 socket；
+    // roundtrip 会读取并处理 socket 中的事件 (合成器应答 sync 为毫秒级)
+    if (wl_display_roundtrip(g_wl_display) == -1) {
+        return false;
+    }
+
+    bool found = false;
+    wl_toplevel_t *prev = nullptr;
+    wl_toplevel_t *node = g_wl_toplevels;
+    while (node) {
+        if (node->dead) {
+            wl_toplevel_t *dead = node;
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                g_wl_toplevels = node->next;
+            }
+            node = node->next;
+            free(dead->title);
+            free(dead);
+            continue;
+        }
+        if (!found && node->title && strstr(node->title, target_window)) {
+            found = true;
+        }
+        prev = node;
+        node = node->next;
+    }
+    return found;
+}
+#endif
 
 static app_config_t g_config = {
     .target_window = nullptr,
@@ -69,9 +243,25 @@ int main(const int argc, char *argv[]) {
     int attempt_count = 0;
     int sleep_seconds = g_config.check_exists_interval;
 
+    bool any_display = false;
+
     g_display = XOpenDisplay(nullptr);
-    if (!g_display) {
-        fprintf(stderr, "无法打开 X Display\n");
+    if (g_display) {
+        any_display = true;
+    }
+
+#ifdef HAVE_WAYLAND
+    if (wl_init()) {
+        any_display = true;
+        printf("窗口检测: Wayland (wlr-foreign-toplevel-management)\n");
+        if (!g_display) {
+            printf("窗口检测: X11 不可用，仅使用 Wayland\n");
+        }
+    }
+#endif
+
+    if (!any_display) {
+        fprintf(stderr, "无法打开 X Display 或 Wayland Display\n");
         return EXIT_FAILURE;
     }
 
@@ -89,8 +279,7 @@ int main(const int argc, char *argv[]) {
             } else {
                 printf(" 窗口不存在，监测结束\n");
                 run_command(g_config.window_closed_cmd);
-                XCloseDisplay(g_display);
-                g_display = nullptr; // 防止信号处理器再次关闭
+                close_displays(); // 防止信号处理器再次关闭
                 return EXIT_SUCCESS;
             }
         } else {
@@ -102,8 +291,7 @@ int main(const int argc, char *argv[]) {
                     }
                     puts("");
                     run_command(g_config.window_exists_cmd);
-                    XCloseDisplay(g_display);
-                    g_display = nullptr;
+                    close_displays();
                     return EXIT_SUCCESS;
                 }
                 printf(" 窗口存在，监测已开始");
@@ -125,8 +313,7 @@ int main(const int argc, char *argv[]) {
                         if (g_config.window_failed_cmd != nullptr) {
                             run_command(g_config.window_failed_cmd);
                         }
-                        XCloseDisplay(g_display);
-                        g_display = nullptr;
+                        close_displays();
                         return EXIT_FAILURE;
                     }
                 } else {
@@ -244,9 +431,7 @@ static void handle_signal_and_exit(const int signum) {
             }
         }
 
-        if (g_display) {
-            XCloseDisplay(g_display);
-        }
+        close_displays();
 
         exit(signum);
     }
@@ -268,7 +453,32 @@ static void run_command(const char *command) {
     }
 }
 
+static void close_displays() {
+    if (g_display) {
+        XCloseDisplay(g_display);
+        g_display = nullptr;
+    }
+#ifdef HAVE_WAYLAND
+    if (g_wl_display) {
+        wl_display_disconnect(g_wl_display);
+        g_wl_display = nullptr;
+    }
+#endif
+}
+
 static bool check_window_exists(Display *display, const char *target_window) {
+#ifdef HAVE_WAYLAND
+    if (g_wl_display && check_wl_windows(target_window)) {
+        return true;
+    }
+#endif
+    if (!display) {
+        return false;
+    }
+    return check_window_exists_x11(display, target_window);
+}
+
+static bool check_window_exists_x11(Display *display, const char *target_window) {
     const Window root = DefaultRootWindow(display);
     const Atom net_client_list = XInternAtom(display, "_NET_CLIENT_LIST", False);
 

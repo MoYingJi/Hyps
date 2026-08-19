@@ -13,7 +13,7 @@ overlay_auto_lower() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$USERDATA_LINK_SCREENSHOTS/ZenlessZoneZero" "$(dirname "$game_exe")/ScreenShot"
+    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$(dirname "$game_exe")/ScreenShot"
 }
 
 hyps_main

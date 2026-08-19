@@ -17,7 +17,7 @@ overlay_auto_lower() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$USERDATA_LINK_SCREENSHOTS/StarRail" "$(dirname "$game_exe")/StarRail_Data/ScreenShots"
+    try_link_dir "$SCREENSHOTS/StarRail" "$(dirname "$game_exe")/StarRail_Data/ScreenShots"
 }
 
 # 注册表解锁帧率

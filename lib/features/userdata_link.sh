@@ -48,9 +48,10 @@ feat_userdata_link_prepare() {
     fi
 
     local screenshots_dir
-    screenshots_dir="$(config_require_realpath_mkdir features.userdata_link.screenshots "$(xdg-user-dir PICTURES)/HypsScreenshots")"
+    config_require_realpath_mkdir features.userdata_link.screenshots "$(xdg-user-dir PICTURES)/HypsScreenshots"
+    screenshots_dir="$(config_get features.userdata_link.screenshots)"
 
-    USERDATA_LINK_SCREENSHOTS="$screenshots_dir" \
+    SCREENSHOTS="$screenshots_dir" \
         userdata_link "$drive_c" "$userprofile" "$game_exe"
 }
 

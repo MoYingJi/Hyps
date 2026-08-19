@@ -23,7 +23,7 @@ userdata_link() {
     local game_dir
     game_dir="$(overlay_auto_lower "$game_exe")"
 
-    try_link_dir "$USERDATA_LINK_SCREENSHOTS/WutheringWaves" "$game_dir/Client/Saved/ScreenShot"
+    try_link_dir "$SCREENSHOTS/WutheringWaves" "$game_dir/Client/Saved/ScreenShot"
 }
 
 hyps_main

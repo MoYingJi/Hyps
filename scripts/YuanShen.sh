@@ -20,7 +20,7 @@ overlay_auto_lower() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$USERDATA_LINK_SCREENSHOTS/YuanShen" "$(dirname "$game_exe")/ScreenShot"
+    try_link_dir "$SCREENSHOTS/YuanShen" "$(dirname "$game_exe")/ScreenShot"
 }
 
 # FPS 解锁

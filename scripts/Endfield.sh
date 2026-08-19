@@ -13,7 +13,7 @@ overlay_auto_lower() {
 
 userdata_link() {
     local userprofile="$2"
-    try_link_dir "$USERDATA_LINK_SCREENSHOTS/Endfield" "$userprofile/Pictures/ENDFIELD"
+    try_link_dir "$SCREENSHOTS/Endfield" "$userprofile/Pictures/ENDFIELD"
 }
 
 hyps_main

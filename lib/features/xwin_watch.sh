@@ -122,14 +122,13 @@ feat_xwin_watch_post_start() {
 
 feat_xwin_watch_cleanup() {
     if [ -n "$XWIN_WATCH_PID" ]; then
-        log_debug xwin-watch "终止 xwin-watch 进程 PID: $XWIN_WATCH_PID"
-
         if kill -0 "$XWIN_WATCH_PID" 2>/dev/null; then
+            log_debug xwin-watch "终止 xwin-watch 进程 PID: $XWIN_WATCH_PID"
             kill "$XWIN_WATCH_PID"
             wait "$XWIN_WATCH_PID"
             true
         else
-            log_debug xwin-watch "xwin-watch 进程 PID: $XWIN_WATCH_PID 不存在，可能已退出"
+            log_debug xwin-watch "终止 xwin-watch 进程 PID: $XWIN_WATCH_PID 不存在"
         fi
     fi
 }

@@ -24,8 +24,15 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #define ANY_ (int16_t)-1
+
+static volatile sig_atomic_t received_signal = 0;
+
+static void signal_handler(const int sig) {
+    received_signal = sig;
+}
 
 static bool setup_fifo(const char *fifo_path);
 static void close_fifo(int fifo_fd, const char* fifo_path);
@@ -56,6 +63,12 @@ int main(const int argc, char **argv) {
     is_dry_run = target_fps < 1;
     if (argc >= 4) interval = atol(argv[3]);
     if (argc == 5) fifo_path = argv[4];
+
+    struct sigaction sa = { .sa_handler = signal_handler };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
     if (!verify_process(pid)) {
         fprintf(stderr, "Error: PID %d does not appear to be a Genshin Impact process.\n", pid);
@@ -89,6 +102,10 @@ int main(const int argc, char **argv) {
         }
 
         usleep(interval * 1000);
+        if (received_signal != 0) {
+            printf("Received signal %d, exiting gracefully.\n", received_signal);
+            break;
+        }
 
         if (use_fifo) {
             char buffer[32];

@@ -38,4 +38,9 @@
 !/tools/xwin-watch/wlr-foreign-toplevel-management-unstable-v1.xml
 !/tools/xwin-watch/wlr-foreign-toplevel-management-unstable-v1.h
 !/tools/xwin-watch/wlr-foreign-toplevel-management-unstable-v1.c
+!/tools/xwin-watch/ext-foreign-toplevel-list-v1.h
+!/tools/xwin-watch/ext-foreign-toplevel-list-v1.c
+!/tools/xwin-watch/plasma-window-management.xml
+!/tools/xwin-watch/plasma-window-management.h
+!/tools/xwin-watch/plasma-window-management.c
 !/tools/starrail-fps.py

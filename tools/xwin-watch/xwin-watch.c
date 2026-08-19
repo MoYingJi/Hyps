@@ -6,6 +6,8 @@
 //
 // 优先通过 Wayland 的 wlr-foreign-toplevel-management 协议检测窗口
 // (Wayland 合成器上生效，如 niri / sway / Hyprland)
+// 其次是标准 ext-foreign-toplevel-list 协议 (GNOME 等)
+// 再其次是 KWin 原生 org_kde_plasma_window_management 协议 (KWin Wayland)
 // 检测不到 Wayland 时回退到 X11 的 _NET_CLIENT_LIST (XWayland / X11 会话)
 
 // 已经堆成石山了，将就用吧
@@ -15,16 +17,17 @@
 #include <string.h>
 #include <time.h>
 
-#include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
 
-#include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 #ifdef HAVE_WAYLAND
 #include <wayland-client.h>
+#include "ext-foreign-toplevel-list-v1.h"
+#include "plasma-window-management.h"
 #include "wlr-foreign-toplevel-management-unstable-v1.h"
 #endif
 
@@ -69,7 +72,7 @@ static wl_toplevel_t *g_wl_toplevels = nullptr;
 
 static void wl_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    wl_toplevel_t *node = (wl_toplevel_t *)data;
+    const auto node = (wl_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -105,7 +108,7 @@ static void wl_noop_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *h
 
 static void wl_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    wl_toplevel_t *node = (wl_toplevel_t *)data;
+    const auto node = (wl_toplevel_t *)data;
     if (node->handle) {
         zwlr_foreign_toplevel_handle_v1_destroy(node->handle);
         node->handle = nullptr;
@@ -144,13 +147,235 @@ static const struct zwlr_foreign_toplevel_manager_v1_listener wl_manager_listene
     .finished = wl_manager_finished,
 };
 
+// Wayland 后端 (ext-foreign-toplevel-list-v1, 标准协议, KWin / GNOME 等实现)
+typedef struct ext_toplevel {
+    struct ext_toplevel *next;
+    struct ext_foreign_toplevel_handle_v1 *handle;
+    char *title;
+    bool dead;
+} ext_toplevel_t;
+
+static struct ext_foreign_toplevel_list_v1 *g_ext_list = nullptr;
+static ext_toplevel_t *g_ext_toplevels = nullptr;
+
+static void ext_handle_title(void *data, struct ext_foreign_toplevel_handle_v1 *handle, const char *title) {
+    (void)handle;
+    const auto node = (ext_toplevel_t *)data;
+    free(node->title);
+    node->title = strdup(title);
+}
+
+static void ext_handle_done(void *data, struct ext_foreign_toplevel_handle_v1 *handle) {
+    (void)data;
+    (void)handle;
+}
+
+static void ext_handle_closed(void *data, struct ext_foreign_toplevel_handle_v1 *handle) {
+    (void)handle;
+    const auto node = (ext_toplevel_t *)data;
+    if (node->handle) {
+        ext_foreign_toplevel_handle_v1_destroy(node->handle);
+        node->handle = nullptr;
+    }
+    node->dead = true;
+}
+
+static void ext_handle_appid(void *data, struct ext_foreign_toplevel_handle_v1 *handle, const char *value) {
+    (void)data;
+    (void)handle;
+    (void)value;
+}
+
+static const struct ext_foreign_toplevel_handle_v1_listener ext_handle_listener = {
+    .closed = ext_handle_closed,
+    .done = ext_handle_done,
+    .title = ext_handle_title,
+    .app_id = ext_handle_appid,
+    .identifier = ext_handle_appid,
+};
+
+static void ext_list_toplevel(void *data, struct ext_foreign_toplevel_list_v1 *list, struct ext_foreign_toplevel_handle_v1 *toplevel) {
+    (void)data;
+    (void)list;
+    ext_toplevel_t *node = calloc(1, sizeof(ext_toplevel_t));
+    node->handle = toplevel;
+    node->next = g_ext_toplevels;
+    g_ext_toplevels = node;
+    ext_foreign_toplevel_handle_v1_add_listener(toplevel, &ext_handle_listener, node);
+}
+
+static void ext_list_finished(void *data, struct ext_foreign_toplevel_list_v1 *list) {
+    (void)data;
+    (void)list;
+}
+
+static const struct ext_foreign_toplevel_list_v1_listener ext_list_listener = {
+    .toplevel = ext_list_toplevel,
+    .finished = ext_list_finished,
+};
+
+// Wayland 后端 (org_kde_plasma_window_management, KWin 原生协议)
+typedef struct plasma_toplevel {
+    struct plasma_toplevel *next;
+    struct org_kde_plasma_window *handle;
+    char *title;
+    bool dead;
+} plasma_toplevel_t;
+
+static struct org_kde_plasma_window_management *g_plasma_wm = nullptr;
+static plasma_toplevel_t *g_plasma_toplevels = nullptr;
+
+static void plasma_handle_title(void *data, struct org_kde_plasma_window *window, const char *title) {
+    (void)window;
+    const auto node = (plasma_toplevel_t *)data;
+    free(node->title);
+    node->title = strdup(title);
+}
+
+static void plasma_handle_unmapped(void *data, struct org_kde_plasma_window *window) {
+    (void)window;
+    const auto node = (plasma_toplevel_t *)data;
+    if (node->handle) {
+        org_kde_plasma_window_destroy(node->handle);
+        node->handle = nullptr;
+    }
+    node->dead = true;
+}
+
+static void plasma_noop(void *data, struct org_kde_plasma_window *window) {
+    (void)data;
+    (void)window;
+}
+
+static void plasma_noop_str(void *data, struct org_kde_plasma_window *window, const char *value) {
+    (void)data;
+    (void)window;
+    (void)value;
+}
+
+static void plasma_noop_state(void *data, struct org_kde_plasma_window *window, uint32_t flags) {
+    (void)data;
+    (void)window;
+    (void)flags;
+}
+
+static void plasma_noop_vdesk(void *data, struct org_kde_plasma_window *window, int32_t number) {
+    (void)data;
+    (void)window;
+    (void)number;
+}
+
+static void plasma_noop_geometry(void *data, struct org_kde_plasma_window *window, int32_t x, int32_t y, uint32_t width, uint32_t height) {
+    (void)data;
+    (void)window;
+    (void)x;
+    (void)y;
+    (void)width;
+    (void)height;
+}
+
+static void plasma_noop_parent(void *data, struct org_kde_plasma_window *window, struct org_kde_plasma_window *parent) {
+    (void)data;
+    (void)window;
+    (void)parent;
+}
+
+static void plasma_noop_menu(void *data, struct org_kde_plasma_window *window, const char *service_name, const char *object_path) {
+    (void)data;
+    (void)window;
+    (void)service_name;
+    (void)object_path;
+}
+
+static const struct org_kde_plasma_window_listener plasma_window_listener = {
+    .title_changed = plasma_handle_title,
+    .app_id_changed = plasma_noop_str,
+    .state_changed = plasma_noop_state,
+    .virtual_desktop_changed = plasma_noop_vdesk,
+    .themed_icon_name_changed = plasma_noop_str,
+    .unmapped = plasma_handle_unmapped,
+    .initial_state = plasma_noop,
+    .parent_window = plasma_noop_parent,
+    .geometry = plasma_noop_geometry,
+    .icon_changed = plasma_noop,
+    .pid_changed = plasma_noop_state,
+    .virtual_desktop_entered = plasma_noop_str,
+    .virtual_desktop_left = plasma_noop_str,
+    .application_menu = plasma_noop_menu,
+    .activity_entered = plasma_noop_str,
+    .activity_left = plasma_noop_str,
+    .resource_name_changed = plasma_noop_str,
+    .client_geometry = plasma_noop_geometry,
+};
+
+static void plasma_add_window(struct org_kde_plasma_window *window) {
+    plasma_toplevel_t *node = calloc(1, sizeof(plasma_toplevel_t));
+    node->handle = window;
+    node->next = g_plasma_toplevels;
+    g_plasma_toplevels = node;
+    org_kde_plasma_window_add_listener(window, &plasma_window_listener, node);
+}
+
+static void plasma_wm_window(void *data, struct org_kde_plasma_window_management *wm, uint32_t id) {
+    (void)data;
+    plasma_add_window(org_kde_plasma_window_management_get_window(wm, id));
+}
+
+static void plasma_wm_window_with_uuid(void *data, struct org_kde_plasma_window_management *wm, uint32_t id, const char *uuid) {
+    (void)data;
+    (void)id;
+    plasma_add_window(org_kde_plasma_window_management_get_window_by_uuid(wm, uuid));
+}
+
+static void plasma_wm_noop(void *data, struct org_kde_plasma_window_management *wm) {
+    (void)data;
+    (void)wm;
+}
+
+static void plasma_wm_noop_state(void *data, struct org_kde_plasma_window_management *wm, uint32_t state) {
+    (void)data;
+    (void)wm;
+    (void)state;
+}
+
+static void plasma_wm_noop_order(void *data, struct org_kde_plasma_window_management *wm, struct wl_array *ids) {
+    (void)data;
+    (void)wm;
+    (void)ids;
+}
+
+static void plasma_wm_noop_order_str(void *data, struct org_kde_plasma_window_management *wm, const char *uuids) {
+    (void)data;
+    (void)wm;
+    (void)uuids;
+}
+
+static const struct org_kde_plasma_window_management_listener plasma_wm_listener = {
+    .show_desktop_changed = plasma_wm_noop_state,
+    .window = plasma_wm_window,
+    .stacking_order_changed = plasma_wm_noop_order,
+    .stacking_order_uuid_changed = plasma_wm_noop_order_str,
+    .window_with_uuid = plasma_wm_window_with_uuid,
+    .stacking_order_changed_2 = plasma_wm_noop,
+};
+
 static void wl_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     (void)data;
-    (void)version;
     if (strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0 && !g_wl_manager) {
         g_wl_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(
             registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 1);
         zwlr_foreign_toplevel_manager_v1_add_listener(g_wl_manager, &wl_manager_listener, nullptr);
+    }
+    if (strcmp(interface, ext_foreign_toplevel_list_v1_interface.name) == 0 && !g_ext_list) {
+        g_ext_list = (struct ext_foreign_toplevel_list_v1 *)wl_registry_bind(
+            registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
+        ext_foreign_toplevel_list_v1_add_listener(g_ext_list, &ext_list_listener, nullptr);
+    }
+    if (strcmp(interface, org_kde_plasma_window_management_interface.name) == 0 && !g_plasma_wm) {
+        uint32_t bind_version = version < 18 ? version : 18;
+        g_plasma_wm = (struct org_kde_plasma_window_management *)wl_registry_bind(
+            registry, name, &org_kde_plasma_window_management_interface, bind_version);
+        org_kde_plasma_window_management_add_listener(g_plasma_wm, &plasma_wm_listener, nullptr);
     }
 }
 
@@ -171,7 +396,7 @@ static bool wl_init() {
     wl_display_roundtrip(g_wl_display);
     wl_registry_destroy(registry);
 
-    if (!g_wl_manager) {
+    if (!g_wl_manager && !g_ext_list && !g_plasma_wm) {
         wl_display_disconnect(g_wl_display);
         g_wl_display = nullptr;
         return false;
@@ -211,6 +436,52 @@ static bool check_wl_windows(const char *target_window) {
         }
         prev = node;
         node = node->next;
+    }
+    if (found) return true;
+
+    ext_toplevel_t *e_prev = nullptr;
+    ext_toplevel_t *e_node = g_ext_toplevels;
+    while (e_node) {
+        if (e_node->dead) {
+            ext_toplevel_t *dead = e_node;
+            if (e_prev) {
+                e_prev->next = e_node->next;
+            } else {
+                g_ext_toplevels = e_node->next;
+            }
+            e_node = e_node->next;
+            free(dead->title);
+            free(dead);
+            continue;
+        }
+        if (!found && e_node->title && strstr(e_node->title, target_window)) {
+            found = true;
+        }
+        e_prev = e_node;
+        e_node = e_node->next;
+    }
+    if (found) return true;
+
+    plasma_toplevel_t *p_prev = nullptr;
+    plasma_toplevel_t *p_node = g_plasma_toplevels;
+    while (p_node) {
+        if (p_node->dead) {
+            plasma_toplevel_t *dead = p_node;
+            if (p_prev) {
+                p_prev->next = p_node->next;
+            } else {
+                g_plasma_toplevels = p_node->next;
+            }
+            p_node = p_node->next;
+            free(dead->title);
+            free(dead);
+            continue;
+        }
+        if (!found && p_node->title && strstr(p_node->title, target_window)) {
+            found = true;
+        }
+        p_prev = p_node;
+        p_node = p_node->next;
     }
     return found;
 }
@@ -253,7 +524,13 @@ int main(const int argc, char *argv[]) {
 #ifdef HAVE_WAYLAND
     if (wl_init()) {
         any_display = true;
-        printf("窗口检测: Wayland (wlr-foreign-toplevel-management)\n");
+        if (g_wl_manager) {
+            printf("窗口检测: Wayland (wlr-foreign-toplevel-management)\n");
+        } else if (g_ext_list) {
+            printf("窗口检测: Wayland (ext-foreign-toplevel-list)\n");
+        } else if (g_plasma_wm) {
+            printf("窗口检测: Wayland (org_kde_plasma_window_management)\n");
+        }
         if (!g_display) {
             printf("窗口检测: X11 不可用，仅使用 Wayland\n");
         }

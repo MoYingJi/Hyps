@@ -63,8 +63,8 @@
  - `bash`: 主要的脚本用它编写
  - 一些基础的工具，如 `coreutils`、`grep`、`awk`、`sed`、`pkill`、`pgrep`、`sudo` 等
  - 下面列出的 Runner 中的依赖。主要就是一些版本的 Proton 和 umu-launcher
- - `gcc`、`sha256sum`: 两个用 C 写的小工具（`sha256sum` 用来校验源代码以重新编译）
-    - `tools/fpsunlock/unlocker.c`（还额外需要 `setcap`、`getcap`）
+ - `gcc`、`sha256sum`: 两个用 C 写的小工具 (`sha256sum` 用来校验源代码以重新编译)
+    - `tools/fpsunlock/unlocker.c` (还额外需要 `setcap`、`getcap`)
     - `tools/xwin-watch/xwin-watch.c`
  - `python3`: 一个用 python3 写的小工具
     - `tools/starrail-fps.py`
@@ -108,8 +108,14 @@
 
 ## 删除
 
-删掉本项目的文件夹即可
-
-如果还设置了单独的配置文件夹，也别忘了
-
-本项目默认会在 `/tmp/hypsc` 留下一些与启动流程相关的启动脚本；在 `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`) 留下一些着色器缓存和用于校验源代码是否变动以便重新编译的哈希值；也可以检查下 `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`) 里面有没有东西，一些功能会在此处保留一些数据（如 Overlay 的默认配置下，还有记录的游玩时间和历史）
+ - 删掉本项目的文件夹
+ - 如果还设置了单独的配置文件夹，也别忘了
+    - 项目根目录的 `config.conf` 设置了 `path.config = "./config"`。配置文件夹可以被设置到别的地方，或者删掉使用默认值 `$XDG_CONFIG_HOM/hypsc` (`~/.config/hypsc`)
+ - `/tmp/hypsc` (临时文件)
+ - `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`)
+    - 着色器缓存 (`cache.shader.enabled` 和 `cache.dx.enabled`)
+    - 源码变更检测 (一些需要编译的小工具)
+ - `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`)
+    - OverlayFS
+    - Wine Prefix / Proton Compat Data
+    - 游玩时间记录

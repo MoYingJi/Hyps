@@ -6,6 +6,7 @@ __FEATURES_XWIN_WATCH_SH_LOADED=1
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+XWIN_WATCH_TOOL="$PROJECT_ROOT/tools/xwin-watch"
 XWIN_WATCH_CMD=()
 
 feat_xwin_watch_load_config() {
@@ -43,84 +44,70 @@ register_hook load_config feat_xwin_watch_load_config
 # KWin 只对声明了 org_kde_plasma_window_management 接口的客户端开放该协议。
 # 权限通过 .desktop 文件授予：Exec 必须精确匹配客户端可执行文件的规范路径，
 # 且声明 X-KDE-Wayland-Interfaces。这里按 XWIN_WATCH_BIN 的实际路径生成并安装。
-feat_xwin_watch_install_kwin_permission() {
+feat_xwin_watch_kwin_permission_desktop() {
+    local bin="$1"
+    echo "[Desktop Entry]"
+    echo "Type=Application"
+    echo "Name=Hyps xwin-watch"
+    echo "Exec=$bin"
+    echo "X-KDE-Wayland-Interfaces=org_kde_plasma_window_management"
+    echo "NoDisplay=true"
+    echo "Terminal=false"
+}
+
+feat_xwin_watch_all_source() {
+    local output="$1"
+    cat "$XWIN_WATCH_TOOL/xwin-watch.c"
+    echo -n "wayland-client " && pkg-config --exists wayland-client && echo true || echo false
+    command_exists kwin_wayland && feat_xwin_watch_kwin_permission_desktop "$output" || echo "kwin not found"
+}
+feat_xwin_watch_verify_output() {
+    local output="$1"
+    [ -f "$output" ] || return 1
+    [ -x "$output" ] || return 1
     local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
+    diff <(feat_xwin_watch_kwin_permission_desktop "$output") "$desktop_file" >/dev/null 2>&1 || return 1
+}
+feat_xwin_watch_compile() {
+    local output="$1"
+    local tool="$XWIN_WATCH_TOOL"
 
-    if [ ! -d "$desktop_dir" ]; then
-        mkdir -p "$desktop_dir"
+    if pkg-config --exists wayland-client; then
+        # 有 wayland-client 时启用 Wayland 后端
+        # (wlr-foreign-toplevel-management + ext-foreign-toplevel-list + org_kde_plasma_window_management)
+        log_debug xwin-watch "启用 Wayland 后端"
+        gcc "$tool/xwin-watch.c" \
+            "$tool/wlr-foreign-toplevel-management-unstable-v1.c" \
+            "$tool/ext-foreign-toplevel-list-v1.c" \
+            "$tool/plasma-window-management.c" \
+            -I"$tool" -lX11 -lwayland-client -DHAVE_WAYLAND \
+            -o "$output"
+        if command_exists kwin_wayland; then
+            local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+            local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
+            mkdir -p "$desktop_dir"
+            feat_xwin_watch_kwin_permission_desktop "$output" > "$desktop_file"
+            command_exists kbuildsycoca6 && kbuildsycoca6 >/dev/null 2>&1 || true
+        fi
+    else
+        log_debug xwin-watch "禁用 Wayland 后端"
+        gcc "$tool/xwin-watch.c" -lX11 -o "$output"
     fi
 
-    if [ -f "$desktop_file" ]; then
-        log_debug xwin-watch "KWin 权限文件已存在: $desktop_file"
-        return 0
-    fi
-
-    {
-        echo "[Desktop Entry]"
-        echo "Type=Application"
-        echo "Name=Hyps xwin-watch"
-        echo "Exec=$XWIN_WATCH_BIN"
-        echo "X-KDE-Wayland-Interfaces=org_kde_plasma_window_management"
-        echo "NoDisplay=true"
-        echo "Terminal=false"
-    } > "$desktop_file"
-
-    # 更新 KDE 的应用缓存，否则 KWin 可能读取不到新生成的 .desktop 文件
-    if command -v kbuildsycoca6 >/dev/null 2>&1; then
-        kbuildsycoca6 >/dev/null 2>&1 || true
-    fi
-
-    log_debug xwin-watch "已安装 KWin 权限文件: $desktop_file (Exec=$XWIN_WATCH_BIN)"
+    ensure_executable "$output" "xwin-watch"
 }
 
 feat_xwin_watch_prepare() {
-    local tool="$PROJECT_ROOT/tools/xwin-watch"
+    local bin="$XWIN_WATCH_TOOL/xwin-watch"
 
-    local additional_conditions
-    local have_wayland
+    check_cache_and_compile "xwin-watch" \
+        "$bin" \
+        feat_xwin_watch_all_source \
+        feat_xwin_watch_verify_output \
+        feat_xwin_watch_compile
 
-    have_wayland="$(pkg-config --exists wayland-client && echo true || echo false)"
-
-    additional_conditions="$have_wayland"
-
-    check_cached_compile "XWIN_WATCH" \
-        "$tool/xwin-watch" \
-        "$tool/xwin-watch.c" \
-        "$CACHE_DIR/xwin-watch.c.sha256sum" \
-        "$additional_conditions"
-
-    #shellcheck disable=SC2153
-    if [ -n "$XWIN_WATCH_BIN" ] && [ ! -f "$XWIN_WATCH_BIN" ] && [ -f "$XWIN_WATCH_SRC" ]; then
-        log_info xwin-watch "编译 $XWIN_WATCH_SRC"
-        if "$have_wayland"; then
-            # 有 wayland-client 时启用 Wayland 后端
-            # (wlr-foreign-toplevel-management + ext-foreign-toplevel-list + org_kde_plasma_window_management)
-            log_debug xwin-watch "启用 Wayland 后端"
-            gcc "$XWIN_WATCH_SRC" "$(dirname "$XWIN_WATCH_SRC")/wlr-foreign-toplevel-management-unstable-v1.c" \
-                "$(dirname "$XWIN_WATCH_SRC")/ext-foreign-toplevel-list-v1.c" \
-                "$(dirname "$XWIN_WATCH_SRC")/plasma-window-management.c" \
-                -o "$XWIN_WATCH_BIN" -lX11 -lwayland-client \
-                -I"$(dirname "$XWIN_WATCH_SRC")" -DHAVE_WAYLAND
-        else
-            log_debug xwin-watch "禁用 Wayland 后端"
-            gcc "$XWIN_WATCH_SRC" -o "$XWIN_WATCH_BIN" -lX11
-        fi
-    fi
-
-    if [ ! -f "$XWIN_WATCH_BIN" ]; then
-        die 1 xwin-watch "编译失败或源文件不存在"
-    else
-        cat "$XWIN_WATCH_SRC" <(echo -n "$additional_conditions") | sha256sum | awk '{print $1}' > "$XWIN_WATCH_SHA256_FILE"
-    fi
-
-    ensure_executable "$XWIN_WATCH_BIN" "xwin-watch"
-
-    if "$have_wayland"; then
-        feat_xwin_watch_install_kwin_permission
-    fi
-
-    XWIN_WATCH_CMD+=("$XWIN_WATCH_BIN")
+    XWIN_WATCH_CMD+=("$bin")
     XWIN_WATCH_CMD+=("-w" "$(config_get features.xwin_watch.window_name)")
     XWIN_WATCH_CMD+=("-s" "$(config_get features.xwin_watch.sleep)")
     XWIN_WATCH_CMD+=("-i" "$(config_get features.xwin_watch.interval)")

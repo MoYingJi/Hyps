@@ -25,6 +25,8 @@ userdata_link() {
 
 # FPS 解锁
 
+GI_FPS_UNLOCK_TOOL="$PROJECT_ROOT/tools/fpsunlock"
+
 gi_fps_unlock_load_config() {
     isy "$(config_get gi.fps_unlock.enabled)" || return 0
 
@@ -49,31 +51,30 @@ gi_fps_unlock_load_config() {
 
 register_hook load_config gi_fps_unlock_load_config 50 before:feat_xwin_watch_load_config
 
+gi_fps_unlock_all_source() {
+    cat "$GI_FPS_UNLOCK_TOOL/unlocker.c"
+}
+gi_fps_unlock_verify_output() {
+    local bin="$1"
+    [ -f "$bin" ] || return 1
+    [ -x "$bin" ] || return 1
+    [[ "$(getcap "$bin")" =~ cap_sys_ptrace=ep ]] || return 1
+}
+gi_fps_unlock_compile() {
+    local output="$1"
+    gcc "$GI_FPS_UNLOCK_TOOL/unlocker.c" -Wall -Wextra -o "$output"
+    ensure_executable "$output" gi-fps-unlock
+    sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$output"
+}
+
 gi_fps_unlock_prepare() {
-    local tool
-    tool="$PROJECT_ROOT/tools/fpsunlock"
+    local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
 
-    check_cached_compile "FPS_UNLOCK" \
-        "$tool/unlocker" \
-        "$tool/unlocker.c" \
-        "$CACHE_DIR/unlocker.c.sha256sum"
-
-    if [ -n "$FPS_UNLOCK_BIN" ] && [ ! -f "$FPS_UNLOCK_BIN" ] && [ -f "$FPS_UNLOCK_SRC" ]; then
-        log_info gi-fps-unlock "编译 $FPS_UNLOCK_SRC"
-        gcc "$FPS_UNLOCK_SRC" -o "$FPS_UNLOCK_BIN" -Wall -Wextra
-    fi
-
-    if [ ! -f "$FPS_UNLOCK_BIN" ]; then
-        die 1 gi-fps-unlock "编译失败或源文件不存在"
-    else
-        sha256sum "$FPS_UNLOCK_SRC" | awk '{print $1}' > "$CACHE_DIR/unlocker.c.sha256sum"
-    fi
-
-    ensure_executable "$FPS_UNLOCK_BIN" gi-fps-unlock
-
-    if [[ ! "$(getcap "$FPS_UNLOCK_BIN")" =~ cap_sys_ptrace=ep ]]; then
-        sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$FPS_UNLOCK_BIN"
-    fi
+    check_cache_and_compile "fpsunlock" \
+        "$bin" \
+        gi_fps_unlock_all_source \
+        gi_fps_unlock_verify_output \
+        gi_fps_unlock_compile
 
     local sleep
     sleep="$(config_get gi.fps_unlock.sleep)"
@@ -93,11 +94,8 @@ gi_fps_unlock_post_start() {
 }
 
 gi_fps_unlock_start() {
-    local pid
-    local fps
-    local interval
-    local fifo
-    local prog
+    local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
+    local pid fps interval fifo prog
 
     pid="$(pgrep -n -u "$USER" "$(config_get gi.fps_unlock.prog)")"
     fps="$(config_get gi.fps_unlock.val)"
@@ -106,8 +104,7 @@ gi_fps_unlock_start() {
     prog="$(config_get gi.fps_unlock.prog)"
 
     log_info gi-fps-unlock "PID: $pid"
-    "$FPS_UNLOCK_BIN" "$pid" "$fps" "$interval" "$fifo" &
-    GI_FPS_UNLOCK_PID="$!"
+    "$bin" "$pid" "$fps" "$interval" "$fifo" &
 }
 
 # 注册表 HDR
@@ -124,9 +121,7 @@ gi_reg_hdr_load_config() {
 register_hook load_config gi_reg_hdr_load_config
 
 try_edit_prefix_reg() {
-    local prefix
-    local file
-    local key
+    local prefix file key
 
     prefix="$(find_wineprefix "$(config_get game.prefix)" || die 1 gi-reg-hdr "无法找到 WINEPREFIX")"
     file="$prefix/user.reg"

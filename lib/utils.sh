@@ -176,49 +176,42 @@ ensure_executable() {
     fi
 }
 
-check_cached_compile() {
-    local var_name="$1"
-    local bin_default="$2"
-    local src_default="$3"
-    local sha256_file_default="$4"
-    local additional_conditions="${5:-}"
+check_cache_and_compile() {
+    local name="$1"
+    local output_file="$2"
+    local all_source_fn="$3" # 会拿函数输出来计算校验和
+    local verify_output_fn="$4"
+    local compile_fn="$5"
 
-    local var_name_bin="$var_name"_BIN
-    local var_name_src="$var_name"_SRC
-    local var_name_sha256_file="$var_name"_SHA256_FILE
+    local sha256sum_dir="$CACHE_DIR/checksums"
+    mkdir -p "$sha256sum_dir"
+    local sha256sum_file="$sha256sum_dir/${name}.sha256sum"
+    local current_sha256
 
-    local bin_file="${!var_name_bin:=$bin_default}"
-    local src_file="${!var_name_src:=$src_default}"
-    local sha256_file="${!var_name_sha256_file:=$sha256_file_default}"
-
-    bin_file="$(realpath "$bin_file")"
-    src_file="$(realpath "$src_file")"
-    sha256_file="$(realpath "$sha256_file")"
-
-    declare -g "$var_name_bin=$bin_file"
-    declare -g "$var_name_src=$src_file"
-    declare -g "$var_name_sha256_file=$sha256_file"
-
-    # 判断是否需要重新编译
-    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ -f "$sha256_file" ]; then
-        # 读取先前的 sha256
+    if [ ! -e "$output_file" ]; then
+        log_debug utils "[$name] 输出文件不存在"
+    elif ! "$verify_output_fn" "$output_file"; then
+        log_debug utils "[$name] 输出文件验证失败"
+    elif [ ! -f "$sha256sum_file" ]; then
+        log_debug utils "[$name] 校验和文件不存在"
+    else
         local cached_sha256
-        cached_sha256="$(cat "$sha256_file")"
-        # 计算源文件的 sha256
-        local src_sha256
-        src_sha256="$(cat "$src_file" <(echo -n "$additional_conditions") | sha256sum | awk '{print $1}')"
-        # 如果不一致，则删除二进制，重新编译
-        if [ "$cached_sha256" != "$src_sha256" ]; then
-            log_debug utils "[$var_name] 校验和不一致 (旧: $cached_sha256, 新: $src_sha256)，删除旧的二进制文件: $bin_file"
-            rm -f "$bin_file"
+        current_sha256="$("$all_source_fn" "$output_file" | sha256sum | awk '{print $1}')"
+        cached_sha256="$(cat "$sha256sum_file")"
+
+        if [ "$current_sha256" != "$cached_sha256" ]; then
+            log_debug utils "[$name] 校验和不一致"
         else
-            log_debug utils "[$var_name] 校验和一致，跳过编译: $bin_file"
+            log_debug utils "[$name] 校验和一致"
+            return 0
         fi
     fi
 
-    if [ -f "$bin_file" ] && [ -f "$src_file" ] && [ ! -f "$sha256_file" ]; then
-        rm -f "$bin_file"
-    fi
+    log_info utils "[$name] 重新编译"
+    "$compile_fn" "$output_file"
+
+    [ -z "$current_sha256" ] && current_sha256="$("$all_source_fn" "$output_file" | sha256sum | awk '{print $1}')"
+    echo "$current_sha256" > "$sha256sum_file"
 }
 
 try_link_dir() {

@@ -26,6 +26,7 @@ declare -a ENV_EXPORTS=(
     "runner.protonpath|PROTONPATH|path_dir"
     "env.PROTONPATH|PROTONPATH|path_dir"
     "env.GAMEID|GAMEID|string"
+    "env.UMU_LOG|UMU_LOG|string"
     # Proton
     "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
     "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
@@ -35,8 +36,10 @@ declare -a ENV_EXPORTS=(
     "env.PROTON_ENABLE_WAYLAND|PROTON_ENABLE_WAYLAND|bool_to_01"
     "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
     # MangoHud
+    "env.MANGOHUD|MANGOHUD|bool_to_01"
     "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
     "env.MANGOHUD_CONFIGFILE|MANGOHUD_CONFIGFILE|path_file"
+    "env.MANGOHUD_DLSYM|MANGOHUD_DLSYM|bool_to_01"
     # NVIDIA
     "env.NVPRESENT_ENABLE_SMOOTH_MOTION|NVPRESENT_ENABLE_SMOOTH_MOTION|bool_to_01"
     # 我是 Steam Deck 别杀我 ✋😭🤚
@@ -139,4 +142,18 @@ env_transform_path_file() {
     else
         die 1 environment "文件不存在: '$file_path'"
     fi
+}
+
+GAME_LD_PRELOAD=()
+env_add_ld_preload() {
+    local lib="$1"
+    if [[ -z "$lib" ]]; then
+        die 1 environment "env_add_ld_preload: 参数不能为空"
+    fi
+    GAME_LD_PRELOAD+=("$lib")
+    log_debug environment "添加 LD_PRELOAD 库: '$lib'"
+}
+env_get_ld_preload() {
+    local IFS=':'
+    echo "${GAME_LD_PRELOAD[*]}"
 }

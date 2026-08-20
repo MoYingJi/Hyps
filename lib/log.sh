@@ -28,7 +28,7 @@ fi
 
 LOG_FILE="${LOG_FILE:-}"
 
-_log_should_output() {
+log_should_output() {
     local level="$1"
     local level_num="${_LOG_LEVELS[$level]:-0}"
     local current_num="${_LOG_LEVELS[$LOG_LEVEL]:-20}"
@@ -61,7 +61,7 @@ log() {
         message="$2"
     fi
 
-    if ! _log_should_output "$level"; then
+    if ! log_should_output "$level"; then
         return 0
     fi
 

@@ -11,16 +11,8 @@ cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 
 SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 
 
-#shellcheck source=log.sh
-source "$SCRIPT_DIR/log.sh"
-#shellcheck source=utils.sh
-source "$SCRIPT_DIR/utils.sh"
-#shellcheck source=lifecycle.sh
-source "$SCRIPT_DIR/lifecycle.sh"
-#shellcheck source=config.sh
-source "$SCRIPT_DIR/config.sh"
-#shellcheck source=environment.sh
-source "$SCRIPT_DIR/environment.sh"
+#shellcheck source=libs.sh
+source "$SCRIPT_DIR/libs.sh"
 
 #shellcheck source=./features/custom_batch.sh
 source "$SCRIPT_DIR/features/custom_batch.sh"
@@ -140,7 +132,7 @@ start_game_process() {
     local -a cmd=("${GAME_COMMAND[@]}")
 
     log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
-    "${cmd[@]}" &
+    LD_PRELOAD="$(env_get_ld_preload)" "${cmd[@]}" &
     GAME_PID="$!"
     log_debug lifecycle "游戏进程 PID: $GAME_PID"
     log_debug lifecycle "本次脚本用时: $(($(date +%s%N) - SCRIPT_START_NANOSECONDS)) 纳秒"

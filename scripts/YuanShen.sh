@@ -97,7 +97,7 @@ gi_fps_unlock_start() {
     local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
     local pid fps interval fifo prog
 
-    pid="$(pgrep -n -u "$USER" "$(config_get gi.fps_unlock.prog)")"
+    pid="$(pgrep -n -u "$USER" -x "$(config_get gi.fps_unlock.prog)")"
     fps="$(config_get gi.fps_unlock.val)"
     interval="$(config_get gi.fps_unlock.interval)"
     fifo="$(config_get gi.fps_unlock.fifo)"

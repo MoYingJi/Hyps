@@ -15,7 +15,7 @@
 !/config/runners/*.example.*
 !/config/runners/umu-cachyos.conf
 !/config/runners/umu-dwproton.conf
-!/config/runners/umu-ge-proton.conf
+!/config/runners/umu-proton-ge.conf
 
 /scripts/*
 !/scripts/_Lib.sh

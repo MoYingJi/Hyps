@@ -306,3 +306,35 @@ find_wineprefix() {
         echo "$prefix"
     fi
 }
+
+get_proton_name() {
+    local proton_path="$1"
+
+    if [ ! -f "$proton_path/compatibilitytool.vdf" ] || [ ! -r "$proton_path/compatibilitytool.vdf" ]; then
+        return 1
+    fi
+
+    sed -n '/"compat_tools"/,/}/p' "$proton_path/compatibilitytool.vdf" \
+        | grep -E '^\s*"[^"]+"' \
+        | tail -n +2 \
+        | head -1 \
+        | sed 's/^\s*"\(.*\)".*$/\1/'
+}
+
+find_proton_by_name() {
+    local proton_name="$1"
+    local compatibility_tools_dir="$2"
+
+    for dir in "$compatibility_tools_dir"/*; do
+        if [ -d "$dir" ]; then
+            local name
+            name="$(get_proton_name "$dir")"
+            if [ "$name" = "$proton_name" ]; then
+                echo "$dir"
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}

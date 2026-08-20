@@ -94,15 +94,13 @@
                 <td><code>umu-launcher</code><br/><code>aur/dwproton-bin</code></td>
             </tr>
             <tr>
-                <td><code>umu-ge-proton</code></td>
+                <td><code>umu-proton-ge</code></td>
                 <td><code>umu-run</code><br/><code>/usr/share/steam/compatibilitytools.d/proton-ge-custom/</code></td>
                 <td><code>umu-launcher</code><br/><code>archlinuxcn/proton-ge-custom-bin</code></td>
             </tr>
         </tbody>
     </table>
 </div>
-
-一般情况下，推荐 `umu-ge-proton`（部分游戏可以使用 `umu-dwproton` 以获得更好体验）
 
 ## 功能
 

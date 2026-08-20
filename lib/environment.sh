@@ -23,10 +23,15 @@ declare -a ENV_EXPORTS=(
     # VKD3D
     "env.VKD3D_CONFIG|VKD3D_CONFIG|string"
     # UMU
-    "runner.protonpath|PROTONPATH|path_dir"
-    "env.PROTONPATH|PROTONPATH|path_dir"
+    "runner.protonpath|PROTONPATH|protonpath"
+    "env.PROTONPATH|PROTONPATH|protonpath"
     "env.GAMEID|GAMEID|string"
     "env.UMU_LOG|UMU_LOG|string"
+    "env.PROTON_VERB|PROTON_VERB|string"
+    "env.UMU_RUNTIME_UPDATE|UMU_RUNTIME_UPDATE|bool_to_01"
+    "env.UMU_NO_PROTON|UMU_NO_PROTON|bool_to_01"
+    "env.UMU_HTTP_TIMEOUT|UMU_HTTP_TIMEOUT|uint"
+    "env.UMU_HTTP_RETRIES|UMU_HTTP_RETRIES|uint"
     # Proton
     "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
     "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
@@ -66,6 +71,10 @@ export_env_vars() {
         raw_value="${CONFIG[$conf_key]:-}"
         [[ -z "$raw_value" ]] && continue
         final_value="$("env_transform_$transform" "$raw_value")"
+        if [[ -z "$final_value" ]]; then
+            log_debug environment "跳过导出 $env_name，因为转换后的值为空"
+            continue
+        fi
         export "${env_name}=${final_value}"
         log_debug environment "[显式] export $env_name=$final_value"
     done
@@ -111,6 +120,15 @@ env_transform_bool_to_01() {
     return 0
 }
 
+env_transform_uint() {
+    local value="$1"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+        echo "$value"
+    else
+        die 1 environment "无效的无符号整数: '$value'"
+    fi
+}
+
 env_transform_path_dir() {
     local dir_path="$1"
     if [[ -d "$dir_path" ]]; then
@@ -141,6 +159,26 @@ env_transform_path_file() {
         realpath "$file_path"
     else
         die 1 environment "文件不存在: '$file_path'"
+    fi
+}
+
+env_transform_protonpath() {
+    local proton_path="$1"
+    if [[ -d "$proton_path" ]]; then
+        realpath "$proton_path"
+    else
+        local extra_proton_paths=()
+        IFS=':' read -ra extra_proton_paths <<< "$STEAM_EXTRA_COMPAT_TOOLS_PATHS"
+        local proton_paths=(
+            "$HOME/.local/share/Steam/compatibilitytools.d"
+            "${extra_proton_paths[@]}"
+            "/usr/local/share/steam/compatibilitytools.d"
+            "/usr/share/steam/compatibilitytools.d"
+        )
+        for path in "${proton_paths[@]}"; do
+            find_proton_by_name "$proton_path" "$path" && return 0
+        done
+        die 1 environment "未找到 Proton: '$proton_path'"
     fi
 }
 

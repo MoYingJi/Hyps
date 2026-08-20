@@ -34,12 +34,15 @@ declare -a ENV_EXPORTS=(
     "env.UMU_HTTP_RETRIES|UMU_HTTP_RETRIES|uint"
     # Proton
     "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
+    "env.UMU_ID|UMU_ID|string"
     "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
     "env.PROTON_DLSS_INDICATOR|PROTON_DLSS_INDICATOR|bool_to_01"
     "env.PROTON_FSR4_INDICATOR|PROTON_FSR4_INDICATOR|bool_to_01"
     "env.PROTON_PREFER_SDL|PROTON_PREFER_SDL|bool_to_01"
     "env.PROTON_ENABLE_WAYLAND|PROTON_ENABLE_WAYLAND|bool_to_01"
     "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
+    "env.PROTON_USE_OPTISCALER|PROTON_USE_OPTISCALER|bool_to_01"
+    "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
     # MangoHud
     "env.MANGOHUD|MANGOHUD|bool_to_01"
     "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
@@ -69,10 +72,11 @@ export_env_vars() {
     for entry in "${ENV_EXPORTS[@]}"; do
         IFS='|' read -r conf_key env_name transform <<< "$entry"
         raw_value="${CONFIG[$conf_key]:-}"
-        [[ -z "$raw_value" ]] && continue
-        final_value="$("env_transform_$transform" "$raw_value")"
-        if [[ -z "$final_value" ]]; then
-            log_debug environment "跳过导出 $env_name，因为转换后的值为空"
+        [[ -z "${CONFIG[$conf_key]+exists}" ]] && continue
+        final_value="$("env_transform_$transform" "$raw_value" "$conf_key")"
+        exit_code=$?
+        if [[ $exit_code -ne 0 ]]; then
+            log_debug environment "跳过导出 $env_name，exit code: $exit_code"
             continue
         fi
         export "${env_name}=${final_value}"
@@ -116,35 +120,42 @@ env_transform_string() {
 
 env_transform_bool_to_01() {
     local value="$1"
+    [ -z "$value" ] && return 1
     isy "$value" && echo "1" || echo "0"
     return 0
 }
 
 env_transform_uint() {
     local value="$1"
+    local conf_key="${2:-}"
+    [ -z "$value" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ "$value" =~ ^[0-9]+$ ]]; then
         echo "$value"
     else
-        die 1 environment "无效的无符号整数: '$value'"
+        die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
     fi
 }
 
 env_transform_path_dir() {
     local dir_path="$1"
+    local conf_key="${2:-}"
+    [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$dir_path" ]]; then
         realpath "$dir_path"
     else
-        die 1 environment "目录不存在: '$dir_path'"
+        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
     fi
 }
 
 env_transform_path_mkdir() {
     local dir_path="$1"
+    local conf_key="${2:-}"
+    [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$dir_path" ]]; then
         realpath "$dir_path"
         return 0
     elif [[ -e "$dir_path" ]]; then
-        die 1 environment "路径已存在但不是目录: '$dir_path'"
+        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
     else
         dir_path="$(realpath -m "$dir_path")"
         ENV_MKDIRS+=("$dir_path")
@@ -155,30 +166,23 @@ env_transform_path_mkdir() {
 
 env_transform_path_file() {
     local file_path="$1"
+    local conf_key="${2:-}"
+    [ -z "$file_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -f "$file_path" ]]; then
         realpath "$file_path"
     else
-        die 1 environment "文件不存在: '$file_path'"
+        die 1 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
     fi
 }
 
 env_transform_protonpath() {
     local proton_path="$1"
+    local conf_key="${2:-}"
+    [ -z "$proton_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$proton_path" ]]; then
         realpath "$proton_path"
     else
-        local extra_proton_paths=()
-        IFS=':' read -ra extra_proton_paths <<< "$STEAM_EXTRA_COMPAT_TOOLS_PATHS"
-        local proton_paths=(
-            "$HOME/.local/share/Steam/compatibilitytools.d"
-            "${extra_proton_paths[@]}"
-            "/usr/local/share/steam/compatibilitytools.d"
-            "/usr/share/steam/compatibilitytools.d"
-        )
-        for path in "${proton_paths[@]}"; do
-            find_proton_by_name "$proton_path" "$path" && return 0
-        done
-        die 1 environment "未找到 Proton: '$proton_path'"
+        find_proton_by_name "$proton_path" || die 1 environment "未找到 Proton: '$proton_path'"
     fi
 }
 

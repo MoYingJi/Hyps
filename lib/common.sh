@@ -103,6 +103,13 @@ load_config() {
         config_merge_temp
     fi
 
+    if ! config_has runner.exe && config_has runner.protonpath; then
+        local proton_path
+        proton_path="$(env_transform_protonpath "$(config_get runner.protonpath)")"
+        config_set runner.protonpath "$proton_path"
+        config_set runner.exe "$proton_path/proton"
+    fi
+
     config_require_realpath_exe runner.exe
     config_require_realpath_file game.exe
 
@@ -117,6 +124,10 @@ build_game_command() {
 
     cmd+=("${RUNNER_WRAPPER[@]}")
     cmd+=("$(config_get runner.exe)")
+
+    local -a runner_args=()
+    config_read_array runner.args runner_args
+    cmd+=("${runner_args[@]}")
 
     if isy "$NEEDS_CUSTOM_BATCH"; then
         cmd+=("$CUSTOM_BATCH_SCRIPT")

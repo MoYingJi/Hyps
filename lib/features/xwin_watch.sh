@@ -21,20 +21,25 @@ feat_xwin_watch_load_config() {
 
     config_has features.xwin_watch.window_name || die 1 xwin-watch "'features.xwin_watch.window_name' 未设置"
 
-    local sleep
-    local interval
-    local attempts
+    local timeout
 
-    config_default features.xwin_watch.sleep 5 >/dev/null
-    sleep="$(config_get features.xwin_watch.sleep)"
-    config_default features.xwin_watch.interval "$sleep" >/dev/null
-    interval="$(config_get features.xwin_watch.interval)"
-    config_default features.xwin_watch.attempts 20 >/dev/null
-    attempts="$(config_get features.xwin_watch.attempts)"
+    config_default features.xwin_watch.timeout 0 >/dev/null
+    timeout="$(config_get features.xwin_watch.timeout)"
 
-    [[ "$sleep" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.sleep' 必须是整数"
-    [[ "$interval" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.interval' 必须是整数"
-    [[ "$attempts" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.attempts' 必须是整数"
+    [[ "$timeout" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.timeout' 必须是整数"
+
+    # 后端开关: x11/wayland 可独立开启关闭 (默认 auto，按 pkg-config 自动检测)
+    local x11 wayland
+    config_default features.xwin_watch.x11 auto >/dev/null
+    config_default features.xwin_watch.wayland auto >/dev/null
+    x11="$(config_get features.xwin_watch.x11)"
+    wayland="$(config_get features.xwin_watch.wayland)"
+    if [[ "$x11" != auto ]] && ! isy "$x11"; then
+        die 1 xwin-watch "'features.xwin_watch.x11' 必须是 auto/true/false"
+    fi
+    if [[ "$wayland" != auto ]] && ! isy "$wayland"; then
+        die 1 xwin-watch "'features.xwin_watch.wayland' 必须是 auto/true/false"
+    fi
 
     register_hook pre_start feat_xwin_watch_prepare
 }
@@ -55,10 +60,46 @@ feat_xwin_watch_kwin_permission_desktop() {
     echo "Terminal=false"
 }
 
+# 后端开关解析: 输出 x11/wayland 是否启用 (true/false)
+feat_xwin_watch_backend_enabled() {
+    local backend="$1"
+    local module="$backend"
+    [[ "$backend" == wayland ]] && module="wayland-client"
+    local cfg
+    cfg="$(config_get "features.xwin_watch.$backend" auto)"
+    if [[ "$cfg" == auto ]]; then
+        if pkg-config --exists "$module"; then
+            echo true
+        else
+            echo false
+        fi
+    elif isy "$cfg"; then
+        echo true
+    else
+        echo false
+    fi
+}
+
 feat_xwin_watch_all_source() {
     local output="$1"
-    cat "$XWIN_WATCH_TOOL/xwin-watch.c"
-    echo -n "wayland-client " && pkg-config --exists wayland-client && echo true || echo false
+    local tool="$XWIN_WATCH_TOOL"
+    cat "$tool/xwin-watch.c"
+    cat "$tool/backends.h"
+    echo -n "x11=" && feat_xwin_watch_backend_enabled x11
+    echo -n "wayland=" && feat_xwin_watch_backend_enabled wayland
+    if isy "$(feat_xwin_watch_backend_enabled x11)"; then
+        cat "$tool/x11-backend.c"
+    fi
+    if isy "$(feat_xwin_watch_backend_enabled wayland)"; then
+        cat "$tool/wayland.c"
+        cat "$tool/wayland.h"
+        cat "$tool/wlr-backend.c"
+        cat "$tool/ext-backend.c"
+        cat "$tool/plasma-backend.c"
+        cat "$tool/generated/wlr-foreign-toplevel-management-unstable-v1.c"
+        cat "$tool/generated/ext-foreign-toplevel-list-v1.c"
+        cat "$tool/generated/plasma-window-management.c"
+    fi
     command_exists kwin_wayland && feat_xwin_watch_kwin_permission_desktop "$output" || echo "kwin not found"
 }
 feat_xwin_watch_verify_output() {
@@ -67,22 +108,60 @@ feat_xwin_watch_verify_output() {
     [ -x "$output" ] || return 1
     local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
-    diff <(feat_xwin_watch_kwin_permission_desktop "$output") "$desktop_file" >/dev/null 2>&1 || return 1
+    if isy "$(feat_xwin_watch_backend_enabled wayland)" && command_exists kwin_wayland; then
+        diff <(feat_xwin_watch_kwin_permission_desktop "$output") "$desktop_file" >/dev/null 2>&1 || return 1
+    fi
 }
 feat_xwin_watch_compile() {
     local output="$1"
     local tool="$XWIN_WATCH_TOOL"
 
-    if pkg-config --exists wayland-client; then
-        # 有 wayland-client 时启用 Wayland 后端
-        # (wlr-foreign-toplevel-management + ext-foreign-toplevel-list + org_kde_plasma_window_management)
+    local x11 wayland
+    x11="$(feat_xwin_watch_backend_enabled x11)"
+    wayland="$(feat_xwin_watch_backend_enabled wayland)"
+
+    if isy "$x11"; then
+        log_debug xwin-watch "启用 X11 后端"
+    else
+        log_debug xwin-watch "禁用 X11 后端"
+    fi
+    if isy "$wayland"; then
         log_debug xwin-watch "启用 Wayland 后端"
-        gcc "$tool/xwin-watch.c" \
-            "$tool/wlr-foreign-toplevel-management-unstable-v1.c" \
-            "$tool/ext-foreign-toplevel-list-v1.c" \
-            "$tool/plasma-window-management.c" \
-            -I"$tool" -lX11 -lwayland-client -DHAVE_WAYLAND \
-            -o "$output"
+    else
+        log_debug xwin-watch "禁用 Wayland 后端"
+    fi
+
+    local -a sources=()
+    local -a cflags=()
+    local -a libs=()
+
+    sources+=("$tool/xwin-watch.c")
+    cflags+=("-I$tool")
+
+    if isy "$x11"; then
+        sources+=("$tool/x11-backend.c")
+        cflags+=("-DHAVE_X11")
+        libs+=("-lX11")
+    fi
+
+    if isy "$wayland"; then
+        sources+=("$tool/wayland.c")
+        cflags+=("-DHAVE_WAYLAND")
+        libs+=("-lwayland-client")
+
+        # Wayland 扩展各自独立编译 (wlr / ext / plasma)
+        sources+=("$tool/wlr-backend.c")
+        cflags+=("-DHAVE_WLR")
+        sources+=("$tool/generated/wlr-foreign-toplevel-management-unstable-v1.c")
+
+        sources+=("$tool/ext-backend.c")
+        cflags+=("-DHAVE_EXT")
+        sources+=("$tool/generated/ext-foreign-toplevel-list-v1.c")
+
+        sources+=("$tool/plasma-backend.c")
+        cflags+=("-DHAVE_PLASMA")
+        sources+=("$tool/generated/plasma-window-management.c")
+
         if command_exists kwin_wayland; then
             local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
             local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
@@ -90,10 +169,9 @@ feat_xwin_watch_compile() {
             feat_xwin_watch_kwin_permission_desktop "$output" > "$desktop_file"
             command_exists kbuildsycoca6 && kbuildsycoca6 >/dev/null 2>&1 || true
         fi
-    else
-        log_debug xwin-watch "禁用 Wayland 后端"
-        gcc "$tool/xwin-watch.c" -lX11 -o "$output"
     fi
+
+    gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output"
 
     ensure_executable "$output" "xwin-watch"
 }
@@ -109,9 +187,7 @@ feat_xwin_watch_prepare() {
 
     XWIN_WATCH_CMD+=("$bin")
     XWIN_WATCH_CMD+=("-w" "$(config_get features.xwin_watch.window_name)")
-    XWIN_WATCH_CMD+=("-s" "$(config_get features.xwin_watch.sleep)")
-    XWIN_WATCH_CMD+=("-i" "$(config_get features.xwin_watch.interval)")
-    XWIN_WATCH_CMD+=("-a" "$(config_get features.xwin_watch.attempts)")
+    XWIN_WATCH_CMD+=("-a" "$(config_get features.xwin_watch.timeout)")
 
     register_hook post_start feat_xwin_watch_post_start
 }

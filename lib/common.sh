@@ -38,6 +38,8 @@ source "$SCRIPT_DIR/features/program_cache.sh"
 source "$SCRIPT_DIR/features/time_record.sh"
 #shellcheck source=./features/userdata_link.sh
 source "$SCRIPT_DIR/features/userdata_link.sh"
+#shellcheck source=./features/window_time_indicator.sh
+source "$SCRIPT_DIR/features/window_time_indicator.sh"
 #shellcheck source=./features/wrappers.sh
 source "$SCRIPT_DIR/features/wrappers.sh"
 #shellcheck source=./features/xwin_watch_kill.sh
@@ -146,5 +148,9 @@ start_game_process() {
     LD_PRELOAD="$(env_get_ld_preload)" "${cmd[@]}" &
     GAME_PID="$!"
     log_debug lifecycle "游戏进程 PID: $GAME_PID"
-    log_debug lifecycle "本次脚本用时: $(($(date +%s%N) - SCRIPT_START_NANOSECONDS)) 纳秒"
+
+    local now_ns dur_ns
+    now_ns="$(date +%s%N)"
+    dur_ns="$((now_ns - SCRIPT_START_NANOSECONDS))"
+    log_debug lifecycle "本次脚本用时: $(printf "%'d" "$dur_ns") 纳秒"
 }

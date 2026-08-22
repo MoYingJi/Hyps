@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <poll.h>
 
 #define ANY_ (int16_t)-1
 
@@ -55,6 +56,7 @@ int main(const int argc, char **argv) {
     int64_t interval = 5000;
     const char *fifo_path = nullptr;
     int fifo_fd = -1;
+    struct pollfd fds[1];
     bool use_fifo = false;
     bool is_dry_run = false;
 
@@ -84,6 +86,8 @@ int main(const int argc, char **argv) {
         fifo_fd = open(fifo_path, O_RDONLY | O_NONBLOCK);
         if (fifo_fd != -1) {
             use_fifo = true;
+            fds[0].fd = fifo_fd;
+            fds[0].events = POLLIN;
         }
     }
 
@@ -101,24 +105,28 @@ int main(const int argc, char **argv) {
             }
         }
 
-        usleep(interval * 1000);
+        if (use_fifo) {
+            const int ret = poll(fds, 1, interval);
+            if (ret > 0 && (fds[0].revents & POLLIN)) {
+                char buffer[32];
+                const ssize_t bytes_read = read(fifo_fd, buffer, sizeof(buffer) - 1);
+                if (bytes_read > 0) {
+                    buffer[bytes_read] = '\0';
+                    const int new_fps = atoi(buffer);
+                    if (new_fps >= 0) {
+                        target_fps = new_fps;
+                        is_dry_run = target_fps < 1;
+                        printf("Updated FPS limit to: %d\n", target_fps);
+                    }
+                }
+            }
+        } else {
+            usleep(interval * 1000);
+        }
+
         if (received_signal != 0) {
             printf("Received signal %d, exiting gracefully.\n", received_signal);
             break;
-        }
-
-        if (use_fifo) {
-            char buffer[32];
-            const ssize_t bytes_read = read(fifo_fd, buffer, sizeof(buffer) - 1);
-            if (bytes_read > 0) {
-                buffer[bytes_read] = '\0';
-                const int new_fps = atoi(buffer);
-                if (new_fps >= 0) {
-                    target_fps = new_fps;
-                    is_dry_run = target_fps < 1;
-                    printf("Updated FPS limit to: %d\n", target_fps);
-                }
-            }
         }
     } while (interval > 0);
 

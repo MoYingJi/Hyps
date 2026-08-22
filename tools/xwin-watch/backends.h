@@ -1,8 +1,6 @@
 #ifndef BACKENDS_H
 #define BACKENDS_H
 
-#include <stdbool.h>
-
 // 统一后端抽象: X11 与 Wayland 都实现同一接口，主程序通过它事件驱动地监听窗口变化。
 typedef struct window_backend {
     const char *(*name)(void);                 // 检测方式显示名，如 "X11 (_NET_CLIENT_LIST)"

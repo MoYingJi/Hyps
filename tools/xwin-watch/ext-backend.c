@@ -18,7 +18,7 @@ static ext_toplevel_t *g_ext_toplevels = NULL;
 
 static void ext_handle_title(void *data, struct ext_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    ext_toplevel_t *node = (ext_toplevel_t *)data;
+    const auto node = (ext_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -30,7 +30,7 @@ static void ext_handle_done(void *data, struct ext_foreign_toplevel_handle_v1 *h
 
 static void ext_handle_closed(void *data, struct ext_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    ext_toplevel_t *node = (ext_toplevel_t *)data;
+    const auto node = (ext_toplevel_t *)data;
     if (node->handle) {
         ext_foreign_toplevel_handle_v1_destroy(node->handle);
         node->handle = NULL;
@@ -73,7 +73,7 @@ static const struct ext_foreign_toplevel_list_v1_listener ext_list_listener = {
     .finished = ext_list_finished,
 };
 
-static void ext_bind(struct wl_registry *registry, uint32_t name, uint32_t version) {
+static void ext_bind(struct wl_registry *registry, const uint32_t name, const uint32_t version) {
     (void)version;
     g_ext_list = (struct ext_foreign_toplevel_list_v1 *)wl_registry_bind(
         registry, name, &ext_foreign_toplevel_list_v1_interface, 1);

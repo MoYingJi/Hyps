@@ -18,7 +18,7 @@ static wlr_toplevel_t *g_wlr_toplevels = NULL;
 
 static void wlr_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    wlr_toplevel_t *node = (wlr_toplevel_t *)data;
+    const auto node = (wlr_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -55,7 +55,7 @@ static void wlr_noop_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *
 
 static void wlr_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    wlr_toplevel_t *node = (wlr_toplevel_t *)data;
+    const auto node = (wlr_toplevel_t *)data;
     if (node->handle) {
         zwlr_foreign_toplevel_handle_v1_destroy(node->handle);
         node->handle = NULL;
@@ -95,7 +95,7 @@ static const struct zwlr_foreign_toplevel_manager_v1_listener wlr_manager_listen
     .finished = wlr_manager_finished,
 };
 
-static void wlr_bind(struct wl_registry *registry, uint32_t name, uint32_t version) {
+static void wlr_bind(struct wl_registry *registry, const uint32_t name, const uint32_t version) {
     (void)version;
     g_wlr_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(
         registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 1);

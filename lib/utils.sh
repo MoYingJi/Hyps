@@ -297,6 +297,17 @@ sudo_request() {
     sudo "$@"
 }
 
+run_and_log() {
+    local level="$1"
+    local module="$2"
+    local prompt="$3"
+    shift 3
+
+    [ -z "$prompt" ] && prompt="执行命令"
+    log "$level" "$module" "$prompt: $(quote_args "$@")"
+    "$@"
+}
+
 find_wineprefix() {
     local prefix="$1"
 
@@ -308,6 +319,25 @@ find_wineprefix() {
         echo "$prefix"
     fi
 }
+
+_load_proton_paths() {
+    local -n proton_paths="$1"
+    local extra_proton_paths=()
+    IFS=':' read -ra extra_proton_paths <<< "$STEAM_EXTRA_COMPAT_TOOLS_PATHS"
+    local all_proton_paths=(
+        "$HOME/.local/share/Steam/compatibilitytools.d"
+        "${extra_proton_paths[@]}"
+        "/usr/local/share/steam/compatibilitytools.d"
+        "/usr/share/steam/compatibilitytools.d"
+    )
+    for path in "${all_proton_paths[@]}"; do
+        if [ -d "$path" ]; then
+            proton_paths+=("$path")
+        fi
+    done
+}
+_PROTON_PATHS=()
+_load_proton_paths _PROTON_PATHS
 
 get_proton_name() {
     local proton_path="$1"
@@ -343,16 +373,8 @@ find_proton_by_name_in_dir() {
 
 find_proton_by_name() {
     local proton_name="$1"
-    local extra_proton_paths=()
-    IFS=':' read -ra extra_proton_paths <<< "$STEAM_EXTRA_COMPAT_TOOLS_PATHS"
-    local proton_paths=(
-        "$HOME/.local/share/Steam/compatibilitytools.d"
-        "${extra_proton_paths[@]}"
-        "/usr/local/share/steam/compatibilitytools.d"
-        "/usr/share/steam/compatibilitytools.d"
-    )
 
-    for path in "${proton_paths[@]}"; do
+    for path in "${_PROTON_PATHS[@]}"; do
         find_proton_by_name_in_dir "$proton_name" "$path" && return 0
     done
 

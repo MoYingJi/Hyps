@@ -1,7 +1,6 @@
 #ifndef WAYLAND_H
 #define WAYLAND_H
 
-#include <stdbool.h>
 #include <stdint.h>
 
 struct wl_registry;

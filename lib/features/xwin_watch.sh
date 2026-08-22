@@ -171,7 +171,7 @@ feat_xwin_watch_compile() {
         fi
     fi
 
-    gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output"
+    run_and_log DEBUG xwin-watch "编译命令" gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output"
 
     ensure_executable "$output" "xwin-watch"
 }

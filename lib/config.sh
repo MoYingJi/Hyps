@@ -8,6 +8,20 @@ source "${SCRIPT_DIR:-.}/log.sh"
 #shellcheck source=utils.sh
 source "${SCRIPT_DIR:-.}/utils.sh"
 
+load_common_config() {
+    config_parse_file "$PROJECT_ROOT/config.conf"
+
+    config_read_realpath path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
+
+    config_parse_file "$CONFIG_DIR/config.conf"
+
+    config_read_realpath path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
+    config_read_realpath path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
+    config_read_realpath path.temp TEMP_DIR "/tmp/hypsc"
+
+    config_parse_file "$CONFIG_DIR/games/_common.conf"
+}
+
 # 本文件部分使用 LLM 生成
 
 declare -A TEMP_CONFIG

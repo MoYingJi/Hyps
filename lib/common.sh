@@ -76,17 +76,7 @@ load_config() {
     local game_config_file
     local runner_name
 
-    config_parse_file "$PROJECT_ROOT/config.conf"
-
-    config_read_realpath path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
-
-    config_parse_file "$CONFIG_DIR/config.conf"
-
-    config_read_realpath path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
-    config_read_realpath path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
-    config_read_realpath path.temp TEMP_DIR "/tmp/hypsc"
-
-    config_parse_file "$CONFIG_DIR/games/_common.conf"
+    load_common_config
 
     game_config_file="$CONFIG_DIR/games/${GAME_NAME}.conf"
     [ -f "$game_config_file" ] || die 1 config "游戏配置文件不存在：$game_config_file"

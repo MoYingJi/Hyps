@@ -3,6 +3,9 @@
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+#shellcheck source=../environment.sh
+source "${SCRIPT_DIR:-.}/environment.sh"
+
 feat_dxvk_nvapi_load_config() {
     local key
     local env_name

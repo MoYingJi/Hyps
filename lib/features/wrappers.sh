@@ -3,6 +3,9 @@
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+#shellcheck source=../environment.sh
+source "${SCRIPT_DIR:-.}/environment.sh"
+
 RUNNER_WRAPPER=()
 
 wrapper_load_config() {

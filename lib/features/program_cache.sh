@@ -3,6 +3,9 @@
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+#shellcheck source=../environment.sh
+source "${SCRIPT_DIR:-.}/environment.sh"
+
 feat_program_cache_load_config() {
     # GLShaderCache
     if isy "$(config_get cache.shader.enabled)"; then

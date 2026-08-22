@@ -3,6 +3,9 @@
 [[ -n "${__LOG_SH_LOADED:-}" ]] && return 0
 __LOG_SH_LOADED=1
 
+#shellcheck source=console.sh
+source "${SCRIPT_DIR:-.}/console.sh"
+
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
 declare -A _LOG_LEVELS=(
@@ -12,19 +15,12 @@ declare -A _LOG_LEVELS=(
     [ERROR]=40
 )
 
-if [[ -t 2 ]] && [[ -z "${LOG_NO_COLOR:-}" ]]; then
-    _LOG_COLOR_RESET=$'\033[0m'
-    _LOG_COLOR_DEBUG=$'\033[90m'   # 灰色
-    _LOG_COLOR_INFO=$'\033[0m'     # 默认
-    _LOG_COLOR_WARN=$'\033[33m'    # 黄色
-    _LOG_COLOR_ERROR=$'\033[31m'   # 红色
-else
-    _LOG_COLOR_RESET=""
-    _LOG_COLOR_DEBUG=""
-    _LOG_COLOR_INFO=""
-    _LOG_COLOR_WARN=""
-    _LOG_COLOR_ERROR=""
-fi
+declare -A _LOG_STYLES=(
+    [DEBUG]=bright_black
+    [INFO]=reset
+    [WARN]=yellow
+    [ERROR]=red
+)
 
 LOG_FILE="${LOG_FILE:-}"
 
@@ -75,16 +71,13 @@ log() {
         log_line="[$timestamp] [$level] $message"
     fi
 
-    local color_code=""
-    case "$level" in
-        DEBUG) color_code="$_LOG_COLOR_DEBUG" ;;
-        INFO)  color_code="$_LOG_COLOR_INFO"  ;;
-        WARN)  color_code="$_LOG_COLOR_WARN"  ;;
-        ERROR) color_code="$_LOG_COLOR_ERROR" ;;
-    esac
+    local style_name color_code color_reset
 
-    if [[ -n "$color_code" ]]; then
-        echo "${color_code}${log_line}${_LOG_COLOR_RESET}" >&2
+    if [[ -t 2 ]]; then
+        style_name="${_LOG_STYLES[$level]:-}"
+        color_code="${_CONSOLE_STYLES[$style_name]:-}"
+        color_reset="${_CONSOLE_STYLES[reset]:-}"
+        printf "%s%s%s\n" "$color_code" "$log_line" "$color_reset" >&2
     else
         echo "$log_line" >&2
     fi
@@ -138,13 +131,4 @@ set_log_level() {
 enable_log_file() {
     LOG_FILE="$1"
     log_debug "日志文件已设置: $LOG_FILE"
-}
-
-disable_log_color() {
-    LOG_NO_COLOR=1
-    _LOG_COLOR_RESET=""
-    _LOG_COLOR_DEBUG=""
-    _LOG_COLOR_INFO=""
-    _LOG_COLOR_WARN=""
-    _LOG_COLOR_ERROR=""
 }

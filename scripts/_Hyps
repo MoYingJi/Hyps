@@ -1,0 +1,105 @@
+#!/usr/bin/bash
+
+# 一个工具脚本
+
+[ "$#" -eq 0 ] && die 1 "需要参数"
+
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
+SCRIPT_DIR="$PROJECT_ROOT/lib"
+
+#shellcheck source=../lib/libs.sh
+source "$SCRIPT_DIR/libs.sh"
+
+register_hook() { return; }
+
+load_common_config_in_scripts() {
+    cd "$PROJECT_ROOT" || die 1 "无法切换到项目根目录: $PROJECT_ROOT"
+    load_common_config
+    cd "$SCRIPTS_DIR" || die 1 "无法切换到脚本目录: $SCRIPTS_DIR"
+}
+
+commands=(
+    "list-proton"
+    "time"
+)
+
+command_list_proton() {
+    [ "$#" -eq 0 ] || die 1 "list-proton 命令不接受任何参数"
+
+    for path in "${_PROTON_PATHS[@]}"; do
+        for proton in "$path"/*; do
+            if ! [ -d "$proton" ]; then
+                log_debug "无效的 Proton 路径，不是文件夹，跳过: $proton"
+                continue
+            fi
+
+            name="$(get_proton_name "$proton")"
+
+            if [ -z "$name" ]; then
+                log_debug "无效的 Proton 路径，无法获取名称，跳过: $proton"
+                continue
+            fi
+
+            printf "%s 位于 %s\n" "$(style_quote bright_blue "$name")" "$(style_quote bright_black "$proton")"
+        done
+    done
+}
+
+command_time() {
+    local time_commands=(
+        "today"
+    )
+
+    [[ " ${time_commands[*]} " == *" $1 "* ]] || die 1 "未知的 time 子命令: $1"
+    local fn_name="command_time_${1//-/_}"; shift
+    "$fn_name" "$@"
+}
+
+command_time_today() {
+    [ "$#" -eq 0 ] || die 1 "time today 命令不接受任何参数"
+
+    #shellcheck source=../lib/features/time_record.sh
+    source "$SCRIPT_DIR/features/time_record.sh"
+
+    load_common_config_in_scripts
+    feat_time_record_load_config
+
+    local dir today_date now today_4am day_start
+    dir="$(config_get features.time_record.dir)"
+    today_date="$(date +%Y-%m-%d)"
+    now="$(date +%s)"
+    today_4am="$(date -d "$today_date 04:00:00" +%s 2>/dev/null)"
+
+    # 计算当前游戏日的起始时间戳
+    if [ "$now" -lt "$today_4am" ]; then
+        local yesterday_date
+        yesterday_date="$(date -d "$today_date -1 day" +%Y-%m-%d)"
+        day_start="$(date -d "$yesterday_date 04:00:00" +%s 2>/dev/null)"
+    else
+        day_start="$today_4am"
+    fi
+
+    local game game_name last_start last_start_time today_status
+
+    {
+        printf "%s\t%s\t%s\n" "游戏名" "最后一次启动时间" "今天 (04:00)"
+        for game in "$dir"/*; do
+            game_name="$(basename "$game")"
+            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
+            last_start_time="$(date -d "@$last_start" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")"
+
+            if [ -n "$last_start" ] && [ "$last_start" -ge "$day_start" ]; then
+                today_status="$(style_quote green "已启动")"
+            else
+                today_status="$(style_quote red "未启动")"
+            fi
+
+            printf "%s\t%s\t%s\n" "$game_name" "$last_start_time" "$today_status"
+        done
+    } | column -t -s $'\t'
+}
+
+[[ " ${commands[*]} " == *" $1 "* ]] || die 1 "未知的命令: $1"
+fn_name="command_${1//-/_}"; shift
+"$fn_name" "$@"

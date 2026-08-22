@@ -27,23 +27,26 @@ commands=(
 command_list_proton() {
     [ "$#" -eq 0 ] || die 1 "list-proton 命令不接受任何参数"
 
-    for path in "${_PROTON_PATHS[@]}"; do
-        for proton in "$path"/*; do
-            if ! [ -d "$proton" ]; then
-                log_debug "无效的 Proton 路径，不是文件夹，跳过: $proton"
-                continue
-            fi
+    {
+        printf "%s\t%s\n" "Proton 名称" "路径"
+        for path in "${_PROTON_PATHS[@]}"; do
+            for proton in "$path"/*; do
+                if ! [ -d "$proton" ]; then
+                    log_debug "无效的 Proton 路径，不是文件夹，跳过: $proton"
+                    continue
+                fi
 
-            name="$(get_proton_name "$proton")"
+                name="$(get_proton_name "$proton")"
 
-            if [ -z "$name" ]; then
-                log_debug "无效的 Proton 路径，无法获取名称，跳过: $proton"
-                continue
-            fi
+                if [ -z "$name" ]; then
+                    log_debug "无效的 Proton 路径，无法获取名称，跳过: $proton"
+                    continue
+                fi
 
-            printf "%s 位于 %s\n" "$(style_quote bright_blue "$name")" "$(style_quote bright_black "$proton")"
+                printf "%s\t%s\n" "$(style_quote bright_blue "$name")" "$(style_quote bright_black "$proton")"
+            done
         done
-    done
+    } | column -t -s $'\t'
 }
 
 command_time() {
@@ -95,7 +98,7 @@ command_time_today() {
                 today_status="$(style_quote red "未启动")"
             fi
 
-            printf "%s\t%s\t%s\n" "$game_name" "$last_start_time" "$today_status"
+            printf "%s\t%s\t%s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote bright_black "$last_start_time")" "$today_status"
         done
     } | column -t -s $'\t'
 }

@@ -52,7 +52,14 @@ declare -A _CONSOLE_STYLES=(
     [bright_white_bg]=$'\033[107m'
 )
 
+use_color() {
+    [[ -t 2 ]] || [[ -n "${FORCE_COLOR:-}" ]] || return 1
+    [[ -n "${NO_COLOR:-}" ]] && return 1
+    return 0
+}
+
 style() {
+    use_color || return 0
     local name="$1"
     if [[ -n "${_CONSOLE_STYLES[$name]:-}" ]]; then
         printf "%s" "${_CONSOLE_STYLES[$name]}"
@@ -63,26 +70,33 @@ style() {
     fi
 }
 style_reset() {
+    use_color || return 0
     printf $'\033[0m'
 }
 style_256_fg() {
+    use_color || return 0
     local color="$1"
     printf "\033[38;5;%sm" "$color"
 }
 style_256_bg() {
+    use_color || return 0
     local color="$1"
     printf "\033[48;5;%sm" "$color"
 }
 style_rgb_fg() {
+    use_color || return 0
     local r="$1" g="$2" b="$3"
     printf "\033[38;2;%s;%s;%sm" "$r" "$g" "$b"
 }
 style_rgb_bg() {
+    use_color || return 0
     local r="$1" g="$2" b="$3"
     printf "\033[48;2;%s;%s;%sm" "$r" "$g" "$b"
 }
 
 style_quote() {
+    use_color || { echo "$2"; return 0; }
+
     local styles=()
     IFS=',' read -ra styles <<< "$1"
     local text="$2"

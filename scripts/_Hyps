@@ -2,8 +2,6 @@
 
 # 一个工具脚本
 
-[ "$#" -eq 0 ] && die 1 "需要参数"
-
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
 SCRIPT_DIR="$PROJECT_ROOT/lib"
@@ -103,6 +101,7 @@ command_time_today() {
     } | column -t -s $'\t'
 }
 
+[ "$#" -eq 0 ] && die 1 "需要参数"
 [[ " ${commands[*]} " == *" $1 "* ]] || die 1 "未知的命令: $1"
 fn_name="command_${1//-/_}"; shift
 "$fn_name" "$@"

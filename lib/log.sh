@@ -73,7 +73,7 @@ log() {
 
     local style_name color_code color_reset
 
-    if [[ -t 2 ]]; then
+    if use_color; then
         style_name="${_LOG_STYLES[$level]:-}"
         color_code="${_CONSOLE_STYLES[$style_name]:-}"
         color_reset="${_CONSOLE_STYLES[reset]:-}"

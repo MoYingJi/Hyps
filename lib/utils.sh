@@ -41,6 +41,17 @@ quote_args() {
     echo # 最后换行
 }
 
+is_json_array() {
+    local json="$1"
+
+    # 去除字符串首尾空白
+    json="${json#"${json%%[![:space:]]*}"}"
+    json="${json%"${json##*[![:space:]]}"}"
+
+    # 必须以 [ 开头，] 结尾
+    [[ "$json" == \[*\] ]] || return 1
+}
+
 parse_json_array() {
     local json="$1"
     local -n reply_array="$2"
@@ -188,7 +199,9 @@ check_cache_and_compile() {
     local sha256sum_file="$sha256sum_dir/${name}.sha256sum"
     local current_sha256
 
-    if [ ! -e "$output_file" ]; then
+    if isy "$HYPS_FORCE_RECOMPILE"; then
+        log_info utils "[$name] 强制重新编译 (HYPS_FORCE_RECOMPILE=1)"
+    elif [ ! -e "$output_file" ]; then
         log_debug utils "[$name] 输出文件不存在"
     elif ! "$verify_output_fn" "$output_file"; then
         log_debug utils "[$name] 输出文件验证失败"
@@ -208,7 +221,8 @@ check_cache_and_compile() {
     fi
 
     log_info utils "[$name] 重新编译"
-    "$compile_fn" "$output_file"
+    "$compile_fn" "$output_file" || die 1 utils "[$name] 编译失败"
+    "$verify_output_fn" "$output_file" || die 1 utils "[$name] 编译后验证失败"
 
     [ -z "$current_sha256" ] && current_sha256="$("$all_source_fn" "$output_file" | sha256sum | awk '{print $1}')"
     echo "$current_sha256" > "$sha256sum_file"

@@ -53,6 +53,7 @@ register_hook load_config gi_fps_unlock_load_config 50 before:feat_xwin_watch_lo
 
 gi_fps_unlock_all_source() {
     cat "$GI_FPS_UNLOCK_TOOL/unlocker.c"
+    echo "${CFLAGS[@]:-}"
 }
 gi_fps_unlock_verify_output() {
     local bin="$1"
@@ -62,7 +63,9 @@ gi_fps_unlock_verify_output() {
 }
 gi_fps_unlock_compile() {
     local output="$1"
-    run_and_log DEBUG gi-fps-unlock "编译命令" gcc "$GI_FPS_UNLOCK_TOOL/unlocker.c" -Wall -Wextra -o "$output"
+    run_and_log DEBUG gi-fps-unlock "编译命令" \
+        gcc "${CFLAGS[@]:-}" "$GI_FPS_UNLOCK_TOOL/unlocker.c" -o "$output" \
+        || return 1
     ensure_executable "$output" gi-fps-unlock
     sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$output"
 }

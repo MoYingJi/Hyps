@@ -20,14 +20,14 @@ static plasma_toplevel_t *g_plasma_toplevels = NULL;
 
 static void plasma_handle_title(void *data, struct org_kde_plasma_window *window, const char *title) {
     (void)window;
-    const auto node = (plasma_toplevel_t *)data;
+    auto const node = (plasma_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
 
 static void plasma_handle_unmapped(void *data, struct org_kde_plasma_window *window) {
     (void)window;
-    const auto node = (plasma_toplevel_t *)data;
+    auto const node = (plasma_toplevel_t *)data;
     if (node->handle) {
         org_kde_plasma_window_destroy(node->handle);
         node->handle = NULL;

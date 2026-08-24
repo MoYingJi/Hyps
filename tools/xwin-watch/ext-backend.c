@@ -18,7 +18,7 @@ static ext_toplevel_t *g_ext_toplevels = NULL;
 
 static void ext_handle_title(void *data, struct ext_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    const auto node = (ext_toplevel_t *)data;
+    auto const node = (ext_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -30,7 +30,7 @@ static void ext_handle_done(void *data, struct ext_foreign_toplevel_handle_v1 *h
 
 static void ext_handle_closed(void *data, struct ext_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    const auto node = (ext_toplevel_t *)data;
+    auto const node = (ext_toplevel_t *)data;
     if (node->handle) {
         ext_foreign_toplevel_handle_v1_destroy(node->handle);
         node->handle = NULL;

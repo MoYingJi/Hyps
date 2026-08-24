@@ -7,6 +7,8 @@ __ENVIRONMENT_SH_LOADED=1
 source "$SCRIPT_DIR/libs.sh"
 
 declare -a ENV_EXPORTS=(
+    # 跳过导出 在项目内设置
+    "env.CFLAGS|CFLAGS|noop"
     # Spritz
     "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
     "env.WINE_ENABLE_STEAM_STUB|WINE_ENABLE_STEAM_STUB|bool_to_01"
@@ -56,6 +58,9 @@ env_load_config() {
 
     # prefix 变量导出
     ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")
+
+    # CFLAGS 设置
+    env_parse_cflags
 }
 
 register_hook load_config env_load_config
@@ -70,11 +75,10 @@ export_env_vars() {
         final_value="$("env_transform_$transform" "$raw_value" "$conf_key")"
         exit_code=$?
         if [[ $exit_code -ne 0 ]]; then
-            log_debug environment "跳过导出 $env_name，exit code: $exit_code"
+            log_debug environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
             continue
         fi
-        export "${env_name}=${final_value}"
-        log_debug environment "[显式] export $env_name=$final_value"
+        _export_env_var "$env_name" "$final_value" "显式"
     done
 
     for key in "${!CONFIG[@]}"; do
@@ -87,9 +91,23 @@ export_env_vars() {
         $already_handled && continue
         raw_value="${CONFIG[$key]}"
         env_name="${key#env.}"
-        export "${env_name}=${raw_value}"
-        log_debug environment "[自动] export $env_name=$raw_value"
+        _export_env_var "$env_name" "$raw_value" "自动"
     done
+}
+
+_export_env_var() {
+    local key="$1"
+    local value="$2"
+    local prefix="$3"
+
+    if [[ -z "${!key:-}" ]]; then
+        export "${key}=${value}"
+        log_debug environment "[$prefix] export $key=$value"
+    else
+        log_debug environment "[$prefix] 跳过 export $key，已存在于环境变量中，保持环境值"
+        log_debug environment "[$prefix]  - [环境值] $key=${!key}"
+        log_debug environment "[$prefix]  - [配置值] $key=$value"
+    fi
 }
 
 declare -a ENV_MKDIRS=()
@@ -106,6 +124,9 @@ env_mkdirs() {
 register_hook prepare env_mkdirs
 
 
+env_transform_noop() {
+    return 1
+}
 
 env_transform_string() {
     local value="$1"
@@ -192,4 +213,38 @@ env_add_ld_preload() {
 env_get_ld_preload() {
     local IFS=':'
     echo "${GAME_LD_PRELOAD[*]}"
+}
+
+# 解析 CFLAGS 后续全局按 array 使用
+env_parse_cflags() {
+    local cflags=()
+    local set_cflags=0
+
+    if [[ -n "$CFLAGS" ]] && config_has env.CFLAGS; then
+        log_debug environment "CFLAGS 已在环境变量中设置，env.CFLAGS 配置项将被忽略"
+    fi
+
+    if [[ -n "$CFLAGS" ]] && [[ "${CFLAGS@a}" != *a* ]]; then
+        read -ra cflags <<< "$CFLAGS"
+        set_cflags=1
+    fi
+
+    #shellcheck disable=SC2128
+    if [ -z "$CFLAGS" ] && config_has env.CFLAGS; then
+        local cflags_raw
+        cflags_raw="$(config_get env.CFLAGS)"
+
+        if is_json_array "$cflags_raw"; then
+            parse_json_array "$cflags_raw" cflags
+        else
+            read -ra cflags <<< "$cflags_raw"
+        fi
+
+        set_cflags=1
+    fi
+
+    if [ "$set_cflags" = 1 ]; then
+        CFLAGS=("${cflags[@]}")
+        log_debug environment "设置 CFLAGS: $(quote_args "${CFLAGS[@]}")"
+    fi
 }

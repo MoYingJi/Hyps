@@ -6,6 +6,9 @@ __FEATURES_XWIN_WATCH_SH_LOADED=1
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+#shellcheck source=../environment.sh
+source "${SCRIPT_DIR:-.}/environment.sh"
+
 XWIN_WATCH_TOOL="$PROJECT_ROOT/tools/xwin-watch"
 XWIN_WATCH_CMD=()
 
@@ -101,6 +104,8 @@ feat_xwin_watch_all_source() {
         cat "$tool/generated/plasma-window-management.c"
     fi
     command_exists kwin_wayland && feat_xwin_watch_kwin_permission_desktop "$output" || echo "kwin not found"
+    #shellcheck disable=SC2153
+    echo "${CFLAGS[@]:-}"
 }
 feat_xwin_watch_verify_output() {
     local output="$1"
@@ -134,6 +139,8 @@ feat_xwin_watch_compile() {
     local -a sources=()
     local -a cflags=()
     local -a libs=()
+
+    cflags+=("${CFLAGS[@]:-}")
 
     sources+=("$tool/xwin-watch.c")
     cflags+=("-I$tool")
@@ -171,8 +178,9 @@ feat_xwin_watch_compile() {
         fi
     fi
 
-    run_and_log DEBUG xwin-watch "编译命令" gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output"
-
+    run_and_log DEBUG xwin-watch "编译命令" \
+        gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output" \
+        || return 1
     ensure_executable "$output" "xwin-watch"
 }
 
@@ -241,11 +249,8 @@ feat_xwin_watch_cleanup() {
 
 
 
-#shellcheck disable=SC2034
 declare -a XWIN_WATCH_CALLBACKS_EXISTS
-#shellcheck disable=SC2034
 declare -a XWIN_WATCH_CALLBACKS_CLOSED
-#shellcheck disable=SC2034
 declare -a XWIN_WATCH_CALLBACKS_FAILED
 
 xwin_watch_on() {

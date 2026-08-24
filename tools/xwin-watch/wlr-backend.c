@@ -18,7 +18,7 @@ static wlr_toplevel_t *g_wlr_toplevels = NULL;
 
 static void wlr_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    const auto node = (wlr_toplevel_t *)data;
+    auto const node = (wlr_toplevel_t *)data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -55,7 +55,7 @@ static void wlr_noop_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *
 
 static void wlr_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    const auto node = (wlr_toplevel_t *)data;
+    auto const node = (wlr_toplevel_t *)data;
     if (node->handle) {
         zwlr_foreign_toplevel_handle_v1_destroy(node->handle);
         node->handle = NULL;

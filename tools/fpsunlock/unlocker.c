@@ -116,7 +116,7 @@ int main(const int argc, char **argv) {
                     if (new_fps >= 0) {
                         target_fps = new_fps;
                         is_dry_run = target_fps < 1;
-                        printf("Updated FPS limit to: %d\n", target_fps);
+                        printf("Updated FPS limit to: %d%s\n", target_fps, is_dry_run ? " (dry-run)" : "");
                     }
                 }
             }

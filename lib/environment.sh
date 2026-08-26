@@ -33,6 +33,7 @@ declare -a ENV_EXPORTS=(
     "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
     "env.UMU_ID|UMU_ID|string"
     "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
+    "env.PRESSURE_VESSEL_FILESYSTEMS_RW|PRESSURE_VESSEL_FILESYSTEMS_RW|colon_separated_array_to_string"
     "env.PROTON_DLSS_INDICATOR|PROTON_DLSS_INDICATOR|bool_to_01"
     "env.PROTON_FSR4_INDICATOR|PROTON_FSR4_INDICATOR|bool_to_01"
     "env.PROTON_PREFER_SDL|PROTON_PREFER_SDL|bool_to_01"
@@ -204,6 +205,20 @@ env_transform_path_file() {
         realpath "$file_path"
     else
         die 4 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
+    fi
+}
+
+env_transform_colon_separated_array_to_string() {
+    local value="$1"
+    local conf_key="${2:-}"
+    if is_array "$value"; then
+        local array=()
+        parse_array "$value" array
+        IFS=':' echo "${array[*]}"
+    elif [[ -n "$value" ]]; then
+        echo "$value"
+    else
+        die 1 environment "配置项 '$conf_key' 的值为空"
     fi
 }
 

@@ -268,7 +268,7 @@ config_require_realpath_mkdir() {
 }
 
 # 获取 $1 的绝对路径，如果不是可执行文件则报错，并将其存储回配置中
-config_require_realpath_exe() {
+config_require_realpath_which_exe() {
     local key="$1"
     local default="${2:-}"
     local target_map_name="${3:-CONFIG}"
@@ -276,7 +276,7 @@ config_require_realpath_exe() {
     local value
     value="$(config_get "$key" "$default" "$target_map_name")"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
-    value="$(which "$value" 2>/dev/null || echo "$value")"
+    value="$(which "$value" 2>/dev/null || realpath "$value")"
     [[ -f "$value" ]] || die 1 config "配置项 '$key' 指向的文件不存在：'$value'"
     [[ -x "$value" ]] || die 1 config "配置项 '$key' 指向的文件不可执行：'$value'"
     config_set "$key" "$value" "$target_map_name"

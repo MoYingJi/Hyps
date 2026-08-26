@@ -25,19 +25,19 @@ wrapper_load_config() {
 
     # MangoHud
     if isy "$(config_get mangohud.enabled)"; then
-        config_require_realpath_exe mangohud.exe "mangohud"
+        config_require_realpath_which_exe mangohud.exe "mangohud"
         RUNNER_WRAPPER=("$(config_get mangohud.exe)" "${RUNNER_WRAPPER[@]}")
     fi
 
     # Gamescope
     if isy "$(config_get gamescope.enabled)"; then
-        config_require_realpath_exe gamescope.exe "gamescope"
+        config_require_realpath_which_exe gamescope.exe "gamescope"
         RUNNER_WRAPPER=("$(config_get gamescope.exe)" "${gamescope_args[@]}" -- "${RUNNER_WRAPPER[@]}")
     fi
 
     # Taskset
     if isy "$(config_get taskset.enabled)"; then
-        config_require_realpath_exe taskset.exe "taskset"
+        config_require_realpath_which_exe taskset.exe "taskset"
         local taskset_args=()
 
         local taskset_config_count=0
@@ -64,7 +64,7 @@ wrapper_load_config() {
 
     # GameMode (wrapper)
     if isy "$(config_get gamemode.wrapper.enabled)"; then
-        config_require_realpath_exe gamemode.wrapper.exe "gamemoderun"
+        config_require_realpath_which_exe gamemode.wrapper.exe "gamemoderun"
         RUNNER_WRAPPER=("$(config_get gamemode.wrapper.exe)" "${RUNNER_WRAPPER[@]}")
     fi
 
@@ -80,7 +80,7 @@ wrapper_load_config() {
 
     # systemd-inhibit
     if isy "$(config_get inhibit.enabled)"; then
-        config_require_realpath_exe inhibit.exe "systemd-inhibit"
+        config_require_realpath_which_exe inhibit.exe "systemd-inhibit"
         inhibit_args+=("--what=$(config_get inhibit.what "idle:sleep")")
         inhibit_args+=("--why=$(config_get inhibit.why "Hyps Game $GAME_NAME")")
         RUNNER_WRAPPER=("$(config_get inhibit.exe)" "${inhibit_args[@]}" -- "${RUNNER_WRAPPER[@]}")

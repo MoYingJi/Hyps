@@ -102,7 +102,7 @@ load_config() {
         config_set runner.exe "$proton_path/proton"
     fi
 
-    config_require_realpath_exe runner.exe
+    config_require_realpath_which_exe runner.exe
     config_require_realpath_file game.exe
 
     config_realpath game.prefix "$DATA_DIR/prefixes/${GAME_NAME}" >/dev/null

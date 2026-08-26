@@ -50,6 +50,9 @@ declare -a ENV_EXPORTS=(
     "env.MANGOHUD_DLSYM|MANGOHUD_DLSYM|bool_to_01"
     # NVIDIA
     "env.NVPRESENT_ENABLE_SMOOTH_MOTION|NVPRESENT_ENABLE_SMOOTH_MOTION|bool_to_01"
+    # OBS Game Capture
+    "obs_vkcapture.env|OBS_VKCAPTURE|bool_to_01"
+    "env.OBS_VKCAPTURE|OBS_VKCAPTURE|bool_to_01"
     # 我是 Steam Deck 别杀我 ✋😭🤚
     "env.STEAMDECK|STEAMDECK|bool_to_01"
     "env.SteamDeck|SteamDeck|bool_to_01"

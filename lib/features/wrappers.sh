@@ -29,6 +29,12 @@ wrapper_load_config() {
         RUNNER_WRAPPER=("$(config_get mangohud.exe)" "${RUNNER_WRAPPER[@]}")
     fi
 
+    # OBS Game Capture (wrapper)
+    if isy "$(config_get obs_vkcapture.wrapper.enabled)"; then
+        config_require_realpath_which_exe obs_vkcapture.wrapper.exe "obs-gamecapture"
+        RUNNER_WRAPPER=("$(config_get obs_vkcapture.wrapper.exe)" "${RUNNER_WRAPPER[@]}")
+    fi
+
     # Gamescope
     if isy "$(config_get gamescope.enabled)"; then
         config_require_realpath_which_exe gamescope.exe "gamescope"

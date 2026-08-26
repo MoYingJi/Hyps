@@ -11,7 +11,7 @@ feat_dxvk_nvapi_load_config() {
     local env_name
 
     local drs_settings=()
-    config_read_array nvapi.drs.settings drs_settings
+    config_has nvapi.drs.settings && config_read_array nvapi.drs.settings drs_settings
 
     for key in "${!CONFIG[@]}"; do
         if [[ "$key" == nvapi.drs.* ]]; then

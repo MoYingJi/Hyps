@@ -36,10 +36,10 @@ feat_xwin_watch_kill_list_pid() {
         local name
         name="$(config_get features.xwin_watch_kill.name)"
         pgrep -u "$USER" -x "$name"
-    else
+    elif config_has features.xwin_watch_kill.pgrep_args; then
         local args
         config_read_array features.xwin_watch_kill.pgrep_args args
-        [[ "${#args[@]}" -gt 0 ]] || die 1 xwin-watch-kill "features.xwin_watch_kill.pgrep_args 未设置"
+        [[ "${#args[@]}" -gt 0 ]] || die 1 xwin-watch-kill "features.xwin_watch_kill.pgrep_args 不能为空"
         pgrep "${args[@]}"
     fi
 }

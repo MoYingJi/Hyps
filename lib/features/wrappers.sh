@@ -10,10 +10,10 @@ RUNNER_WRAPPER=()
 
 wrapper_load_config() {
     local gamescope_args=()
-    config_read_array gamescope.args gamescope_args
+    config_has gamescope.args && config_read_array gamescope.args gamescope_args
 
     local inhibit_args=()
-    config_read_array inhibit.args inhibit_args
+    config_has inhibit.args && config_read_array inhibit.args inhibit_args
 
 
     # 检测 Gamescope 搭配 MangoHud 使用的情况
@@ -50,11 +50,13 @@ wrapper_load_config() {
         if config_has taskset.args; then
             config_read_array taskset.args taskset_args
         fi
+
         if config_has taskset.cpus; then
             local cpus=()
             config_read_array taskset.cpus cpus
             taskset_args+=("--cpu-list" "$(IFS=,; echo "${cpus[*]}")")
         fi
+
         if config_has taskset.mask; then
             taskset_args+=("--mask" "$(config_get taskset.mask)")
         fi

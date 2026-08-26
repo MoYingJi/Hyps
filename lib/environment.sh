@@ -245,13 +245,7 @@ env_parse_cflags() {
     if [ -z "$CFLAGS" ] && config_has env.CFLAGS; then
         local cflags_raw
         cflags_raw="$(config_get env.CFLAGS)"
-
-        if is_json_array "$cflags_raw"; then
-            parse_json_array "$cflags_raw" cflags
-        else
-            read -ra cflags <<< "$cflags_raw"
-        fi
-
+        parse_array "$cflags_raw" cflags || read -ra cflags <<< "$cflags_raw"
         set_cflags=1
     fi
 

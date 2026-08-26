@@ -108,7 +108,7 @@ load_config() {
     config_realpath game.prefix "$DATA_DIR/prefixes/${GAME_NAME}" >/dev/null
 
     GAME_ARGS=()
-    config_read_array game.args GAME_ARGS
+    config_has game.args && config_read_array game.args GAME_ARGS
 }
 
 build_game_command() {
@@ -118,7 +118,7 @@ build_game_command() {
     cmd+=("$(config_get runner.exe)")
 
     local -a runner_args=()
-    config_read_array runner.args runner_args
+    config_has runner.args && config_read_array runner.args runner_args
     cmd+=("${runner_args[@]}")
 
     if isy "$NEEDS_CUSTOM_BATCH"; then

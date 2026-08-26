@@ -11,13 +11,13 @@ source "${SCRIPT_DIR:-.}/utils.sh"
 load_common_config() {
     config_parse_file "$PROJECT_ROOT/config.conf"
 
-    config_read_realpath path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
+    config_read_realpath_prefer_env path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
 
     config_parse_file "$CONFIG_DIR/config.conf"
 
-    config_read_realpath path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
-    config_read_realpath path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
-    config_read_realpath path.temp TEMP_DIR "/tmp/hypsc"
+    config_read_realpath_prefer_env path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
+    config_read_realpath_prefer_env path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
+    config_read_realpath_prefer_env path.temp TEMP_DIR "/tmp/hypsc"
 
     config_parse_file "$CONFIG_DIR/games/_common.conf"
 }
@@ -282,17 +282,8 @@ config_require_realpath_exe() {
     config_set "$key" "$value" "$target_map_name"
 }
 
-#shellcheck disable=SC2034
-config_read() {
-    local key="$1"
-    local -n var="$2"
-    local default="${3:-}"
-    local target_map_name="${4:-CONFIG}"
 
-    [[ -z "$var" ]] && var="$(config_get "$key" "$default" "$target_map_name")"
-}
-
-config_read_realpath() {
+config_read_realpath_prefer_env() {
     local key="$1"
     local -n var="$2"
     local default="${3:-}"
@@ -302,6 +293,7 @@ config_read_realpath() {
     var="$(realpath -m "$var")"
     config_set "$key" "$var" "$target_map_name"
 }
+
 
 #shellcheck disable=SC2034
 config_read_array() {

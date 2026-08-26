@@ -83,14 +83,14 @@ load_config() {
 
     if config_has runner.name; then
         # 如果已经有 runner，直接读
-        config_read runner.name runner_name
+        runner_name="$(config_get runner.name)"
         config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
         config_parse_file "$game_config_file"
     else
         # 为了保证优先级 runner < games
         # 先从 games 读 runner，再读 runner 配置，然后将 games 配置合并上去
         config_parse_to_temp "$game_config_file"
-        config_read runner.name runner_name "" TEMP_CONFIG
+        runner_name="${TEMP_CONFIG[runner.name]}"
         config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
         config_merge_temp
     fi

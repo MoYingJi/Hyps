@@ -74,8 +74,16 @@ export_env_vars() {
         [[ -z "${CONFIG[$conf_key]+exists}" ]] && continue
         final_value="$("env_transform_$transform" "$raw_value" "$conf_key")"
         exit_code=$?
-        if [[ $exit_code -ne 0 ]]; then
-            log_debug environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
+        if [ "$exit_code" -ne 0 ]; then
+            if [ "$exit_code" -eq 1 ]; then
+                log_debug environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
+            elif [ "$exit_code" -eq 2 ]; then
+                log_info environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
+            elif [ "$exit_code" -eq 3 ]; then
+                log_warn environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
+            elif [ "$exit_code" -eq 4 ]; then
+                die "$exit_code" environment "配置项 '$conf_key' 的值 '$raw_value' 无效: transform '$transform' 返回错误码 $exit_code"
+            fi
             continue
         fi
         _export_env_var "$env_name" "$final_value" "显式"
@@ -147,7 +155,7 @@ env_transform_uint() {
     if [[ "$value" =~ ^[0-9]+$ ]]; then
         echo "$value"
     else
-        die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
+        die 4 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
     fi
 }
 
@@ -158,7 +166,7 @@ env_transform_path_dir() {
     if [[ -d "$dir_path" ]]; then
         realpath "$dir_path"
     else
-        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
+        die 4 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
     fi
 }
 
@@ -170,7 +178,7 @@ env_transform_path_mkdir() {
         realpath "$dir_path"
         return 0
     elif [[ -e "$dir_path" ]]; then
-        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
+        die 4 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
     else
         dir_path="$(realpath -m "$dir_path")"
         ENV_MKDIRS+=("$dir_path")
@@ -186,18 +194,18 @@ env_transform_path_file() {
     if [[ -f "$file_path" ]]; then
         realpath "$file_path"
     else
-        die 1 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
+        die 4 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
     fi
 }
 
 env_transform_protonpath() {
     local proton_path="$1"
     local conf_key="${2:-}"
-    [ -z "$proton_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
+    [ -z "$proton_path" ] && die 4 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$proton_path" ]]; then
         realpath "$proton_path"
     else
-        find_proton_by_name "$proton_path" || die 1 environment "未找到 Proton: '$proton_path'"
+        find_proton_by_name "$proton_path" || die 4 environment "未找到 Proton: '$proton_path'"
     fi
 }
 

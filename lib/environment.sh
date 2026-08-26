@@ -41,8 +41,12 @@ declare -a ENV_EXPORTS=(
     "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
     # MangoHud
     "env.MANGOHUD|MANGOHUD|bool_to_01"
+    "mangohud.config|MANGOHUD_CONFIG|string"
+    "env.MANGOHUD_CONFIG|MANGOHUD_CONFIG|string"
     "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
     "env.MANGOHUD_CONFIGFILE|MANGOHUD_CONFIGFILE|path_file"
+    "mangohud.presetsfile|MANGOHUD_PRESETSFILE|path_file"
+    "env.MANGOHUD_PRESETSFILE|MANGOHUD_PRESETSFILE|path_file"
     "env.MANGOHUD_DLSYM|MANGOHUD_DLSYM|bool_to_01"
     # NVIDIA
     "env.NVPRESENT_ENABLE_SMOOTH_MOTION|NVPRESENT_ENABLE_SMOOTH_MOTION|bool_to_01"

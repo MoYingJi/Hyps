@@ -9,6 +9,7 @@ source "$SCRIPT_DIR/libs.sh"
 declare -a ENV_EXPORTS=(
     # 跳过导出 在项目内设置
     "env.CFLAGS|CFLAGS|noop"
+    "env.LD_PRELOAD|LD_PRELOAD|noop"
     # Spritz
     "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
     "env.WINE_ENABLE_STEAM_STUB|WINE_ENABLE_STEAM_STUB|bool_to_01"
@@ -66,8 +67,9 @@ env_load_config() {
     # prefix 变量导出
     ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")
 
-    # CFLAGS 设置
+
     env_parse_cflags
+    env_parse_ld_preload
 }
 
 register_hook load_config env_load_config
@@ -217,6 +219,29 @@ env_transform_protonpath() {
 }
 
 GAME_LD_PRELOAD=()
+env_parse_ld_preload() {
+    local ld_preload_array
+
+    if [[ -n "$LD_PRELOAD" ]] && config_has env.LD_PRELOAD; then
+        log_debug environment "LD_PRELOAD 已在环境变量中设置，env.LD_PRELOAD 配置项将被忽略"
+    fi
+
+    if [[ -n "$LD_PRELOAD" ]] && [[ "${LD_PRELOAD@a}" != *a* ]]; then
+        IFS=':' read -ra ld_preload_array <<< "$LD_PRELOAD"
+        for lib in "${ld_preload_array[@]}"; do
+            env_add_ld_preload "$lib"
+        done
+    fi
+
+    if [ -z "$LD_PRELOAD" ] && config_has env.LD_PRELOAD; then
+        local ld_preload_raw
+        ld_preload_raw="$(config_get env.LD_PRELOAD)"
+        parse_array "$ld_preload_raw" ld_preload_array || IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
+        for lib in "${ld_preload_array[@]}"; do
+            env_add_ld_preload "$lib"
+        done
+    fi
+}
 env_add_ld_preload() {
     local lib="$1"
     if [[ -z "$lib" ]]; then

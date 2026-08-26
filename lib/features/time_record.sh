@@ -58,6 +58,10 @@ feat_time_record_end() {
 
     total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$time_record_data_dir/history")"
     total_dur="$(( total_dur + current_dur ))"
-    echo "$total_dur" > "$time_record_data_dir/total-dur"
+
     log_info time-record "累计游戏时长 $((total_dur)) 秒"
+
+    # echo "$total_dur" > "$time_record_data_dir/total-dur"
+    # 删除旧文件，total-dur 文件已弃用
+    rm -f "$time_record_data_dir/total-dur" 2>/dev/null
 }

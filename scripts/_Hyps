@@ -11,9 +11,11 @@ source "$SCRIPT_DIR/libs.sh"
 
 register_hook() { return; }
 
-load_common_config_in_scripts() {
-    cd "$PROJECT_ROOT" || die 1 "无法切换到项目根目录: $PROJECT_ROOT"
-    load_common_config
+cd "$PROJECT_ROOT" || die 1 "无法切换到项目根目录: $PROJECT_ROOT"
+
+trap cleanup EXIT
+
+cleanup() {
     cd "$SCRIPTS_DIR" || die 1 "无法切换到脚本目录: $SCRIPTS_DIR"
 }
 
@@ -21,6 +23,7 @@ commands=(
     "list-proton"
     "time"
 )
+
 
 command_list_proton() {
     [ "$#" -eq 0 ] || die 1 "list-proton 命令不接受任何参数"
@@ -47,23 +50,27 @@ command_list_proton() {
     } | column -t -s $'\t'
 }
 
+
 command_time() {
     local time_commands=(
         "today"
+        "list"
+        "report"
     )
 
     [[ " ${time_commands[*]} " == *" $1 "* ]] || die 1 "未知的 time 子命令: $1"
     local fn_name="command_time_${1//-/_}"; shift
+
+    #shellcheck source=../lib/features/time_record.sh
+    source "$SCRIPT_DIR/features/time_record.sh"
+
     "$fn_name" "$@"
 }
 
 command_time_today() {
     [ "$#" -eq 0 ] || die 1 "time today 命令不接受任何参数"
 
-    #shellcheck source=../lib/features/time_record.sh
-    source "$SCRIPT_DIR/features/time_record.sh"
-
-    load_common_config_in_scripts
+    load_common_config
     feat_time_record_load_config
 
     local dir today_date now today_4am day_start
@@ -100,6 +107,71 @@ command_time_today() {
         done
     } | column -t -s $'\t'
 }
+
+format_dur() {
+    local dur_sec="$1"
+    hours=$((dur_sec / 3600))
+    minutes=$(((dur_sec % 3600) / 60))
+    secs=$((dur_sec % 60))
+    printf "%s%d%s 时 %s%02d%s 分 %s%02d%s 秒" "$(style bright_blue)" "$hours" "$(style bright_black)" "$(style bright_blue)" "$minutes" "$(style bright_black)" "$(style bright_blue)" "$secs" "$(style bright_black)"
+}
+format_time() {
+    local timestamp="$1"
+    date -d "@$timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo ""
+}
+
+command_time_list() {
+    [ "$#" -eq 0 ] || die 1 "time list 命令不接受任何参数"
+
+    load_common_config
+    feat_time_record_load_config
+
+    local dir
+    dir="$(config_get features.time_record.dir)"
+
+    {
+        printf "%s\t%s\t    %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
+
+        for game in "$dir"/*; do
+            game_name="$(basename "$game")"
+
+            start_count="$(wc -l < "$game/history" 2>/dev/null || echo "0")"
+
+            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
+            last_start_time="$(format_time "$last_start")"
+
+            total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$game/history" 2>/dev/null || echo "0")"
+            total_dur_formatted="$(format_dur "$total_dur")"
+
+            printf "%s\t%s\t    %s\t  %s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote cyan "$start_count")" "$total_dur_formatted" "$(style_quote bright_black "$last_start_time")"
+        done
+    } | column -t -s $'\t' -o '' -R 2,3
+}
+
+command_time_report() {
+    [ "$#" -eq 1 ] || die 1 "time report 命令接受 1 个 game_name 参数"
+
+    local game_name="$1"
+
+    load_common_config
+    load_game_config "$game_name"
+    feat_time_record_load_config
+
+    local dir total_dur
+    dir="$(config_get features.time_record.dir)/$game_name"
+
+    total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$dir/history")"
+
+    last_start="$(awk 'END {print $1}' "$dir/history" 2>/dev/null || echo "")"
+
+    {
+        printf "%s\t%s\n" "$(style_quote bright_black "游戏名")" "$(style_quote bright_blue "$game_name")"
+        printf "%s\t%s\n" "$(style_quote bright_black "总时长")" "$(format_dur "$total_dur")"
+        printf "%s\t%s\n" "$(style_quote bright_black "最后启动")" "$(style_quote bright_blue "$(format_time "$last_start")")"
+
+    } | column -t -s $'\t'
+}
+
 
 [ "$#" -eq 0 ] && die 1 "需要参数"
 [[ " ${commands[*]} " == *" $1 "* ]] || die 1 "未知的命令: $1"

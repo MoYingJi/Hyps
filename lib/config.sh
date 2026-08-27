@@ -50,7 +50,15 @@ load_game_config() {
 
     if ! config_has runner.exe && config_has runner.protonpath; then
         local proton_path
-        proton_path="$(env_transform_protonpath "$(config_get runner.protonpath)")"
+        proton_path="$(config_get runner.protonpath)"
+        [ -z "$proton_path" ] && die 1 config "配置项 'runner.protonpath' 的值为空"
+
+        if [[ -d "$proton_path" ]]; then
+            proton_path="$(realpath "$proton_path")"
+        else
+            proton_path="$(find_proton_by_name "$proton_path")" || die 4 config "未找到 Proton: '$proton_path'"
+        fi
+
         config_set runner.protonpath "$proton_path"
         config_set runner.exe "$proton_path/proton"
     fi

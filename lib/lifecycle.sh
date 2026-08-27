@@ -16,6 +16,8 @@ source "${SCRIPT_DIR:-.}/log.sh"
 #   - 拓扑排序，自动处理依赖顺序
 #   - 循环依赖检测
 #   - 丰富的日志输出
+#   - 可配置钩子失败行为: run_hooks <phase> [continue]
+#     当传入 "continue" 参数时，某个钩子失败后仍会继续执行后续钩子
 #
 # 用法:
 #   source lifecycle.sh
@@ -142,10 +144,11 @@ register_hook() {
 }
 
 # 内部：构建依赖图并进行拓扑排序，执行钩子
-# 参数: $1 = phase
-# 返回: 0 成功，1 失败
+# 参数: $1 = phase, $2 = on_failure (可选, "continue" 表示失败时继续执行)
+# 返回: 0 成功, 1 失败
 _lifecycle_run_sorted_hooks() {
     local phase="$1"
+    local on_failure="${2:-}"
     local raw="${HOOKS_BY_PHASE[$phase]:-}"
 
     [[ -z "$raw" ]] && return 0
@@ -268,22 +271,30 @@ _lifecycle_run_sorted_hooks() {
     fi
 
     # 按顺序执行钩子
+    local hook_failed=0
     for fn in "${sorted[@]}"; do
         log_debug lifecycle "执行钩子 [$phase] $fn"
         "$fn" || {
-            log_error lifecycle "钩子 '$fn' 在阶段 '$phase' 执行失败"
-            return 1
+            local exit_code=$?
+            log_error lifecycle "钩子 '$fn' 在阶段 '$phase' 执行失败 (exit code $exit_code)"
+            if [[ "$on_failure" != "continue" ]]; then
+                return 1
+            fi
+            hook_failed=1
         }
     done
+
+    [[ $hook_failed -ne 0 ]] && return 1
 
     return 0
 }
 
 # 运行指定阶段的所有钩子
-# 参数: $1 = phase
-# 返回: 0 成功，1 失败
+# 参数: $1 = phase, $2 = on_failure (可选, "continue" 表示失败时继续执行)
+# 返回: 0 成功, 1 失败
 run_hooks() {
     local phase="$1"
+    local on_failure="${2:-}"
 
     if ! _lifecycle_valid_phase "$phase"; then
         log_error lifecycle "未知阶段 '$phase'"
@@ -296,7 +307,7 @@ run_hooks() {
     fi
 
     log_debug lifecycle "开始执行阶段 '$phase' 的钩子"
-    _lifecycle_run_sorted_hooks "$phase"
+    _lifecycle_run_sorted_hooks "$phase" "$on_failure"
     local ret=$?
     if [[ $ret -eq 0 ]]; then
         log_debug lifecycle "阶段 '$phase' 完成"

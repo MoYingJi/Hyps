@@ -23,6 +23,7 @@ config_parse_file() {
     local pending_value=""
     local pending_type=""
     local stripped_line
+    local current_section=""
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         ((line_no++))
@@ -33,6 +34,15 @@ config_parse_file() {
 
         # 跳过空行和注释
         [[ -z "$line" || "$line" == \#* ]] && continue
+
+        # 解析节标题 [section] 或 [section.subsection]
+        if [[ "$line" =~ ^\[([^\]]+)\]$ ]]; then
+            current_section="${BASH_REMATCH[1]}"
+            # 去除节名称中的空白
+            current_section="${current_section#"${current_section%%[![:space:]]*}"}"
+            current_section="${current_section%"${current_section##*[![:space:]]}"}"
+            continue
+        fi
 
         # 解析 key=value
         if [[ -z "$pending_key" ]] && [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
@@ -57,6 +67,10 @@ config_parse_file() {
             else
                 # 单行值，直接存储
                 value="$(_strip_trailing_comment "$value")"
+                # 如果有节前缀，添加到键名中
+                if [[ -n "$current_section" ]]; then
+                    key="${current_section}.${key}"
+                fi
                 _config_store_value "$target_map" "$key" "$value"
             fi
         elif [[ -n "$pending_key" ]]; then
@@ -82,7 +96,12 @@ config_parse_file() {
             if [[ "$pending_type" == "square" && "$pending_value" == *"]" ]] || \
                [[ "$pending_type" == "paren" && "$pending_value" == *")" ]]; then
                 # 闭合，存储
-                _config_store_value "$target_map" "$pending_key" "$pending_value"
+                local final_key="$pending_key"
+                # 如果有节前缀，添加到键名中
+                if [[ -n "$current_section" ]]; then
+                    final_key="${current_section}.${pending_key}"
+                fi
+                _config_store_value "$target_map" "$final_key" "$pending_value"
                 pending_key=""
                 pending_value=""
                 pending_type=""

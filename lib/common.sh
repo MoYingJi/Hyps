@@ -56,18 +56,18 @@ hyps_main() {
     trap cleanup EXIT
 
     mkdir -p "$TEMP_DIR" || die 1 lifecycle "无法创建临时目录: '$TEMP_DIR'"
-    run_hooks prepare
+    run_hooks prepare || exit $?
     build_game_command
-    run_hooks pre_start
+    run_hooks pre_start || exit $?
     start_game_process
-    run_hooks post_start
+    run_hooks post_start continue
     wait "$GAME_PID"
 }
 
 cleanup() {
     log_info lifecycle "终止"
     kill "$GAME_PID" 2>/dev/null
-    run_hooks cleanup
+    run_hooks cleanup continue
 
     isy "$DEBUG_SKIP_REMOVE_TEMP" || rm -rf "$TEMP_DIR"
 }

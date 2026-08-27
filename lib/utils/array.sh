@@ -3,6 +3,7 @@
 [[ -n "${__UTILS_ARRAY_SH_LOADED:-}" ]] && return 0
 __UTILS_ARRAY_SH_LOADED=1
 
+# 本文件部分使用 LLM 生成
 
 is_array() {
     local string="$1"

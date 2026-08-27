@@ -31,6 +31,9 @@ wrapper_load_config() {
 
     # OBS Game Capture (wrapper)
     if isy "$(config_get obs_vkcapture.wrapper.enabled)"; then
+        log_warn wrapper "OBS Game Capture 不推荐使用 wrapper 模式。如果你知道你在做什么，请忽略此警告"
+        log_warn wrapper "推荐禁用 'obs_vkcapture.wrapper.enabled' 并使用 'obs_vkcapture.env = true'"
+
         config_require_realpath_which_exe obs_vkcapture.wrapper.exe "obs-gamecapture"
         RUNNER_WRAPPER=("$(config_get obs_vkcapture.wrapper.exe)" "${RUNNER_WRAPPER[@]}")
     fi

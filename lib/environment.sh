@@ -55,6 +55,8 @@ declare -a ENV_EXPORTS=(
     # OBS Game Capture
     "obs_vkcapture.env|OBS_VKCAPTURE|bool_to_01"
     "env.OBS_VKCAPTURE|OBS_VKCAPTURE|bool_to_01"
+    "obs_vkcapture.name|OBS_VKCAPTURE_NAME|string"
+    "env.OBS_VKCAPTURE_NAME|OBS_VKCAPTURE_NAME|string"
     # 我是 Steam Deck 别杀我 ✋😭🤚
     "env.STEAMDECK|STEAMDECK|bool_to_01"
     "env.SteamDeck|SteamDeck|bool_to_01"

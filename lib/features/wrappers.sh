@@ -97,6 +97,24 @@ wrapper_load_config() {
         RUNNER_WRAPPER=("$(config_get inhibit.exe)" "${inhibit_args[@]}" -- "${RUNNER_WRAPPER[@]}")
     fi
 
+    # systemd-run
+    if isy "$(config_get systemd_run.enabled)"; then
+        config_require_realpath_which_exe systemd_run.exe "systemd-run"
+        local systemd_run_args=() systemd_run_args_config=()
+        config_has systemd_run.args && config_read_array systemd_run.args systemd_run_args_config
+
+        config_default systemd_run.unit "app-hyps-$(systemd-escape -- "hyps-$GAME_NAME")" >/dev/null
+
+        systemd_run_args+=("--user")
+        systemd_run_args+=("--scope")
+        systemd_run_args+=("--unit=$(config_get systemd_run.unit)-$$")
+        systemd_run_args+=("--collect")
+
+        systemd_run_args+=("${systemd_run_args_config[@]}")
+
+        RUNNER_WRAPPER=("$(config_get systemd_run.exe)" "${systemd_run_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+    fi
+
     # 日志
     log_debug wrapper "游戏启动器包装器: $(quote_args "${RUNNER_WRAPPER[@]}")"
 }

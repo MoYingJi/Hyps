@@ -32,8 +32,17 @@ feat_overlay_load_config() {
     config_has overlay.upper || die 1 overlay "overlay.upper 未设置"
     config_has overlay.work || die 1 overlay "overlay.work 未设置"
 
+    local mount lower
+    mount="$(config_get overlay.mount)"
+    lower="$(config_get overlay.lower)"
+
     OVERLAY_ORIGINAL_GAME="$(config_get game.exe)"
-    config_set game.exe "$(config_get overlay.mount)/$(realpath --relative-to="$(config_get overlay.lower)" "$OVERLAY_ORIGINAL_GAME")"
+    config_set game.exe "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME")"
+
+    OVERLAY_ORIGINAL_GAME_CWD="$(config_get game.cwd)"
+    if [[ "$OVERLAY_ORIGINAL_GAME_CWD" == "$lower"* ]]; then
+        config_set game.cwd "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME_CWD")"
+    fi
 
     register_hook prepare feat_overlay_mount
 }

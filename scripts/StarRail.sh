@@ -50,6 +50,8 @@ starrail_reg_fps_prepare() {
         die 1 starrail-reg-fps "无法读写注册表文件 $file"
     fi
 
+    ensure_no_wineserver "$prefix" error "'starrail.reg_fps.enabled' 已启用"
+
     python3 "$PROJECT_ROOT/tools/starrail-fps.py" "$file" "$(config_get starrail.reg_fps.val)" || {
         log_error starrail-reg-fps "注册表解锁帧率失败"
         return 0 # 仅记录错误，不影响游戏运行

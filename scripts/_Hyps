@@ -2,6 +2,8 @@
 
 # 一个工具脚本
 
+[ "$UID" -ne 0 ] || { echo "你个小天才是怎么想到用 root 运行的（"; exit 1; }
+
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
 SCRIPT_DIR="$PROJECT_ROOT/lib"
@@ -10,6 +12,8 @@ SCRIPT_DIR="$PROJECT_ROOT/lib"
 source "$SCRIPT_DIR/libs.sh"
 
 register_hook() { return; }
+hyps_main() { return; }
+__COMMON_SH_LOADED=1
 
 cd "$PROJECT_ROOT" || die 1 "无法切换到项目根目录: $PROJECT_ROOT"
 
@@ -21,12 +25,74 @@ cleanup() {
 
 commands=(
     "list-proton"
+    "list-game"
     "time"
 )
 
 
+command_list_game() {
+    [ "$#" -eq 0 ] || die 1 "list-game 命令不接受任何参数"
+
+    load_common_config
+
+    local sh basename name exe_path basename_style name_style exe_path_style
+
+    {
+        printf "%s\t%s\t%s\n" "脚本" "游戏名" "游戏可执行文件"
+        for sh in "$SCRIPTS_DIR"/*; do
+            basename="$(basename "$sh")"
+            [[ "$basename" == _* ]] && continue
+
+            basename_style="green,bold"
+
+            name="$(
+                #shellcheck disable=SC1090
+                source "$sh"
+                #shellcheck disable=SC2153
+                echo "$GAME_NAME"
+            )"
+
+            if [ -z "$name" ]; then
+                name="无效"
+                name_style="red"
+
+                exe_path="无效"
+                exe_path_style="red"
+            else
+                name_style="bright_blue"
+
+                local config_has_game_exe
+                IFS=$'\t' read -r config_has_game_exe exe_path <<< "$(
+                    if log_should_output DEBUG; then
+                        load_game_config "$name"
+                    else
+                        load_game_config "$name" 2>/dev/null
+                    fi
+
+                    printf "%s\t%s" "$(bool_str config_has game.exe)" "$(config_get game.exe)"
+                )"
+
+                if isy "$config_has_game_exe"; then
+                    if [ -f "$(realpath -m "$exe_path")" ]; then
+                        exe_path_style="bright_black"
+                    else
+                        exe_path_style="red"
+                    fi
+                else
+                    exe_path="无效"
+                    exe_path_style="red"
+                fi
+            fi
+
+            printf "%s\t%s\t%s\n" "$(style_quote "$basename_style" "$basename")" "$(style_quote "$name_style" "$name")" "$(style_quote "$exe_path_style" "$exe_path")"
+        done
+    } | column -t -s $'\t'
+}
+
 command_list_proton() {
     [ "$#" -eq 0 ] || die 1 "list-proton 命令不接受任何参数"
+
+    local path proton name
 
     {
         printf "%s\t%s\n" "Proton 名称" "路径"

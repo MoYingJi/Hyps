@@ -24,6 +24,10 @@ isy() {
     fi
 }
 
+bool_str() {
+    "$@" && echo true || echo false
+}
+
 quote_args() {
     local arg
     for arg in "$@"; do

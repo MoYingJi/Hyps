@@ -31,6 +31,8 @@ source "$SCRIPT_DIR/features/jade_patch.sh"
 source "$SCRIPT_DIR/features/kill_wineserver.sh"
 #shellcheck source=./features/mod_reg_hostname.sh
 source "$SCRIPT_DIR/features/mod_reg_hostname.sh"
+#shellcheck source=./features/ntfs_detect.sh
+source "$SCRIPT_DIR/features/ntfs_detect.sh"
 #shellcheck source=./features/overlay.sh
 source "$SCRIPT_DIR/features/overlay.sh"
 #shellcheck source=./features/pfx_link.sh

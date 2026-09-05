@@ -35,6 +35,8 @@ command_list_game() {
 
     load_common_config
 
+    local print_no_config_game="true"
+
     local sh basename name exe_path basename_style name_style exe_path_style
 
     {
@@ -61,18 +63,32 @@ command_list_game() {
             else
                 name_style="bright_blue"
 
-                local config_has_game_exe
-                IFS=$'\t' read -r config_has_game_exe exe_path <<< "$(
+                local has_config config_has_game_exe
+                IFS=$'\t' read -r has_config config_has_game_exe exe_path <<< "$(
+                    if [ ! -f "$CONFIG_DIR/games/${name}.conf" ]; then
+                        echo "false"
+                        return 0
+                    fi
+
                     if log_should_output DEBUG; then
                         load_game_config "$name"
                     else
                         load_game_config "$name" 2>/dev/null
                     fi
 
-                    printf "%s\t%s" "$(bool_str config_has game.exe)" "$(config_get game.exe)"
+                    printf "%s\t%s\t%s" "true" "$(bool_str config_has game.exe)" "$(config_get game.exe)"
                 )"
 
-                if isy "$config_has_game_exe"; then
+                if [ "$has_config" = "false" ]; then
+                    if [ "$print_no_config_game" = "true" ]; then
+                        exe_path="未配置"
+                        exe_path_style="bright_black"
+                        name_style="bright_black"
+                        basename_style="bright_black"
+                    else
+                        continue
+                    fi
+                elif [ "$config_has_game_exe" = "true" ]; then
                     if [ -f "$(realpath -m "$exe_path")" ]; then
                         exe_path_style="bright_black"
                     else

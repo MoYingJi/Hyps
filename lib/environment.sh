@@ -14,7 +14,7 @@ declare -a ENV_EXPORTS=(
     "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
     "env.WINE_ENABLE_STEAM_STUB|WINE_ENABLE_STEAM_STUB|bool_to_01"
     # DXVK
-    "env.DXVK_HUD|DXVK_HUD|bool_to_01"
+    "env.DXVK_HUD|DXVK_HUD|string"
     "env.DXVK_HDR|DXVK_HDR|bool_to_01"
     "env.DXVK_CONFIG|DXVK_CONFIG|string"
     # VKD3D
@@ -67,7 +67,7 @@ declare -a ENV_EXPORTS=(
 
 env_load_config() {
     # 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
-    config_default env.DXVK_HUD false >/dev/null
+    config_default env.DXVK_HUD 0 >/dev/null
 
     # prefix 变量导出
     ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")

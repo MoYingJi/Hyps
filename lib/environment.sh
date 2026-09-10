@@ -18,7 +18,8 @@ declare -a ENV_EXPORTS=(
     "env.DXVK_HDR|DXVK_HDR|bool_to_01"
     "env.DXVK_CONFIG|DXVK_CONFIG|string"
     # VKD3D
-    "env.VKD3D_CONFIG|VKD3D_CONFIG|string"
+    "env.VKD3D_CONFIG|VKD3D_CONFIG|comma_separated_array_to_string"
+    "env.VKD3D_DEBUG|VKD3D_DEBUG|string"
     # UMU
     "runner.protonpath|PROTONPATH|protonpath"
     "env.PROTONPATH|PROTONPATH|protonpath"
@@ -44,8 +45,8 @@ declare -a ENV_EXPORTS=(
     "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
     # MangoHud
     "env.MANGOHUD|MANGOHUD|bool_to_01"
-    "mangohud.config|MANGOHUD_CONFIG|string"
-    "env.MANGOHUD_CONFIG|MANGOHUD_CONFIG|string"
+    "mangohud.config|MANGOHUD_CONFIG|comma_separated_array_to_string"
+    "env.MANGOHUD_CONFIG|MANGOHUD_CONFIG|comma_separated_array_to_string"
     "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
     "env.MANGOHUD_CONFIGFILE|MANGOHUD_CONFIGFILE|path_file"
     "mangohud.presetsfile|MANGOHUD_PRESETSFILE|path_file"
@@ -218,6 +219,20 @@ env_transform_colon_separated_array_to_string() {
         local array=()
         parse_array "$value" array
         IFS=':' echo "${array[*]}"
+    elif [[ -n "$value" ]]; then
+        echo "$value"
+    else
+        die 1 environment "配置项 '$conf_key' 的值为空"
+    fi
+}
+
+env_transform_comma_separated_array_to_string() {
+    local value="$1"
+    local conf_key="${2:-}"
+    if is_array "$value"; then
+        local array=()
+        parse_array "$value" array
+        IFS=',' echo "${array[*]}"
     elif [[ -n "$value" ]]; then
         echo "$value"
     else

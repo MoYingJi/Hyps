@@ -26,3 +26,18 @@ run_and_log() {
     log "$level" "$module" "$prompt: $(quote_args "$@")"
     "$@"
 }
+
+nvidia_version() {
+    # if command -v nvidia-smi >/dev/null 2>&1; then
+    #     nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null \
+    #         | head -n1 | tr -d '[:space:]'
+    #     return
+    # fi
+
+    if [ -r /sys/module/nvidia/version ]; then
+        cat /sys/module/nvidia/version
+        return
+    fi
+
+    echo "unknown"
+}

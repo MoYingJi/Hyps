@@ -10,7 +10,10 @@ feat_overlay_load_config() {
 
     if ! config_has overlay.lower && config_has overlay.lower_auto; then
         if [ "$(type -t overlay_auto_lower)" = "function" ]; then
-            config_set overlay.lower "$(overlay_auto_lower "$(config_get game.exe)")"
+            local auto_lower
+            auto_lower="$(overlay_auto_lower "$(config_get game.exe)")" \
+                || die 1 overlay "overlay_auto_lower 函数执行失败"
+            config_set overlay.lower "$auto_lower"
         else
             die 1 overlay "游戏没有定义 overlay_auto_lower 函数，无法自动选择 lower 目录"
         fi

@@ -1,0 +1,112 @@
+#!/usr/bin/bash
+
+#shellcheck source=../libs.sh
+source "$SCRIPT_DIR/libs.sh"
+
+#shellcheck source=../features/time_record.sh
+source "$SCRIPT_DIR/features/time_record.sh"
+
+command_time_today() {
+    [ "$#" -eq 0 ] || die 1 "time today 命令不接受任何参数"
+
+    load_common_config
+    feat_time_record_load_config
+
+    local dir today_date now today_4am day_start
+    dir="$(config_get features.time_record.dir)"
+    today_date="$(date +%Y-%m-%d)"
+    now="$(date +%s)"
+    today_4am="$(date -d "$today_date 04:00:00" +%s 2>/dev/null)"
+
+    # 计算当前游戏日的起始时间戳
+    if [ "$now" -lt "$today_4am" ]; then
+        local yesterday_date
+        yesterday_date="$(date -d "$today_date -1 day" +%Y-%m-%d)"
+        day_start="$(date -d "$yesterday_date 04:00:00" +%s 2>/dev/null)"
+    else
+        day_start="$today_4am"
+    fi
+
+    local game game_name last_start last_start_time today_status
+
+    {
+        printf "%s\t%s\t%s\n" "游戏名" "最后一次启动时间" "今天 (04:00)"
+        for game in "$dir"/*; do
+            game_name="$(basename "$game")"
+            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
+            last_start_time="$(date -d "@$last_start" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")"
+
+            if [ -n "$last_start" ] && [ "$last_start" -ge "$day_start" ]; then
+                today_status="$(style_quote green "已启动")"
+            else
+                today_status="$(style_quote red "未启动")"
+            fi
+
+            printf "%s\t%s\t%s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote bright_black "$last_start_time")" "$today_status"
+        done
+    } | column -t -s $'\t'
+}
+
+format_dur() {
+    local dur_sec="$1"
+    hours=$((dur_sec / 3600))
+    minutes=$(((dur_sec % 3600) / 60))
+    secs=$((dur_sec % 60))
+    printf "%s%d%s 时 %s%02d%s 分 %s%02d%s 秒" "$(style bright_blue)" "$hours" "$(style bright_black)" "$(style bright_blue)" "$minutes" "$(style bright_black)" "$(style bright_blue)" "$secs" "$(style bright_black)"
+}
+format_time() {
+    local timestamp="$1"
+    date -d "@$timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo ""
+}
+
+command_time_list() {
+    [ "$#" -eq 0 ] || die 1 "time list 命令不接受任何参数"
+
+    load_common_config
+    feat_time_record_load_config
+
+    local dir
+    dir="$(config_get features.time_record.dir)"
+
+    {
+        printf "%s\t%s\t    %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
+
+        for game in "$dir"/*; do
+            game_name="$(basename "$game")"
+
+            start_count="$(wc -l < "$game/history" 2>/dev/null || echo "0")"
+
+            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
+            last_start_time="$(format_time "$last_start")"
+
+            total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$game/history" 2>/dev/null || echo "0")"
+            total_dur_formatted="$(format_dur "$total_dur")"
+
+            printf "%s\t%s\t    %s\t  %s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote cyan "$start_count")" "$total_dur_formatted" "$(style_quote bright_black "$last_start_time")"
+        done
+    } | column -t -s $'\t' -o '' -R 2,3
+}
+
+command_time_report() {
+    [ "$#" -eq 1 ] || die 1 "time report 命令接受 1 个 game_name 参数"
+
+    local game_name="$1"
+
+    load_common_config
+    load_game_config "$game_name"
+    feat_time_record_load_config
+
+    local dir total_dur
+    dir="$(config_get features.time_record.dir)/$game_name"
+
+    total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$dir/history")"
+
+    last_start="$(awk 'END {print $1}' "$dir/history" 2>/dev/null || echo "")"
+
+    {
+        printf "%s\t%s\n" "$(style_quote bright_black "游戏名")" "$(style_quote bright_blue "$game_name")"
+        printf "%s\t%s\n" "$(style_quote bright_black "总时长")" "$(format_dur "$total_dur")"
+        printf "%s\t%s\n" "$(style_quote bright_black "最后启动")" "$(style_quote bright_blue "$(format_time "$last_start")")"
+
+    } | column -t -s $'\t'
+}

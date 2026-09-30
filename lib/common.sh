@@ -17,41 +17,10 @@ SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 #shellcheck source=libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=./features/custom_batch.sh
-source "$SCRIPT_DIR/features/custom_batch.sh"
-#shellcheck source=./features/dxvk_nvapi_env.sh
-source "$SCRIPT_DIR/features/dxvk_nvapi_env.sh"
-#shellcheck source=./features/hosts_disconnect.sh
-source "$SCRIPT_DIR/features/hosts_disconnect.sh"
-#shellcheck source=./features/intel_rapl_read.sh
-source "$SCRIPT_DIR/features/intel_rapl_read.sh"
-#shellcheck source=./features/jade_patch.sh
-source "$SCRIPT_DIR/features/jade_patch.sh"
-#shellcheck source=./features/kill_wineserver.sh
-source "$SCRIPT_DIR/features/kill_wineserver.sh"
-#shellcheck source=./features/mod_reg_hostname.sh
-source "$SCRIPT_DIR/features/mod_reg_hostname.sh"
-#shellcheck source=./features/ntfs_detect.sh
-source "$SCRIPT_DIR/features/ntfs_detect.sh"
-#shellcheck source=./features/overlay.sh
-source "$SCRIPT_DIR/features/overlay.sh"
-#shellcheck source=./features/pfx_link.sh
-source "$SCRIPT_DIR/features/pfx_link.sh"
-#shellcheck source=./features/program_cache.sh
-source "$SCRIPT_DIR/features/program_cache.sh"
-#shellcheck source=./features/time_record.sh
-source "$SCRIPT_DIR/features/time_record.sh"
-#shellcheck source=./features/userdata_link.sh
-source "$SCRIPT_DIR/features/userdata_link.sh"
-#shellcheck source=./features/window_time_indicator.sh
-source "$SCRIPT_DIR/features/window_time_indicator.sh"
-#shellcheck source=./features/wrappers.sh
-source "$SCRIPT_DIR/features/wrappers.sh"
-#shellcheck source=./features/xwin_watch_kill.sh
-source "$SCRIPT_DIR/features/xwin_watch_kill.sh"
-#shellcheck source=./features/xwin_watch.sh
-source "$SCRIPT_DIR/features/xwin_watch.sh"
-
+for feature_script in "$SCRIPT_DIR"/features/*.sh; do
+    #shellcheck source=/dev/null
+    source "$feature_script"
+done
 
 hyps_main() {
     local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"

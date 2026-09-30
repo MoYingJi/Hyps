@@ -17,3 +17,5 @@ source "${SCRIPT_DIR:-.}/utils/fs.sh"
 source "${SCRIPT_DIR:-.}/utils/wine.sh"
 #shellcheck source=utils/misc.sh
 source "${SCRIPT_DIR:-.}/utils/misc.sh"
+#shellcheck source=utils/time.sh
+source "${SCRIPT_DIR:-.}/utils/time.sh"

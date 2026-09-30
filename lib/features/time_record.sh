@@ -56,7 +56,7 @@ feat_time_record_end() {
 
     printf "%s\t%s\n" "$current_start" "$current_end" >> "$time_record_data_dir/history"
 
-    total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$time_record_data_dir/history")"
+    total_dur="$(time_record_total_dur "$time_record_data_dir")"
     total_dur="$(( total_dur + current_dur ))"
 
     log_info time-record "累计游戏时长 $((total_dur)) 秒"

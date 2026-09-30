@@ -12,20 +12,9 @@ command_time_today() {
     load_common_config
     feat_time_record_load_config
 
-    local dir today_date now today_4am day_start
+    local dir day_start
     dir="$(config_get features.time_record.dir)"
-    today_date="$(date +%Y-%m-%d)"
-    now="$(date +%s)"
-    today_4am="$(date -d "$today_date 04:00:00" +%s 2>/dev/null)"
-
-    # 计算当前游戏日的起始时间戳
-    if [ "$now" -lt "$today_4am" ]; then
-        local yesterday_date
-        yesterday_date="$(date -d "$today_date -1 day" +%Y-%m-%d)"
-        day_start="$(date -d "$yesterday_date 04:00:00" +%s 2>/dev/null)"
-    else
-        day_start="$today_4am"
-    fi
+    day_start="$(time_day_start)"
 
     local game game_name last_start last_start_time today_status
 
@@ -33,8 +22,8 @@ command_time_today() {
         printf "%s\t%s\t%s\n" "游戏名" "最后一次启动时间" "今天 (04:00)"
         for game in "$dir"/*; do
             game_name="$(basename "$game")"
-            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
-            last_start_time="$(date -d "@$last_start" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")"
+            last_start="$(time_record_last_start "$game")"
+            last_start_time="$(format_time "$last_start")"
 
             if [ -n "$last_start" ] && [ "$last_start" -ge "$day_start" ]; then
                 today_status="$(style_quote green "已启动")"
@@ -45,18 +34,6 @@ command_time_today() {
             printf "%s\t%s\t%s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote bright_black "$last_start_time")" "$today_status"
         done
     } | column -t -s $'\t'
-}
-
-format_dur() {
-    local dur_sec="$1"
-    hours=$((dur_sec / 3600))
-    minutes=$(((dur_sec % 3600) / 60))
-    secs=$((dur_sec % 60))
-    printf "%s%d%s 时 %s%02d%s 分 %s%02d%s 秒" "$(style bright_blue)" "$hours" "$(style bright_black)" "$(style bright_blue)" "$minutes" "$(style bright_black)" "$(style bright_blue)" "$secs" "$(style bright_black)"
-}
-format_time() {
-    local timestamp="$1"
-    date -d "@$timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo ""
 }
 
 command_time_list() {
@@ -74,12 +51,12 @@ command_time_list() {
         for game in "$dir"/*; do
             game_name="$(basename "$game")"
 
-            start_count="$(wc -l < "$game/history" 2>/dev/null || echo "0")"
+            start_count="$(time_record_count "$game")"
 
-            last_start="$(awk 'END {print $1}' "$game/history" 2>/dev/null || echo "")"
+            last_start="$(time_record_last_start "$game")"
             last_start_time="$(format_time "$last_start")"
 
-            total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$game/history" 2>/dev/null || echo "0")"
+            total_dur="$(time_record_total_dur "$game")"
             total_dur_formatted="$(format_dur "$total_dur")"
 
             printf "%s\t%s\t    %s\t  %s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote cyan "$start_count")" "$total_dur_formatted" "$(style_quote bright_black "$last_start_time")"
@@ -99,9 +76,8 @@ command_time_report() {
     local dir total_dur
     dir="$(config_get features.time_record.dir)/$game_name"
 
-    total_dur="$(awk '{sum += $2 - $1} END {print sum}' "$dir/history")"
-
-    last_start="$(awk 'END {print $1}' "$dir/history" 2>/dev/null || echo "")"
+    total_dur="$(time_record_total_dur "$dir")"
+    last_start="$(time_record_last_start "$dir")"
 
     {
         printf "%s\t%s\n" "$(style_quote bright_black "游戏名")" "$(style_quote bright_blue "$game_name")"

@@ -9,6 +9,7 @@
 
 #include <poll.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -21,20 +22,18 @@
 
 typedef struct {
     const char *target_window;
-    const char *window_exists_cmd;
-    const char *window_closed_cmd;
-    const char *window_failed_cmd;
     int appear_timeout;
+    bool watch_closed; // false 时窗口出现后立即退出，不再等待关闭
 } app_config_t;
 
 // 函数声明
 static bool parse_arguments(int argc, char *argv[]);
 static void print_usage(const char *program_name);
-static void print_arguments();
-static void print_current_time();
-static void run_command(const char *command);
+static void print_arguments(void);
+static void log_timestamped(const char *fmt, ...);
+static void emit_event(const char *event);
 static bool check_window_exists(const char *target_window);
-static void close_displays();
+static void close_displays(void);
 static void handle_signal_and_exit(int signum);
 
 // 全局变量
@@ -50,10 +49,8 @@ static int handle_state(bool found);
 
 static app_config_t g_config = {
     .target_window = NULL,
-    .window_exists_cmd = NULL,
-    .window_closed_cmd = NULL,
-    .window_failed_cmd = NULL,
-    .appear_timeout = 0
+    .appear_timeout = 0,
+    .watch_closed = false
 };
 
 // 窗口出现超时判断: 返回 true 表示已超时
@@ -81,7 +78,7 @@ static void add_backend(window_backend_t *backend) {
         return;
     }
     if (g_backend_count == 0) {
-        printf("窗口检测: %s\n", backend->name());
+        fprintf(stderr, "窗口检测: %s\n", backend->name());
     }
     g_backends[g_backend_count++] = backend;
 }
@@ -129,8 +126,7 @@ int main(const int argc, char *argv[]) {
         }
     }
     if (!g_window_found) {
-        print_current_time();
-        printf(" 等待窗口出现\n");
+        log_timestamped("等待窗口出现");
     }
 
     while (true) {
@@ -167,44 +163,33 @@ int main(const int argc, char *argv[]) {
 }
 
 // 状态机: 处理一次检查结果，返回 -1 表示继续，>=0 表示退出码
+// 事件通过 stdout 逐行输出 (exists/closed/failed)，由调用方 (bash) 读取并分发回调
 static int handle_state(const bool found) {
     if (g_window_found) {
         if (!found) {
-            print_current_time();
-            printf(" 窗口消失，监测结束\n");
-            run_command(g_config.window_closed_cmd);
+            log_timestamped("窗口消失，监测结束");
+            emit_event("closed");
             close_displays(); // 防止信号处理器再次关闭
             return EXIT_SUCCESS;
         }
     } else {
         if (found) {
-            if (g_config.window_closed_cmd == NULL) {
-                print_current_time();
-                printf(" 窗口出现，监测已结束");
-                if (g_config.appear_timeout > 0) {
-                    printf(" (等待 %ld 秒)", (long)(time(NULL) - g_wait_start));
-                }
-                puts("");
-                run_command(g_config.window_exists_cmd);
+            if (g_config.appear_timeout > 0) {
+                log_timestamped("窗口出现，监测已开始 (等待 %ld 秒)", (long)(time(NULL) - g_wait_start));
+            } else {
+                log_timestamped("窗口出现，监测已开始");
+            }
+            emit_event("exists");
+            if (!g_config.watch_closed) {
                 close_displays();
                 return EXIT_SUCCESS;
             }
-            print_current_time();
-            printf(" 窗口出现，监测已开始");
-            if (g_config.appear_timeout > 0) {
-                printf(" (等待 %ld 秒)", (long)(time(NULL) - g_wait_start));
-            }
-            puts("");
-            run_command(g_config.window_exists_cmd);
             g_window_found = true;
         } else {
-            // 窗口未出现: 若已超时则执行失败命令并退出，否则继续等待事件
+            // 窗口未出现: 若已超时则输出失败事件并退出，否则继续等待事件
             if (wait_timed_out()) {
-                print_current_time();
-                printf(" 窗口出现超时 (%d 秒) 已到，退出\n", g_config.appear_timeout);
-                if (g_config.window_failed_cmd != NULL) {
-                    run_command(g_config.window_failed_cmd);
-                }
+                log_timestamped("窗口出现超时 (%d 秒) 已到，退出", g_config.appear_timeout);
+                emit_event("failed");
                 close_displays();
                 return EXIT_FAILURE;
             }
@@ -215,9 +200,8 @@ static int handle_state(const bool found) {
 
 static bool parse_arguments(const int argc, char *argv[]) {
     bool w_flag = false;
-    bool e_flag = false, c_flag = false;
     int opt;
-    while ((opt = getopt(argc, argv, "w:a:e:c:f:")) != -1) {
+    while ((opt = getopt(argc, argv, "w:a:c")) != -1) {
         switch (opt) {
             case 'w':
                 g_config.target_window = optarg;
@@ -225,14 +209,8 @@ static bool parse_arguments(const int argc, char *argv[]) {
             case 'a':
                 g_config.appear_timeout = atoi(optarg);
                 break;
-            case 'e':
-                g_config.window_exists_cmd = optarg;
-                e_flag = true; break;
             case 'c':
-                g_config.window_closed_cmd = optarg;
-                c_flag = true; break;
-            case 'f':
-                g_config.window_failed_cmd = optarg;
+                g_config.watch_closed = true;
                 break;
 
             default:
@@ -247,60 +225,36 @@ static bool parse_arguments(const int argc, char *argv[]) {
         print_usage(argv[0]);
         return false;
     }
-    if (!e_flag && !c_flag) {
-        fprintf(stderr, "错误: 你想让我执行啥？让我猜吗喵？\n");
-        print_usage(argv[0]);
-        return false;
-    }
 
     return true;
 }
 
 static void print_usage(const char *program_name) {
-    puts("\n用法: ");
-    printf("    %s [选项]\n", program_name);
-    puts("\n选项: ");
-    puts("    -w <窗口名称>                   监控的窗口名称，必填");
-    puts("    -a <窗口出现超时>               窗口出现的超时时间（秒），超时后执行失败命令，默认为 0，表示无限制");
-    puts("    -e <窗口出现命令>               窗口出现时执行的命令，不填写代表不执行");
-    puts("    -c <窗口关闭命令>               窗口关闭时执行的命令，不填写代表不检测窗口关闭");
-    puts("    -f <检查窗口失败命令>           检查窗口失败时执行的命令，例如窗口出现超时");
+    fprintf(stderr, "\n用法: \n");
+    fprintf(stderr, "    %s [选项]\n", program_name);
+    fprintf(stderr, "\n选项: \n");
+    fprintf(stderr, "    -w <窗口名称>       监控的窗口名称，必填\n");
+    fprintf(stderr, "    -a <窗口出现超时>   窗口出现的超时时间（秒），超时后输出 failed 事件并退出，默认为 0，表示无限制\n");
+    fprintf(stderr, "    -c                  窗口出现后继续监控，窗口关闭时输出 closed 事件；不指定则窗口出现后立即退出\n");
+    fprintf(stderr, "\n事件通过 stdout 逐行输出: exists / closed / failed，其余日志输出到 stderr\n");
 }
 
-static void print_arguments() {
-    printf("窗口名称: %s\n", g_config.target_window);
-    puts("=== 窗口出现 ===");
-    if (g_config.window_exists_cmd != NULL) {
-        printf("执行命令: %s\n", g_config.window_exists_cmd);
-    }
+static void print_arguments(void) {
+    fprintf(stderr, "窗口名称: %s\n", g_config.target_window);
     if (g_config.appear_timeout > 0) {
-        printf("窗口出现超时: %d 秒\n", g_config.appear_timeout);
-        if (g_config.window_failed_cmd != NULL) {
-            puts("=== 检查失败 ===");
-            printf("执行命令: %s\n", g_config.window_failed_cmd);
-        }
-    }
-    if (g_config.window_closed_cmd != NULL) {
-        puts("=== 窗口关闭 ===");
-        printf("执行命令: %s\n", g_config.window_closed_cmd);
+        fprintf(stderr, "窗口出现超时: %d 秒\n", g_config.appear_timeout);
     }
 }
 
 static void handle_signal_and_exit(const int signum) {
     if (signum) {
-        printf("\n收到信号 %d，开始清理...\n", signum);
+        log_timestamped("收到信号 %d，开始清理...", signum);
 
-        // 保证脚本执行逻辑完整
-        if (g_window_found) {
-            if (g_config.window_closed_cmd != NULL) {
-                printf("执行窗口关闭命令...\n");
-                run_command(g_config.window_closed_cmd);
-            }
-        } else {
-            if (g_config.window_failed_cmd != NULL) {
-                printf("执行检查失败命令...\n");
-                run_command(g_config.window_failed_cmd);
-            }
+        // 保证消费者能收到对应事件
+        if (!g_window_found) {
+            emit_event("failed");
+        } else if (g_config.watch_closed) {
+            emit_event("closed");
         }
 
         close_displays();
@@ -309,23 +263,28 @@ static void handle_signal_and_exit(const int signum) {
     }
 }
 
-static void print_current_time() {
+// 输出带时间戳的日志到 stderr，不干扰 stdout 上的事件流
+static void log_timestamped(const char *fmt, ...) {
     const time_t now = time(NULL);
     const struct tm *tm_info = localtime(&now);
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
-    printf("[%s]", time_str);
+    fprintf(stderr, "[%s] ", time_str);
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fputc('\n', stderr);
 }
 
-static void run_command(const char *command) {
-    if (command != NULL) {
-        print_current_time();
-        printf(" 运行命令: %s\n", command);
-        system(command);
-    }
+// 向 stdout 输出一行事件 (exists/closed/failed)，供调用方读取分发
+static void emit_event(const char *event) {
+    printf("%s\n", event);
+    fflush(stdout);
 }
 
-static void close_displays() {
+static void close_displays(void) {
     for (int i = 0; i < g_backend_count; i++) {
         g_backends[i]->close();
     }

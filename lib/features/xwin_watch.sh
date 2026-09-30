@@ -212,26 +212,30 @@ feat_xwin_watch_post_start() {
         return 0
     fi
 
-    local declare_pack_file
-    declare_pack_file="$(generate_declare_pack)"
-
-    local on_exists_script=""
-    local on_closed_script=""
-    local on_failed_script=""
-
-    on_exists_script="$(generate_callback_script exists "$declare_pack_file")"
-    on_closed_script="$(generate_callback_script closed "$declare_pack_file")"
-    on_failed_script="$(generate_callback_script failed "$declare_pack_file")"
-
-    [[ -n "$on_exists_script" ]] && XWIN_WATCH_CMD+=("-e" "$on_exists_script")
-    [[ -n "$on_closed_script" ]] && XWIN_WATCH_CMD+=("-c" "$on_closed_script")
-    [[ -n "$on_failed_script" ]] && XWIN_WATCH_CMD+=("-f" "$on_failed_script")
+    # 没有 closed 回调时无需常驻等待窗口关闭
+    [ "${#XWIN_WATCH_CALLBACKS_CLOSED[@]}" -gt 0 ] && XWIN_WATCH_CMD+=("-c")
 
     log_info xwin-watch "启动 xwin-watch 监控窗口: $(quote_args "${XWIN_WATCH_CMD[@]}")"
-    "${XWIN_WATCH_CMD[@]}" &
+    XWIN_WATCH_FIFO="$(mktemp -u "$TEMP_DIR/xwin-watch-XXXXXX.fifo")"
+    mkfifo "$XWIN_WATCH_FIFO"
+
+    "${XWIN_WATCH_CMD[@]}" > "$XWIN_WATCH_FIFO" &
     XWIN_WATCH_PID="$!"
 
+    feat_xwin_watch_dispatch_loop < "$XWIN_WATCH_FIFO" &
+    XWIN_WATCH_DISPATCH_PID="$!"
+
     register_hook cleanup feat_xwin_watch_cleanup
+}
+
+feat_xwin_watch_dispatch_loop() {
+    local event fn
+    while IFS= read -r event; do
+        local -n callback_list="XWIN_WATCH_CALLBACKS_${event^^}"
+        for fn in "${callback_list[@]}"; do
+            "$fn"
+        done
+    done
 }
 
 feat_xwin_watch_cleanup() {
@@ -239,12 +243,14 @@ feat_xwin_watch_cleanup() {
         if kill -0 "$XWIN_WATCH_PID" 2>/dev/null; then
             log_debug xwin-watch "终止 xwin-watch 进程 PID: $XWIN_WATCH_PID"
             kill "$XWIN_WATCH_PID"
-            wait "$XWIN_WATCH_PID"
-            true
         else
             log_debug xwin-watch "终止 xwin-watch 进程 PID: $XWIN_WATCH_PID 不存在"
         fi
+        wait "$XWIN_WATCH_PID" 2>/dev/null
     fi
+    [ -n "$XWIN_WATCH_DISPATCH_PID" ] && wait "$XWIN_WATCH_DISPATCH_PID" 2>/dev/null
+    [ -n "$XWIN_WATCH_FIFO" ] && rm -f "$XWIN_WATCH_FIFO"
+    true
 }
 
 
@@ -272,38 +278,4 @@ xwin_watch_on() {
     else
         log_warn xwin-watch "注册回调 '$fn' 失败，函数不存在"
     fi
-}
-
-generate_declare_pack() {
-    local script_file
-    script_file="$(mktemp "$TEMP_DIR/xwin-watch-declare-pack-XXXXXX.sh")"
-    {
-        print_bash_script_header
-        pack_declare
-    } > "$script_file"
-    echo "$script_file"
-}
-
-generate_callback_script() {
-    local event="$1" # exists | closed | failed
-    local declare_pack_file="$2"
-    #shellcheck disable=SC2178
-    local -n callback_list="XWIN_WATCH_CALLBACKS_${event^^}"
-    [[ "${#callback_list[@]}" -eq 0 ]] && return 1
-
-    local script_file
-    script_file="$(mktemp "$TEMP_DIR/xwin-watch-$event-XXXXXX.sh")"
-
-    {
-        print_bash_script_header
-        echo "source \"$declare_pack_file\""
-        echo ""
-        echo "# Execute callbacks"
-        for fn in "${callback_list[@]}"; do
-            echo "$fn"
-        done
-    } > "$script_file"
-
-    chmod +x "$script_file"
-    echo "$script_file"
 }

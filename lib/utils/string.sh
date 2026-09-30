@@ -24,6 +24,27 @@ isy() {
     fi
 }
 
+isn() {
+    [ -z "$1" ] && return 1
+
+    if [ "$1" = "n" ] ||
+       [ "$1" = "N" ] ||
+       [ "$1" = "no" ] ||
+       [ "$1" = "No" ] ||
+       [ "$1" = "NO" ] ||
+       [ "$1" = "f" ] ||
+       [ "$1" = "F" ] ||
+       [ "$1" = "false" ] ||
+       [ "$1" = "False" ] ||
+       [ "$1" = "FALSE" ] ||
+       [ "$1" = "0" ]
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
 bool_str() {
     "$@" && echo true || echo false
 }

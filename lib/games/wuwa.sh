@@ -13,6 +13,10 @@ overlay_auto_lower() {
     esac
 }
 
+feat_time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
+}
+
 userdata_link() {
     local game_exe="$3"
 

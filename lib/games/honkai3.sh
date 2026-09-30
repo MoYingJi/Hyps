@@ -8,6 +8,10 @@ overlay_auto_lower() {
     dirname "$game_exe"
 }
 
+feat_time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
+}
+
 userdata_link() {
     local userprofile="$2"
     # 我已经不玩崩崩崩了，这个路径是我在米游社找的

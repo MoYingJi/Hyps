@@ -3,6 +3,8 @@
 #shellcheck source=../libs.sh
 source "${SCRIPT_DIR:-.}/libs.sh"
 
+TIME_RECORD_TODAY_RESET_DEFAULT="04:00 Asia/Shanghai"
+
 feat_time_record_load_config() {
     config_default features.time_record.enabled true >/dev/null
     isy "$(config_get features.time_record.enabled)" || return 0
@@ -10,7 +12,18 @@ feat_time_record_load_config() {
     config_require_realpath_mkdir features.time_record.dir "$DATA_DIR/time"
     config_default features.time_record.min_sec 60 >/dev/null
 
-    [[ "$(config_get features.time_record.min_sec)" =~ [^0-9] ]] && die 1 time_record "'features.time_record.min_sec' 必须是整数"
+    if ! config_has features.time_record.today.reset; then
+        local reset_time
+        if [ "$(type -t feat_time_record_today_reset)" = "function" ]; then
+            reset_time="$(feat_time_record_today_reset)"
+        else
+            reset_time="$TIME_RECORD_TODAY_RESET_DEFAULT"
+        fi
+        [ -z "$reset_time" ] || isn "$reset_time" || time_day_start "$reset_time" >/dev/null || die 1 time-record "无效的重置时间: $reset_time"
+        config_set features.time_record.today.reset "$reset_time"
+    fi
+
+    [[ "$(config_get features.time_record.min_sec)" =~ [^0-9] ]] && die 1 time-record "'features.time_record.min_sec' 必须是整数"
 
     register_hook pre_start feat_time_record_start
     register_hook cleanup feat_time_record_end

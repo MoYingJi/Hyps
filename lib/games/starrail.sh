@@ -10,6 +10,12 @@ overlay_auto_lower() {
     dirname "$game_exe"
 }
 
+# 日常重置时间
+
+feat_time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
+}
+
 # 用户数据链接
 
 userdata_link() {

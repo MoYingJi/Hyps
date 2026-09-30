@@ -43,6 +43,13 @@ config_set() {
 }
 
 #shellcheck disable=SC2178
+config_unset() {
+    local key="$1"
+    local -n target_map="${2:-CONFIG}"
+    unset "target_map[$key]"
+}
+
+#shellcheck disable=SC2178
 config_has() {
     local key="$1"
     local -n target_map="${2:-CONFIG}"

@@ -54,6 +54,15 @@ source "$SCRIPT_DIR/features/xwin_watch.sh"
 
 
 hyps_main() {
+    local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"
+    if [ -f "$game_impl" ]; then
+        log_debug lifecycle "加载游戏实现: $game_impl"
+        #shellcheck source=/dev/null
+        source "$game_impl"
+    else
+        log_debug lifecycle "未找到游戏实现 $GAME_NAME"
+    fi
+
     load_config
     run_hooks load_config || exit $?
     export_env_vars

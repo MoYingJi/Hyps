@@ -81,7 +81,7 @@ command_time_list() {
     dir="$(config_get features.time_record.dir)"
 
     {
-        printf "%s\t%s\t    %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
+        printf "%s\t%s\t  %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
 
         for game in "$dir"/*; do
             game_name="$(basename "$game")"
@@ -94,7 +94,11 @@ command_time_list() {
             total_dur="$(time_record_total_dur "$game")"
             total_dur_formatted="$(format_dur "$total_dur")"
 
-            printf "%s\t%s\t    %s\t  %s\n" "$(style_quote bright_blue "$game_name")" "$(style_quote cyan "$start_count")" "$total_dur_formatted" "$(style_quote bright_black "$last_start_time")"
+            printf "%s\t%s\t  %s\t  %s\n" \
+                "$(style_quote bright_blue "$game_name")" \
+                "  $(style_quote cyan "$start_count") $(style_quote bright_black "次")" \
+                "$total_dur_formatted" \
+                "$(style_quote bright_black "$last_start_time")"
         done
     } | column -t -s $'\t' -o '' -R 2,3
 }
@@ -115,8 +119,8 @@ command_time_report() {
     last_start="$(time_record_last_start "$dir")"
 
     {
-        printf "%s\t%s\n" "$(style_quote bright_black "游戏名")" "$(style_quote bright_blue "$game_name")"
-        printf "%s\t%s\n" "$(style_quote bright_black "总时长")" "$(format_dur "$total_dur")"
+        printf "%s\t%s\n" "$(style_quote bright_black "游戏名")"   "$(style_quote bright_blue "$game_name")"
+        printf "%s\t%s\n" "$(style_quote bright_black "总时长")"   "$(format_dur "$total_dur")"
         printf "%s\t%s\n" "$(style_quote bright_black "最后启动")" "$(style_quote bright_blue "$(format_time "$last_start")")"
 
     } | column -t -s $'\t'

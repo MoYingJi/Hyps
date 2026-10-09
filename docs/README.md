@@ -106,6 +106,32 @@
 
 刚重构完，还没写呢... ✋😭🤚
 
+### Overlay
+
+Overlay 使用 FUSE OverlayFS 为游戏目录提供一个可写视图：游戏安装目录作为只读的 `lower` 层，游戏运行时对目录的修改写入 `upper` 层，不会直接改动安装目录。`upper` 会保留在多次运行之间，因此这不是每次启动都会重置的临时环境
+
+在对应游戏的配置文件中添加以下配置，并将 `overlay.lower` 改成游戏安装目录（该目录需要包含配置中的 `game.exe`）：
+
+```ini
+overlay.enabled = true
+overlay.lower = "/path/to/game"
+```
+
+挂载需要四个目录：`lower` 是原始游戏目录，`upper` 保存运行时产生的修改，`work` 是 OverlayFS 使用的工作目录，`mount` 是提供给游戏使用的合并视图。通常只需设置 `overlay.enabled` 和 `overlay.lower`；其余目录会默认创建在 `overlay.dir/<游戏名>/` 下：
+
+```text
+~/.local/share/hypsc/overlays/<游戏名>/
+├── mount/
+├── upper/
+└── work/
+```
+
+`overlay.dir` 默认是 `$XDG_DATA_HOME/hypsc/overlays`；未设置 `XDG_DATA_HOME` 时即 `~/.local/share/hypsc/overlays`。如需自定义位置，可设置 `overlay.dir`，也可以分别用 `overlay.mount`、`overlay.upper` 和 `overlay.work` 指定目录。自定义的 `upper` 和 `work` 应放在同一文件系统中
+
+部分游戏支持自动识别游戏目录；对此类游戏，可以不设置 `overlay.lower`，改为设置 `overlay.lower_auto = true`。若游戏不支持自动识别，则必须手动设置 `overlay.lower`
+
+启用后需要安装 `fuse-overlayfs`
+
 ## 删除
 
  - 删掉本项目的文件夹

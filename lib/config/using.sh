@@ -119,13 +119,13 @@ config_require_realpath_which_exe() {
     local default="${2:-}"
     local target_map_name="${3:-CONFIG}"
 
-    local value
+    local value path
     value="$(config_get "$key" "$default" "$target_map_name")"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
-    value="$(which "$value" 2>/dev/null || realpath "$value")"
-    [[ -f "$value" ]] || die 1 config "配置项 '$key' 指向的文件不存在：'$value'"
-    [[ -x "$value" ]] || die 1 config "配置项 '$key' 指向的文件不可执行：'$value'"
-    config_set "$key" "$value" "$target_map_name"
+
+    path="$(type -P -- "$value")" \
+        || die 1 config "配置项 '$key' 指向的可执行文件不存在：'$value'"
+    config_set "$key" "$path" "$target_map_name"
 }
 
 

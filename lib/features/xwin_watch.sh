@@ -105,7 +105,8 @@ feat_xwin_watch_all_source() {
     fi
     command_exists kwin_wayland && feat_xwin_watch_kwin_permission_desktop "$output" || echo "kwin not found"
     #shellcheck disable=SC2153
-    echo "${CFLAGS[@]:-}"
+    echo "${HYPS_CC:-}"
+    echo "${HYPS_CFLAGS[@]:-}"
 }
 feat_xwin_watch_verify_output() {
     local output="$1"
@@ -136,11 +137,12 @@ feat_xwin_watch_compile() {
         log_debug xwin-watch "禁用 Wayland 后端"
     fi
 
+    local cc="${HYPS_CC:-gcc}"
     local -a sources=()
     local -a cflags=()
     local -a libs=()
 
-    cflags+=("${CFLAGS[@]:-}")
+    cflags+=("${HYPS_CFLAGS[@]:-}")
 
     sources+=("$tool/xwin-watch.c")
     cflags+=("-I$tool")
@@ -179,7 +181,7 @@ feat_xwin_watch_compile() {
     fi
 
     run_and_log DEBUG xwin-watch "编译命令" \
-        gcc "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output" \
+        "$cc" "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output" \
         || return 1
     ensure_executable "$output" "xwin-watch"
 }

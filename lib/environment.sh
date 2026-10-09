@@ -8,7 +8,6 @@ source "$SCRIPT_DIR/libs.sh"
 
 declare -a ENV_EXPORTS=(
     # 跳过导出 在项目内设置
-    "env.CFLAGS|CFLAGS|noop"
     "env.LD_PRELOAD|LD_PRELOAD|noop"
     # Spritz
     "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
@@ -73,7 +72,7 @@ env_load_config() {
     ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")
 
 
-    env_parse_cflags
+    env_parse_compile_settings
     env_parse_ld_preload
 }
 
@@ -288,30 +287,53 @@ env_get_ld_preload() {
     echo "${GAME_LD_PRELOAD[*]}"
 }
 
-# 解析 CFLAGS 后续全局按 array 使用
-env_parse_cflags() {
+env_parse_compile_settings() {
     local cflags=()
     local set_cflags=0
+    unset HYPS_CFLAGS
 
-    if [[ -n "$CFLAGS" ]] && config_has env.CFLAGS; then
-        log_debug environment "CFLAGS 已在环境变量中设置，env.CFLAGS 配置项将被忽略"
+    if [[ -n "$CFLAGS" ]] && config_has compile.CFLAGS; then
+        log_debug environment "CFLAGS 已在环境变量中设置，compile.CFLAGS 配置项将被忽略"
     fi
 
-    if [[ -n "$CFLAGS" ]] && [[ "${CFLAGS@a}" != *a* ]]; then
-        read -ra cflags <<< "$CFLAGS"
-        set_cflags=1
-    fi
-
-    #shellcheck disable=SC2128
-    if [ -z "$CFLAGS" ] && config_has env.CFLAGS; then
+    if [[ -n "$CFLAGS" ]]; then
+        if [[ "${CFLAGS@a}" != *a* ]]; then
+            read -ra HYPS_CFLAGS <<< "$CFLAGS"
+            set_cflags=1
+        else
+            cflags=("${CFLAGS[@]}")
+            set_cflags=1
+        fi
+    elif config_has compile.CFLAGS; then
         local cflags_raw
-        cflags_raw="$(config_get env.CFLAGS)"
+        cflags_raw="$(config_get compile.CFLAGS)"
         parse_array "$cflags_raw" cflags || read -ra cflags <<< "$cflags_raw"
         set_cflags=1
     fi
 
     if [ "$set_cflags" = 1 ]; then
-        CFLAGS=("${cflags[@]}")
-        log_debug environment "设置 CFLAGS: $(quote_args "${CFLAGS[@]}")"
+        HYPS_CFLAGS=("${cflags[@]}")
+        log_debug environment "应用内 CFLAGS: $(quote_args "${HYPS_CFLAGS[@]}")"
+    fi
+
+    local cc=""
+    local set_cc=0
+    unset HYPS_CC
+
+    if [[ -n "$CC" ]] && config_has compile.CC; then
+        log_debug environment "CC 已在环境变量中设置，compile.CC 配置项将被忽略"
+    fi
+
+    if [[ -n "$CC" ]]; then
+        cc="$CC"
+        set_cc=1
+    elif config_has compile.CC; then
+        cc="$(config_get compile.CC)"
+        set_cc=1
+    fi
+
+    if [ "$set_cc" = 1 ]; then
+        HYPS_CC="$cc"
+        log_debug environment "应用内 CC: '$HYPS_CC'"
     fi
 }

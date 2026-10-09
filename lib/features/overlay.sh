@@ -6,7 +6,22 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 feat_overlay_load_config() {
     isy "$(config_get overlay.enabled)" || return 0
 
-    command_exists fuse-overlayfs || die 1 overlay "'overlay.enabled' 为 true，但系统中未安装 fuse-overlayfs"
+    local backend
+    backend="$(config_get overlay.backend fuse)"
+    case "$backend" in
+        fuse)
+            command_exists fuse-overlayfs \
+                || die 1 overlay "'overlay.backend' 为 fuse，但系统中未安装 fuse-overlayfs"
+            ;;
+        kernel)
+            command_exists mount \
+                || die 1 overlay "'overlay.backend' 为 kernel，但系统中未安装 mount"
+            ;;
+        *)
+            die 1 overlay "不支持的 overlay.backend：'$backend'（可选值：fuse、kernel）"
+            ;;
+    esac
+    config_set overlay.backend "$backend"
 
     if ! config_has overlay.lower && config_has overlay.lower_auto; then
         if [ "$(type -t overlay_auto_lower)" = "function" ]; then
@@ -67,12 +82,28 @@ feat_overlay_mount() {
         "workdir=$(config_get overlay.work)"
     )
 
-    cmd+=(
-        "fuse-overlayfs"
-        "-o"
-        "$(IFS=,; echo "${options[*]}")"
-        "$(config_get overlay.mount)"
-    )
+    case "$(config_get overlay.backend)" in
+        fuse)
+            cmd+=(
+                "fuse-overlayfs"
+                "-o"
+                "$(IFS=,; echo "${options[*]}")"
+                "$(config_get overlay.mount)"
+            )
+            ;;
+        kernel)
+            options+=("userxattr")
+            cmd+=(
+                "mount"
+                "-t"
+                "overlay"
+                "overlay"
+                "-o"
+                "$(IFS=,; echo "${options[*]}")"
+                "$(config_get overlay.mount)"
+            )
+            ;;
+    esac
 
     log_debug overlay "挂载 overlayfs: $(quote_args "${cmd[@]}")"
     "${cmd[@]}" || die 1 overlay "挂载 overlayfs 失败"
@@ -81,13 +112,29 @@ feat_overlay_mount() {
 }
 
 feat_overlay_umount() {
-    if command_exists fusermount3; then
-        fusermount3 -uz "$(config_get overlay.mount)"
-    elif command_exists fusermount; then
-        fusermount -uz "$(config_get overlay.mount)"
-    elif command_exists umount; then
-        umount -l "$(config_get overlay.mount)"
-    else
-        log_error overlay "无法卸载 overlayfs，请手动卸载 $(config_get overlay.mount)"
-    fi
+    local mount
+    mount="$(config_get overlay.mount)"
+
+    case "$(config_get overlay.backend)" in
+        fuse)
+            if command_exists fusermount3; then
+                fusermount3 -uz "$mount" || log_error overlay "卸载 overlayfs 失败：$mount"
+            elif command_exists fusermount; then
+                fusermount -uz "$mount" || log_error overlay "卸载 overlayfs 失败：$mount"
+            elif command_exists umount; then
+                umount -l "$mount" || log_error overlay "卸载 overlayfs 失败：$mount"
+            else
+                log_error overlay "无法卸载 overlayfs，请手动卸载 $mount"
+                return 1
+            fi
+            ;;
+        kernel)
+            if command_exists umount; then
+                umount -l "$mount" || log_error overlay "卸载 overlayfs 失败：$mount"
+            else
+                log_error overlay "无法卸载 overlayfs，请手动卸载 $mount"
+                return 1
+            fi
+            ;;
+    esac
 }

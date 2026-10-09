@@ -32,10 +32,10 @@
 /tools/*/*
 
 !/tools/nvidia-env.sh
+!/tools/starrail-fps.py
 
 !/tools/fpsunlock/unlocker.c
 !/tools/xwin-watch/*.c
 !/tools/xwin-watch/*.h
 !/tools/xwin-watch/protocols/
 !/tools/xwin-watch/generated/
-!/tools/starrail-fps.py

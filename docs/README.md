@@ -31,6 +31,7 @@
 - [x] 使用 Taskset 关联 CPU 核心
 - [x] 自定义 DXVK/VKD3D 缓存路径
 - [x] 启用 NVIDIA 着色器缓存并自定义路径
+- [x] 清除着色器缓存（部分游戏）
 - [x] 修改 NVIDIA DLSS (DXVK NVAPI) 相关设置
 - [x] 修改权限以支持 MangoHud 读取 Intel CPU 功耗
 - [x] 使用 FUSE OverlayFS 分离游戏运行时产生的数据或缓存

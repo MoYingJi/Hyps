@@ -18,21 +18,7 @@ feat_userdata_link_prepare() {
 
     prefix="$(config_get game.prefix)"
 
-    if [ -d "$prefix/drive_c" ]; then
-        drive_c="$prefix/drive_c"
-    elif [ -d "$prefix/pfx/drive_c" ]; then
-        drive_c="$prefix/pfx/drive_c"
-    else
-        die 1 userdata-link "未找到 prefix 中的 drive_c 目录"
-    fi
-
-    if [ -d "$drive_c/users/steamuser" ]; then
-        userprofile="$drive_c/users/steamuser"
-    elif [ -d "$drive_c/users/$USER" ]; then
-        userprofile="$drive_c/users/$USER"
-    else
-        die 1 userdata-link "未找到 prefix 中的用户目录"
-    fi
+    wine_resolve_user_dirs userdata-link "$prefix" drive_c userprofile
 
     game_exe="$(config_get game.exe)"
     if isy "$(config_get overlay.enabled)"; then

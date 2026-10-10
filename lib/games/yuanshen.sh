@@ -26,6 +26,22 @@ userdata_link() {
     try_link_dir "$SCREENSHOTS/YuanShen" "$(dirname "$game_exe")/ScreenShot"
 }
 
+# 着色器缓存
+
+shader_cache_invalidate() {
+    local userprofile="$2"
+    local dir
+
+    # 国服与国际服的 d3d12PSOcache 所在目录名不同，两者都尝试清除
+    for dir in "原神" "Genshin Impact"; do
+        local cache="$userprofile/AppData/LocalLow/miHoYo/$dir/d3d12PSOcache"
+        if [ -e "$cache" ]; then
+            log_info shader-cache "清除游戏着色器缓存: $cache"
+            rm -rf -- "$cache"
+        fi
+    done
+}
+
 # FPS 解锁
 
 GI_FPS_UNLOCK_TOOL="$PROJECT_ROOT/tools/fpsunlock"

@@ -25,3 +25,16 @@ userdata_link() {
 
     try_link_dir "$SCREENSHOTS/WutheringWaves" "$game_dir/Client/Saved/ScreenShot"
 }
+
+shader_cache_invalidate() {
+    local game_exe="$3"
+
+    local game_dir
+    game_dir="$(overlay_auto_lower "$game_exe")" || return 1
+
+    local cache="$game_dir/Client/Saved/PSO"
+    if [ -e "$cache" ]; then
+        log_info shader-cache "清除游戏着色器缓存: $cache"
+        rm -rf -- "$cache"
+    fi
+}

@@ -51,6 +51,32 @@ find_wineprefix() {
     fi
 }
 
+# 解析 prefix 中的 drive_c 和用户目录，结果写入第 3、4 个参数指定的变量
+# 用法: wine_resolve_user_dirs <module> <prefix> <drive_c_var> <userprofile_var>
+wine_resolve_user_dirs() {
+    local module="$1"
+    local prefix="$2"
+    local -n drive_c_ref="$3"
+    local -n userprofile_ref="$4"
+
+    if [ -d "$prefix/drive_c" ]; then
+        drive_c_ref="$prefix/drive_c"
+    elif [ -d "$prefix/pfx/drive_c" ]; then
+        drive_c_ref="$prefix/pfx/drive_c"
+    else
+        die 1 "$module" "未找到 prefix 中的 drive_c 目录"
+    fi
+
+    if [ -d "$drive_c_ref/users/steamuser" ]; then
+        userprofile_ref="$drive_c_ref/users/steamuser"
+    elif [ -d "$drive_c_ref/users/$USER" ]; then
+        # shellcheck disable=SC2034 # 通过 nameref 写入调用方变量
+        userprofile_ref="$drive_c_ref/users/$USER"
+    else
+        die 1 "$module" "未找到 prefix 中的用户目录"
+    fi
+}
+
 _load_proton_paths() {
     local -n proton_paths="$1"
     local extra_proton_paths=()

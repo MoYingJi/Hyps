@@ -99,6 +99,11 @@ export_env_vars() {
             fi
             continue
         fi
+        # transform 在子 shell 中执行，副作用无法带回，因此由此处登记待创建目录
+        if [[ "$transform" == path_mkdir && ! -d "$final_value" ]]; then
+            ENV_MKDIRS+=("$final_value")
+            log_debug environment "目录待创建: '$final_value'"
+        fi
         _export_env_var "$env_name" "$final_value" "显式"
     done
 
@@ -193,9 +198,7 @@ env_transform_path_mkdir() {
     elif [[ -e "$dir_path" ]]; then
         die 4 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
     else
-        dir_path="$(realpath -m "$dir_path")"
-        ENV_MKDIRS+=("$dir_path")
-        log_debug environment "目录待创建: '$dir_path'"
+        realpath -m "$dir_path"
         return 0
     fi
 }

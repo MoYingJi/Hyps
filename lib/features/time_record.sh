@@ -32,6 +32,10 @@ feat_time_record_load_config() {
 register_hook load_config feat_time_record_load_config
 
 feat_time_record_start() {
+    if isy "$SKIP_TIME_RECORD"; then
+        log_info time-record "因环境变量 SKIP_TIME_RECORD 设置，跳过时间记录"
+        return 0
+    fi
     TIME_RECORD_CURRENT_START_SEC="$(date +%s)"
     log_debug time-record "记录游戏开始时间: $TIME_RECORD_CURRENT_START_SEC"
 }

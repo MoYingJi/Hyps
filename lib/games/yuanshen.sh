@@ -32,7 +32,7 @@ shader_cache_invalidate() {
     local userprofile="$2"
     local dir
 
-    # 国服与国际服的 d3d12PSOcache 所在目录名不同，两者都尝试清除
+    # 国服目录为 原神，国际服目录为 Genshin Impact（后者未经本机验证），两者都尝试清除
     for dir in "原神" "Genshin Impact"; do
         local cache="$userprofile/AppData/LocalLow/miHoYo/$dir/d3d12PSOcache"
         if [ -e "$cache" ]; then

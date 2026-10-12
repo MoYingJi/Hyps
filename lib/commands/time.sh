@@ -37,7 +37,7 @@ command_time_today() {
                 continue
             fi
 
-            game_name="$(basename "$game")"
+            game_name="${game##*/}"
 
             reset_time="$(
                 local game_impl="$SCRIPT_DIR/games/$game_name.sh"
@@ -84,7 +84,7 @@ command_time_list() {
         printf "%s\t%s\t  %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
 
         for game in "$dir"/*; do
-            game_name="$(basename "$game")"
+            game_name="${game##*/}"
 
             start_count="$(time_record_count "$game")"
 

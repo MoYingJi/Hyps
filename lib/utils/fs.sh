@@ -6,6 +6,24 @@ __UTILS_FS_SH_LOADED=1
 #shellcheck source=../log.sh
 source "${SCRIPT_DIR:-.}/log.sh"
 
+path_dirname() {
+    local path="$1"
+    local -n output="$2"
+
+    while [[ "$path" == */ && "$path" != "/" ]]; do
+        path="${path%/}"
+    done
+
+    local dir="${path%/*}"
+    [[ "$dir" == "$path" ]] && dir="."
+    [[ -z "$dir" ]] && dir="/"
+    while [[ "$dir" == */ && "$dir" != "/" ]]; do
+        dir="${dir%/}"
+    done
+    #shellcheck disable=SC2034 # Writes through the nameref to the caller's variable.
+    output="$dir"
+}
+
 try_link_dir() {
     local src="$1"
     local dst="$2"
@@ -42,6 +60,8 @@ try_link_dir() {
         rmdir "$dst"
     fi
 
-    mkdir -p "$(dirname "$dst")"
+    local dst_dir
+    path_dirname "$dst" dst_dir
+    mkdir -p "$dst_dir"
     ln -sn "$src" "$dst"
 }

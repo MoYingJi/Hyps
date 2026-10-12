@@ -14,7 +14,7 @@ time_day_start() {
         tz="${BASH_REMATCH[2]}"
     fi
 
-    now="$(date +%s)"
+    printf -v now '%(%s)T' -1
     start="$(
         [ -z "$tz" ] || export TZ="$tz"
         date -d "today $reset_time" +%s 2>/dev/null

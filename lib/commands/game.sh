@@ -15,7 +15,7 @@ command_game_list() {
     {
         printf "%s\t%s\t%s\n" "脚本" "游戏名" "游戏可执行文件"
         for sh in "$SCRIPTS_DIR"/*; do
-            basename="$(basename "$sh")"
+            basename="${sh##*/}"
             [[ "$basename" == _* ]] && continue
 
             basename_style="green,bold"

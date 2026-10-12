@@ -33,8 +33,14 @@ log_should_output() {
 
 _log_write_file() {
     if [[ -n "$LOG_FILE" ]]; then
+        local log_path="$LOG_FILE"
         local log_dir
-        log_dir="$(dirname "$LOG_FILE")"
+        while [[ "$log_path" == */ && "$log_path" != "/" ]]; do
+            log_path="${log_path%/}"
+        done
+        log_dir="${log_path%/*}"
+        [[ -z "$log_dir" ]] && log_dir="/"
+        [[ "$log_dir" == "$log_path" ]] && log_dir="."
         [[ -d "$log_dir" ]] || mkdir -p "$log_dir" 2>/dev/null
 
         echo "$1" >> "$LOG_FILE" 2>/dev/null || {
@@ -62,7 +68,7 @@ log() {
     fi
 
     local timestamp
-    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    printf -v timestamp '%(%Y-%m-%d %H:%M:%S)T' -1
 
     local log_line
     if [[ -n "$module" ]]; then

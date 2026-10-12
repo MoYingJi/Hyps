@@ -69,8 +69,9 @@ load_game_config() {
     config_realpath game.prefix "$DATA_DIR/prefixes/${game_name}" >/dev/null
 
     if ! config_has game.cwd; then
-        local game_exe_dir
-        game_exe_dir="$(dirname "$(config_get game.exe)")"
+        local game_exe game_exe_dir
+        game_exe="$(config_get game.exe)"
+        path_dirname "$game_exe" game_exe_dir
         config_set game.cwd "$game_exe_dir"
     fi
 

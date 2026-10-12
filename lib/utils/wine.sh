@@ -15,7 +15,16 @@ ensure_no_wineserver() {
     local current_prefix
 
     for pid in $(pgrep wineserver); do
-        current_prefix="$(cat "/proc/$pid/environ" 2>/dev/null | tr '\0' '\n' | grep '^WINEPREFIX=' | cut -d= -f2)"
+        local env_entry=""
+        current_prefix=""
+        if [[ -r "/proc/$pid/environ" ]]; then
+            while IFS= read -r -d '' env_entry || [[ -n "$env_entry" ]]; do
+                if [[ "$env_entry" == WINEPREFIX=* ]]; then
+                    current_prefix="${env_entry#WINEPREFIX=}"
+                    break
+                fi
+            done < "/proc/$pid/environ" 2>/dev/null
+        fi
         [[ "$current_prefix" -ef "$prefix" ]] || [[ "$current_prefix" -ef "$prefix/pfx" ]] || continue
 
         case "$action" in

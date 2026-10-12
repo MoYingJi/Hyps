@@ -29,8 +29,8 @@ check_cache_and_compile() {
         log_debug utils "[$name] 校验和文件不存在"
     else
         local cached_sha256
-        current_sha256="$("$all_source_fn" "$output_file" | sha256sum | awk '{print $1}')"
-        cached_sha256="$(cat "$sha256sum_file")"
+        read -r current_sha256 _ < <("$all_source_fn" "$output_file" | sha256sum)
+        IFS= read -r cached_sha256 < "$sha256sum_file" || cached_sha256=""
 
         if [ "$current_sha256" != "$cached_sha256" ]; then
             log_debug utils "[$name] 校验和不一致"
@@ -44,6 +44,8 @@ check_cache_and_compile() {
     "$compile_fn" "$output_file" || die 1 utils "[$name] 编译失败"
     "$verify_output_fn" "$output_file" || die 1 utils "[$name] 编译后验证失败"
 
-    [ -z "$current_sha256" ] && current_sha256="$("$all_source_fn" "$output_file" | sha256sum | awk '{print $1}')"
+    if [ -z "$current_sha256" ]; then
+        read -r current_sha256 _ < <("$all_source_fn" "$output_file" | sha256sum)
+    fi
     echo "$current_sha256" > "$sha256sum_file"
 }

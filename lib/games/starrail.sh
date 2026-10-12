@@ -7,7 +7,9 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 
 overlay_auto_lower() {
     local game_exe="$1"
-    dirname "$game_exe"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    printf '%s\n' "$game_dir"
 }
 
 # 日常重置时间
@@ -20,7 +22,9 @@ feat_time_record_today_reset() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$SCREENSHOTS/StarRail" "$(dirname "$game_exe")/StarRail_Data/ScreenShots"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    try_link_dir "$SCREENSHOTS/StarRail" "$game_dir/StarRail_Data/ScreenShots"
 }
 
 # 注册表解锁帧率

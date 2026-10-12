@@ -36,7 +36,7 @@ feat_time_record_start() {
         log_info time-record "因环境变量 SKIP_TIME_RECORD 设置，跳过时间记录"
         return 0
     fi
-    TIME_RECORD_CURRENT_START_SEC="$(date +%s)"
+    printf -v TIME_RECORD_CURRENT_START_SEC '%(%s)T' -1
     log_debug time-record "记录游戏开始时间: $TIME_RECORD_CURRENT_START_SEC"
 }
 
@@ -54,7 +54,7 @@ feat_time_record_end() {
         return 0
     fi
 
-    current_end="$(date +%s)"
+    printf -v current_end '%(%s)T' -1
     current_dur="$(( current_end - current_start ))"
 
     log_debug time-record "记录游戏结束时间: $current_end"

@@ -14,14 +14,23 @@ command_help() {
     declare -F "$help_fn" &>/dev/null && "$help_fn"
 
     if [ "$fn" = "command" ]; then
-        subs="$(compgen -G "$COMMANDS_DIR/[!_]*.sh" | xargs -r -n1 basename -s .sh)"
+        local command_file command_name
+        subs=""
+        for command_file in "$COMMANDS_DIR"/[!_]*.sh; do
+            [ -e "$command_file" ] || continue
+            command_name="${command_file##*/}"
+            command_name="${command_name%.sh}"
+            [[ -n "$subs" ]] && subs+=$'\n'
+            subs+="$command_name"
+        done
     else
-        subs="$(compgen -A function "${fn}_" | sed "s/^${fn}_//")"
+        subs="$(compgen -A function "${fn}_")"
     fi
 
     [ -n "$subs" ] || return 0
     echo "可用子命令:"
     while IFS= read -r sub; do
+        [[ "$fn" == "command" ]] || sub="${sub#"${fn}"_}"
         echo "  ${sub//_/-}"
     done <<< "$subs"
 }

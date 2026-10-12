@@ -5,9 +5,12 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 
 overlay_auto_lower() {
     local game_exe="$1"
-
+    local game_dir
     case "$game_exe" in
-        */"Wuthering Waves.exe") dirname "$game_exe";;
+        */"Wuthering Waves.exe")
+            path_dirname "$game_exe" game_dir
+            printf '%s\n' "$game_dir"
+            ;;
         */"Client/Binaries/Win64/Client-Win64-Shipping.exe") realpath -m "$game_exe/../../../..";;
         *) die 1 "overlay" "无法识别游戏路径: $game_exe";;
     esac

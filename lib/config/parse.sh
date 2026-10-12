@@ -66,7 +66,7 @@ config_parse_file() {
                 pending_type="paren"
             else
                 # 单行值，直接存储
-                value="$(_strip_trailing_comment "$value")"
+                _strip_trailing_comment value
                 # 如果有节前缀，添加到键名中
                 if [[ -n "$current_section" ]]; then
                     key="${current_section}.${key}"
@@ -80,7 +80,8 @@ config_parse_file() {
                 continue
             fi
 
-            stripped_line="$(_strip_trailing_comment "$line")"
+            stripped_line="$line"
+            _strip_trailing_comment stripped_line
 
             if [[ "$pending_type" == "square" ]]; then
                 if [[ "$pending_value" == *"," ]]; then
@@ -118,7 +119,8 @@ config_parse_file() {
 }
 
 _strip_trailing_comment() {
-    local str="$1"
+    local -n str_ref="$1"
+    local str="$str_ref"
     local in_single=0
     local in_double=0
     local escape=0
@@ -162,7 +164,7 @@ _strip_trailing_comment() {
         str="${str:0:comment_pos}"
         str="${str%"${str##*[![:space:]]}"}"
     fi
-    echo "$str"
+    str_ref="$str"
 }
 
 

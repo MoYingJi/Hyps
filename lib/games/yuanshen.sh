@@ -10,7 +10,9 @@ source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
 
 overlay_auto_lower() {
     local game_exe="$1"
-    dirname "$game_exe"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    printf '%s\n' "$game_dir"
 }
 
 # 日常重置时间
@@ -23,7 +25,9 @@ feat_time_record_today_reset() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$SCREENSHOTS/YuanShen" "$(dirname "$game_exe")/ScreenShot"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    try_link_dir "$SCREENSHOTS/YuanShen" "$game_dir/ScreenShot"
 }
 
 # 着色器缓存
@@ -71,7 +75,11 @@ gi_fps_unlock_load_config() {
 register_hook load_config gi_fps_unlock_load_config 50 before:feat_xwin_watch_load_config
 
 gi_fps_unlock_all_source() {
-    cat "$GI_FPS_UNLOCK_TOOL/unlocker.c"
+    local line
+    while IFS= read -r line; do
+        printf '%s\n' "$line"
+    done < "$GI_FPS_UNLOCK_TOOL/unlocker.c"
+    [[ -n "$line" ]] && printf '%s' "$line"
     echo "${HYPS_CFLAGS[@]:-}"
 }
 gi_fps_unlock_verify_output() {

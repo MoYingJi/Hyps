@@ -6,8 +6,11 @@ __COMMON_SH_LOADED=1
 [ "$UID" -ne 0 ] || { echo "你个小天才是怎么想到用 root 运行的（"; exit 1; }
 [ -n "$GAME_NAME" ] || { echo "请在运行前设置环境变量 GAME_NAME"; exit 1; }
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+[[ "$SCRIPT_DIR" == "${BASH_SOURCE[0]}" ]] && SCRIPT_DIR="."
+SCRIPT_DIR="$(cd -- "$SCRIPT_DIR" &> /dev/null && pwd)"
+PROJECT_ROOT="${SCRIPT_DIR%/*}"
+[[ "$PROJECT_ROOT" == "$SCRIPT_DIR" ]] && PROJECT_ROOT="/"
 
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 

@@ -35,7 +35,9 @@ nvidia_version() {
     # fi
 
     if [ -r /sys/module/nvidia/version ]; then
-        cat /sys/module/nvidia/version
+        local version
+        IFS= read -r version < /sys/module/nvidia/version || [[ -n "$version" ]] || return 1
+        printf '%s\n' "$version"
         return
     fi
 

@@ -5,7 +5,9 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 
 overlay_auto_lower() {
     local game_exe="$1"
-    dirname "$game_exe"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    printf '%s\n' "$game_dir"
 }
 
 feat_time_record_today_reset() {
@@ -14,7 +16,9 @@ feat_time_record_today_reset() {
 
 userdata_link() {
     local game_exe="$3"
-    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$(dirname "$game_exe")/ScreenShot"
+    local game_dir
+    path_dirname "$game_exe" game_dir
+    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$game_dir/ScreenShot"
 }
 
 shader_cache_invalidate() {

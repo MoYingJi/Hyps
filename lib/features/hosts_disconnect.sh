@@ -33,9 +33,11 @@ feat_hosts_disconnect_prepare() {
 
     local content
     local hosts_file
+    local duration
 
     content="$(config_get features.hosts_disconnect.content)"
     hosts_file="$(config_get features.hosts_disconnect.file)"
+    duration="$(config_get features.hosts_disconnect.duration)"
 
     if [ ! -w "$hosts_file" ]; then
         HOSTS_ORI_PERM="$(stat -c "%a" "$hosts_file")"

@@ -16,3 +16,10 @@ userdata_link() {
     local game_exe="$3"
     try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$(dirname "$game_exe")/ScreenShot"
 }
+
+shader_cache_invalidate() {
+    log_warn shader-cache "清除着色器缓存后，游戏并不会重新预编译着色器"
+    log_warn shader-cache "需要启动游戏，在启动页（「点击进入游戏」那个界面）点击右下角四"
+    log_warn shader-cache "个图标中的扳手图标，点击「确认修复」，重新触发着色器编译，见："
+    log_warn shader-cache "https://www.miyoushe.com/zzz/article/76056101"
+}

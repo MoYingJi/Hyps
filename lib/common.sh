@@ -96,11 +96,11 @@ start_game_process() {
 
     log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
     log_debug lifecycle "工作目录: $game_cwd"
-    cd "$game_cwd" || die 1 lifecycle "无法切换到游戏工作目录: '$game_cwd'"
+    pushd "$game_cwd" > /dev/null || die 1 lifecycle "无法切换到游戏工作目录: '$game_cwd'"
     LD_PRELOAD="$(env_get_ld_preload)" "${cmd[@]}" &
     GAME_PID="$!"
     log_debug lifecycle "游戏进程 PID: $GAME_PID"
-    cd - || die 1 lifecycle "无法切换回项目根目录"
+    popd > /dev/null || die 1 lifecycle "无法切换回项目根目录"
 
     local now_ns dur_ns
     now_ns="$(date +%s%N)"

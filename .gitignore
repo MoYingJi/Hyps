@@ -35,6 +35,8 @@
 !/tools/starrail-fps.py
 
 !/tools/fpsunlock/unlocker.c
+!/tools/genshin-d3d12/patch-unitypy.py
+!/tools/genshin-d3d12/patch-bytes.py
 !/tools/xwin-watch/*.c
 !/tools/xwin-watch/*.h
 !/tools/xwin-watch/protocols/

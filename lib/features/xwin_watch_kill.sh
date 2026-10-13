@@ -45,7 +45,7 @@ feat_xwin_watch_kill_list_pid() {
     if config_has features.xwin_watch_kill.name; then
         local name
         name="$(config_get features.xwin_watch_kill.name)"
-        pgrep -u "$USER" -x "$name"
+        find_pid_by_name "$name"
     elif config_has features.xwin_watch_kill.pgrep_args; then
         local args
         config_read_array features.xwin_watch_kill.pgrep_args args

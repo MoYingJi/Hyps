@@ -133,7 +133,7 @@ gi_fps_unlock_start() {
     interval="$(config_get gi.fps_unlock.interval)"
     fifo="$(config_get gi.fps_unlock.fifo)"
 
-    pid="$(pgrep -n -u "$USER" -x "$prog")"
+    pid="$(find_pid_by_name -n "$prog")"
 
     log_info gi-fps-unlock "PID: $pid"
     "$bin" "$pid" "$fps" "$interval" "$fifo" &

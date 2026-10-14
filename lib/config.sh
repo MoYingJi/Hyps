@@ -36,7 +36,7 @@ load_game_config() {
 
     if config_has runner.name; then
         # 如果已经有 runner，直接读
-        runner_name="$(config_get runner.name)"
+        config_read runner.name runner_name
         config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
         config_parse_file "$game_config_file"
     else
@@ -50,7 +50,7 @@ load_game_config() {
 
     if ! config_has runner.exe && config_has runner.protonpath; then
         local proton_path
-        proton_path="$(config_get runner.protonpath)"
+        config_read runner.protonpath proton_path
         [ -z "$proton_path" ] && die 1 config "配置项 'runner.protonpath' 的值为空"
 
         if [[ -d "$proton_path" ]]; then
@@ -70,7 +70,7 @@ load_game_config() {
 
     if ! config_has game.cwd; then
         local game_exe game_exe_dir
-        game_exe="$(config_get game.exe)"
+        config_read game.exe game_exe
         path_dirname "$game_exe" game_exe_dir
         config_set game.cwd "$game_exe_dir"
     fi

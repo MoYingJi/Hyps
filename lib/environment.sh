@@ -69,10 +69,13 @@ declare -a ENV_EXPORTS=(
 
 env_load_config() {
     # 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
-    config_default env.DXVK_HUD 0 >/dev/null
+    config_default env.DXVK_HUD 0
 
     # prefix 变量导出
-    ENV_EXPORTS+=("game.prefix|$(config_default runner.prefix_var "WINEPREFIX")|string")
+    config_default runner.prefix_var "WINEPREFIX"
+    local prefix_var
+    config_read runner.prefix_var prefix_var
+    ENV_EXPORTS+=("game.prefix|$prefix_var|string")
 
 
     env_parse_compile_settings
@@ -281,7 +284,7 @@ env_parse_ld_preload() {
 
     if [ -z "$LD_PRELOAD" ] && config_has env.LD_PRELOAD; then
         local ld_preload_raw
-        ld_preload_raw="$(config_get env.LD_PRELOAD)"
+        config_read env.LD_PRELOAD ld_preload_raw
         parse_array "$ld_preload_raw" ld_preload_array || IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
         for lib in "${ld_preload_array[@]}"; do
             env_add_ld_preload "$lib"
@@ -320,7 +323,7 @@ env_parse_compile_settings() {
         fi
     elif config_has compile.CFLAGS; then
         local cflags_raw
-        cflags_raw="$(config_get compile.CFLAGS)"
+        config_read compile.CFLAGS cflags_raw
         parse_array "$cflags_raw" cflags || read -ra cflags <<< "$cflags_raw"
         set_cflags=1
     fi
@@ -342,7 +345,7 @@ env_parse_compile_settings() {
         cc="$CC"
         set_cc=1
     elif config_has compile.CC; then
-        cc="$(config_get compile.CC)"
+        config_read compile.CC cc
         set_cc=1
     fi
 

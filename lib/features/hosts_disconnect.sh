@@ -7,14 +7,14 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
 
 feat_hosts_disconnect_load_config() {
-    isy "$(config_get features.hosts_disconnect.enabled)" || return 0
+    config_is_true features.hosts_disconnect.enabled || return 0
 
     config_has features.hosts_disconnect.content || die 1 hosts-disconnect "请在配置文件中设置 features.hosts_disconnect.content"
     config_require_realpath_file features.hosts_disconnect.file "/etc/hosts"
-    config_default features.hosts_disconnect.duration "-" >/dev/null
+    config_default features.hosts_disconnect.duration "-"
 
     local duration
-    duration="$(config_get features.hosts_disconnect.duration)"
+    config_read features.hosts_disconnect.duration duration
     if [[ "$duration" != "-" ]]; then
         if ! [[ "$duration" =~ ^[0-9]+$ ]]; then
             die 1 hosts-disconnect "features.hosts_disconnect.duration 必须是整数或 '-'"
@@ -35,9 +35,9 @@ feat_hosts_disconnect_prepare() {
     local hosts_file
     local duration
 
-    content="$(config_get features.hosts_disconnect.content)"
-    hosts_file="$(config_get features.hosts_disconnect.file)"
-    duration="$(config_get features.hosts_disconnect.duration)"
+    config_read features.hosts_disconnect.content content
+    config_read features.hosts_disconnect.file hosts_file
+    config_read features.hosts_disconnect.duration duration
 
     if [ ! -w "$hosts_file" ]; then
         HOSTS_ORI_PERM="$(stat -c "%a" "$hosts_file")"
@@ -66,7 +66,7 @@ EOF
 
 feat_hosts_disconnect_pre_start() {
     local duration
-    duration="$(config_get features.hosts_disconnect.duration)"
+    config_read features.hosts_disconnect.duration duration
     (
         trap feat_hosts_disconnect_restore EXIT
         sleep "$duration"
@@ -84,7 +84,7 @@ feat_hosts_disconnect_restore() {
     local flagStart="# $flag $GAME_NAME Start"
     local flagEnd="# $flag $GAME_NAME End"
 
-    hosts_file="$(config_get features.hosts_disconnect.file)"
+    config_read features.hosts_disconnect.file hosts_file
 
     if [ ! -w "$hosts_file" ]; then
         sudo_request "使 hosts 文件可写" chmod +w "$hosts_file"

@@ -4,7 +4,7 @@
 source "${SCRIPT_DIR:-.}/libs.sh"
 
 feat_intel_rapl_read_prepare() {
-    isy "$(config_get prepare.intel_rapl_read)" || return 0
+    config_is_true prepare.intel_rapl_read || return 0
 
     local files=(
         /sys/class/powercap/intel-rapl:0/energy_uj

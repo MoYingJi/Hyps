@@ -7,11 +7,11 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 source "${SCRIPT_DIR:-.}/features/custom_batch.sh"
 
 feat_mod_reg_hostname_load_config() {
-    isy "$(config_get feat.reg_hostname.enabled)" || return 0
+    config_is_true feat.reg_hostname.enabled || return 0
 
-    config_default feat.reg_hostname.hostname "STEAMDECK" >/dev/null
+    config_default feat.reg_hostname.hostname "STEAMDECK"
     local hostname
-    hostname="$(config_get feat.reg_hostname.hostname)"
+    config_read feat.reg_hostname.hostname hostname
 
     CUSTOM_BATCH_BEFORE_GAME="$(cat << EOF
 $CUSTOM_BATCH_BEFORE_GAME

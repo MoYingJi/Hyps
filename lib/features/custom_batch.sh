@@ -11,8 +11,10 @@ gen_custom_batch() {
     local content
     local game_cwd
     local game_cwd_win
+    local game_exe
     script="$(mktemp "$TEMP_DIR/start-game-XXXXXXX.bat")"
-    game_cwd="$(config_get game.cwd)"
+    config_read game.cwd game_cwd
+    config_read game.exe game_exe
     game_cwd_win="Z:${game_cwd//\//\\}"
     content="$(cat << EOF
 chcp 65001
@@ -20,7 +22,7 @@ Z:
 cd /d "$game_cwd_win"
 $PREPARE_BATCH
 $CUSTOM_BATCH_BEFORE_GAME
-start "" /WAIT /B $(quote_args "${WINE_SIDE_GAME_WRAPPER[@]}") "Z:\\$(config_get game.exe)" $(quote_args "${GAME_ARGS[@]}")
+start "" /WAIT /B $(quote_args "${WINE_SIDE_GAME_WRAPPER[@]}") "Z:\\$game_exe" $(quote_args "${GAME_ARGS[@]}")
 $CUSTOM_BATCH_AFTER_GAME
 EOF
     )"
@@ -38,7 +40,9 @@ EOF
     )"
     echo "$content" > "$script" || die 1 custom-batch "无法写入准备批处理文件: '$script'"
     local -a cmd=()
-    cmd+=("$(config_get runner.exe)")
+    local runner_exe
+    config_read runner.exe runner_exe
+    cmd+=("$runner_exe")
     cmd+=("cmd" "/c" "$script")
     log_info custom-batch "运行准备批处理脚本: $(quote_args "${cmd[@]}")"
     "${cmd[@]}" &

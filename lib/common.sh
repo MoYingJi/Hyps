@@ -70,7 +70,9 @@ build_game_command() {
     local -a cmd=()
 
     cmd+=("${RUNNER_WRAPPER[@]}")
-    cmd+=("$(config_get runner.exe)")
+    local runner_exe
+    config_read runner.exe runner_exe
+    cmd+=("$runner_exe")
 
     local -a runner_args=()
     config_has runner.args && config_read_array runner.args runner_args
@@ -79,7 +81,9 @@ build_game_command() {
     if isy "$NEEDS_CUSTOM_BATCH"; then
         cmd+=("cmd" "/c" "$CUSTOM_BATCH_SCRIPT")
     else
-        cmd+=("$(config_get game.exe)")
+        local game_exe
+        config_read game.exe game_exe
+        cmd+=("$game_exe")
         cmd+=("${GAME_ARGS[@]}")
     fi
 
@@ -89,7 +93,7 @@ build_game_command() {
 start_game_process() {
     local -a cmd=("${GAME_COMMAND[@]}")
     local game_cwd
-    game_cwd="$(config_get game.cwd)"
+    config_read game.cwd game_cwd
 
     log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
     log_debug lifecycle "工作目录: $game_cwd"

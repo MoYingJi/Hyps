@@ -13,7 +13,7 @@ XWIN_WATCH_TOOL="$PROJECT_ROOT/tools/xwin-watch"
 XWIN_WATCH_CMD=()
 
 feat_xwin_watch_load_config() {
-    if ! isy "$(config_get features.xwin_watch.enabled)"; then
+    if ! config_is_true features.xwin_watch.enabled; then
         XWIN_WATCH_SKIPPED=1
         [ "${#XWIN_WATCH_CALLBACKS_EXISTS[@]}" -gt 0 ] ||
         [ "${#XWIN_WATCH_CALLBACKS_CLOSED[@]}" -gt 0 ] ||
@@ -26,17 +26,17 @@ feat_xwin_watch_load_config() {
 
     local timeout
 
-    config_default features.xwin_watch.timeout 0 >/dev/null
-    timeout="$(config_get features.xwin_watch.timeout)"
+    config_default features.xwin_watch.timeout 0
+    config_read features.xwin_watch.timeout timeout
 
     [[ "$timeout" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.timeout' 必须是整数"
 
     # 后端开关: x11/wayland 可独立开启关闭 (默认 auto，按 pkg-config 自动检测)
     local x11 wayland
-    config_default features.xwin_watch.x11 auto >/dev/null
-    config_default features.xwin_watch.wayland auto >/dev/null
-    x11="$(config_get features.xwin_watch.x11)"
-    wayland="$(config_get features.xwin_watch.wayland)"
+    config_default features.xwin_watch.x11 auto
+    config_default features.xwin_watch.wayland auto
+    config_read features.xwin_watch.x11 x11
+    config_read features.xwin_watch.wayland wayland
     if [[ "$x11" != auto ]] && ! isy "$x11"; then
         die 1 xwin-watch "'features.xwin_watch.x11' 必须是 auto/true/false"
     fi
@@ -69,7 +69,7 @@ feat_xwin_watch_backend_enabled() {
     local module="$backend"
     [[ "$backend" == wayland ]] && module="wayland-client"
     local cfg
-    cfg="$(config_get "features.xwin_watch.$backend" auto)"
+    config_read "features.xwin_watch.$backend" auto cfg
     if [[ "$cfg" == auto ]]; then
         if pkg-config --exists "$module"; then
             echo true
@@ -195,9 +195,12 @@ feat_xwin_watch_prepare() {
         feat_xwin_watch_verify_output \
         feat_xwin_watch_compile
 
+    local window_name xwin_timeout
+    config_read features.xwin_watch.window_name window_name
+    config_read features.xwin_watch.timeout xwin_timeout
     XWIN_WATCH_CMD+=("$bin")
-    XWIN_WATCH_CMD+=("-w" "$(config_get features.xwin_watch.window_name)")
-    XWIN_WATCH_CMD+=("-a" "$(config_get features.xwin_watch.timeout)")
+    XWIN_WATCH_CMD+=("-w" "$window_name")
+    XWIN_WATCH_CMD+=("-a" "$xwin_timeout")
 
     register_hook post_start feat_xwin_watch_post_start
 }

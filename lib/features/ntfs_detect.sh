@@ -4,10 +4,10 @@
 source "${SCRIPT_DIR:-.}/libs.sh"
 
 feat_ntfs_detect_pre_start() {
-    isy "$(config_get features.ntfs_detect.enabled true)" || return 0
+    config_is_true features.ntfs_detect.enabled true || return 0
 
     local game_exe fs
-    game_exe="$(config_get game.exe)"
+    config_read game.exe game_exe
     fs="$(stat -f -c %T "$game_exe")"
 
     if [ "$fs" = "ntfs" ] || [ "$fs" = "ntfs3" ]; then

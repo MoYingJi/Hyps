@@ -7,7 +7,7 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
 
 feat_xwin_watch_kill_load_config() {
-    isy "$(config_get features.xwin_watch_kill.enabled)" || return 0
+    config_is_true features.xwin_watch_kill.enabled || return 0
 
     local count=0
     config_has features.xwin_watch_kill.name && count=$((count + 1))
@@ -15,7 +15,9 @@ feat_xwin_watch_kill_load_config() {
     [[ "$count" -eq 1 ]] || die 1 xwin-watch-kill "必须设置 features.xwin_watch_kill.name 或 features.xwin_watch_kill.pgrep_args 中的一个"
 
     config_default features.xwin_watch_kill.sleep 5
-    [[ "$(config_get features.xwin_watch_kill.sleep)" =~ ^[0-9]+$ ]] || die 1 xwin-watch-kill "features.xwin_watch_kill.sleep 必须是整数"
+    local kill_sleep
+    config_read features.xwin_watch_kill.sleep kill_sleep
+    [[ "$kill_sleep" =~ ^[0-9]+$ ]] || die 1 xwin-watch-kill "features.xwin_watch_kill.sleep 必须是整数"
 
     config_set features.xwin_watch.enabled true
     xwin_watch_on closed feat_xwin_watch_kill_on_closed
@@ -25,7 +27,7 @@ register_hook load_config feat_xwin_watch_kill_load_config 50 before:feat_xwin_w
 
 feat_xwin_watch_kill_on_closed() {
     local pid list sleep
-    sleep="$(config_get features.xwin_watch_kill.sleep)"
+    config_read features.xwin_watch_kill.sleep sleep
     list="$(feat_xwin_watch_kill_list_pid)"
     [[ -n "$list" ]] || log_info xwin-watch-kill "没有找到要杀死的进程"
     log_info xwin-watch-kill "等待 $sleep 秒后杀死进程"
@@ -44,7 +46,7 @@ feat_xwin_watch_kill_on_closed() {
 feat_xwin_watch_kill_list_pid() {
     if config_has features.xwin_watch_kill.name; then
         local name
-        name="$(config_get features.xwin_watch_kill.name)"
+        config_read features.xwin_watch_kill.name name
         find_pid_by_name "$name"
     elif config_has features.xwin_watch_kill.pgrep_args; then
         local args

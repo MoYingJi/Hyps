@@ -49,7 +49,9 @@ command_game_list() {
                         load_game_config "$name" 2>/dev/null
                     fi
 
-                    printf "%s\t%s\t%s" "true" "$(bool_str config_has game.exe)" "$(config_get game.exe)"
+                    local game_exe_value
+                    config_read game.exe game_exe_value
+                    printf "%s\t%s\t%s" "true" "$(bool_str config_has game.exe)" "$game_exe_value"
                 )"
 
                 if [ "$has_config" = "false" ]; then

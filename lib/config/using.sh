@@ -5,29 +5,36 @@ source "${SCRIPT_DIR:-.}/log.sh"
 #shellcheck source=../utils.sh
 source "${SCRIPT_DIR:-.}/utils.sh"
 
+# 读取配置值到调用方变量 $2（不存在时使用默认值 $3），不创建子 Shell
 #shellcheck disable=SC2178
-config_get() {
-    local key="$1"
-    local default="${2:-}"
-    local -n target_map="${3:-CONFIG}"
+config_read() {
+    local _key="$1"
+    local -n _var="$2"
+    local _default="${3:-}"
+    local -n _map="${4:-CONFIG}"
 
-    if [[ -n "${target_map[$key]+exists}" ]]; then
-        echo "${target_map[$key]}"
+    if [[ -n "${_map[$_key]+exists}" ]]; then
+        _var="${_map[$_key]}"
     else
-        echo "$default"
+        _var="$_default"
     fi
 }
 
+# 布尔读取：配置值（不存在时使用默认值 $2）符合 isy 的真值规则时返回 0
+config_is_true() {
+    local _value
+    config_read "$1" _value "${2:-}"
+    isy "$_value"
+}
+
+# 配置项未设置时写入默认值（不输出到 stdout）
 #shellcheck disable=SC2178
 config_default() {
     local key="$1"
     local default="${2:-}"
     local -n target_map="${3:-CONFIG}"
 
-    if [[ -n "${target_map[$key]+exists}" ]]; then
-        echo "${target_map[$key]}"
-    else
-        echo "$default"
+    if [[ -z "${target_map[$key]+exists}" ]]; then
         log_debug config "设置配置 [${3:-CONFIG}] $key = $default"
         target_map["$key"]="$default"
     fi
@@ -63,7 +70,7 @@ config_realpath() {
     local target_map_name="${3:-CONFIG}"
 
     local value
-    value="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" value "$default" "$target_map_name"
     [ -n "$value" ] && value="$(realpath -m "$value")"
     config_set "$key" "$value" "$target_map_name"
 }
@@ -75,7 +82,7 @@ config_require_realpath_file() {
     local target_map_name="${3:-CONFIG}"
 
     local value
-    value="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" value "$default" "$target_map_name"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
     value="$(realpath -m "$value")"
     [[ -e "$value" ]] || die 1 config "配置项 '$key' 指向的文件不存在：'$value'"
@@ -90,7 +97,7 @@ config_require_realpath_dir() {
     local target_map_name="${3:-CONFIG}"
 
     local value
-    value="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" value "$default" "$target_map_name"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
     value="$(realpath -m "$value")"
     [[ -e "$value" ]] || die 1 config "配置项 '$key' 指向的目录不存在：'$value'"
@@ -105,7 +112,7 @@ config_require_realpath_mkdir() {
     local target_map_name="${3:-CONFIG}"
 
     local value
-    value="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" value "$default" "$target_map_name"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
     value="$(realpath -m "$value")"
     [[ -e "$value" ]] && [[ ! -d "$value" ]] && die 1 config "配置项 '$key' 指向的路径不是目录：'$value'"
@@ -120,7 +127,7 @@ config_require_realpath_which_exe() {
     local target_map_name="${3:-CONFIG}"
 
     local value path
-    value="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" value "$default" "$target_map_name"
     [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
 
     path="$(type -P -- "$value")" \
@@ -135,7 +142,7 @@ config_read_realpath_prefer_env() {
     local default="${3:-}"
     local target_map_name="${4:-CONFIG}"
 
-    [[ -z "$var" ]] && var="$(config_get "$key" "$default" "$target_map_name")"
+    [[ -z "$var" ]] && config_read "$key" var "$default" "$target_map_name"
     var="$(realpath -m "$var")"
     config_set "$key" "$var" "$target_map_name"
 }
@@ -152,7 +159,7 @@ config_read_array() {
     [[ "${#var_array[@]}" -eq 0 ]] || return 0
 
     local array_str
-    array_str="$(config_get "$key" "$default" "$target_map_name")"
+    config_read "$key" array_str "$default" "$target_map_name"
     parse_array "$array_str" "$var_array_name" || die 1 config "配置项 '$key' 的值 '$array_str' 无法解析为数组"
 }
 

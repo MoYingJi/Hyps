@@ -8,8 +8,8 @@ source "${SCRIPT_DIR:-.}/environment.sh"
 
 feat_program_cache_load_config() {
     # GLShaderCache
-    if isy "$(config_get cache.shader.enabled)"; then
-        config_default cache.shader.path "$CACHE_DIR/GLShaderCache/$GAME_NAME" >/dev/null
+    if config_is_true cache.shader.enabled; then
+        config_default cache.shader.path "$CACHE_DIR/GLShaderCache/$GAME_NAME"
 
         ENV_EXPORTS+=(
             "cache.shader.enabled|__GL_SHADER_DISK_CACHE_SKIP_CLEANUP|bool_to_01"
@@ -18,8 +18,8 @@ feat_program_cache_load_config() {
     fi
 
     # DXCache
-    if isy "$(config_get cache.dx.enabled)"; then
-        config_default cache.dx.path "$CACHE_DIR/DXCache/$GAME_NAME" >/dev/null
+    if config_is_true cache.dx.enabled; then
+        config_default cache.dx.path "$CACHE_DIR/DXCache/$GAME_NAME"
 
         ENV_EXPORTS+=(
             "cache.dx.path|DXVK_STATE_CACHE_PATH|path_mkdir"
@@ -42,7 +42,7 @@ program_cache_clear_dir() {
         return 0
     fi
 
-    path="$(config_get "$key")"
+    config_read "$key" path
     if [ -z "$path" ] || [ "$path" = / ]; then
         log_warn program-cache "$label 缓存路径无效: '$path'，跳过清除"
         return 0

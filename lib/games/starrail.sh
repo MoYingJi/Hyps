@@ -30,11 +30,11 @@ userdata_link() {
 # 注册表解锁帧率
 
 starrail_reg_fps_load_config() {
-    isy "$(config_get starrail.reg_fps.enabled)" || return 0
+    config_is_true starrail.reg_fps.enabled || return 0
 
     command_exists python3 || die 1 starrail-reg-fps "未安装 python3，无法注册表解锁帧率"
 
-    config_default starrail.reg_fps.val 120 >/dev/null
+    config_default starrail.reg_fps.val 120
 
     register_hook prepare starrail_reg_fps_prepare
 }
@@ -44,8 +44,11 @@ register_hook load_config starrail_reg_fps_load_config
 starrail_reg_fps_prepare() {
     local prefix
     local file
+    local game_prefix
+    local reg_fps_val
 
-    prefix="$(find_wineprefix "$(config_get game.prefix)")"
+    config_read game.prefix game_prefix
+    prefix="$(find_wineprefix "$game_prefix")"
     file="$prefix/user.reg"
 
     if [ ! -f "$file" ]; then
@@ -59,7 +62,8 @@ starrail_reg_fps_prepare() {
 
     ensure_no_wineserver "$prefix" error "'starrail.reg_fps.enabled' 已启用"
 
-    python3 "$PROJECT_ROOT/tools/starrail-fps.py" "$file" "$(config_get starrail.reg_fps.val)" || {
+    config_read starrail.reg_fps.val reg_fps_val
+    python3 "$PROJECT_ROOT/tools/starrail-fps.py" "$file" "$reg_fps_val" || {
         log_error starrail-reg-fps "注册表解锁帧率失败"
         return 0 # 仅记录错误，不影响游戏运行
     }

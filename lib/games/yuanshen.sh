@@ -51,16 +51,16 @@ shader_cache_invalidate() {
 GI_FPS_UNLOCK_TOOL="$PROJECT_ROOT/tools/fpsunlock"
 
 gi_fps_unlock_load_config() {
-    isy "$(config_get gi.fps_unlock.enabled)" || return 0
+    config_is_true gi.fps_unlock.enabled || return 0
 
-    config_default gi.fps_unlock.val 120 >/dev/null
-    config_default gi.fps_unlock.interval 5000 >/dev/null
-    config_default gi.fps_unlock.fifo "$TEMP_DIR/fpsunlock_fifo" >/dev/null
-    config_default gi.fps_unlock.prog "YuanShen.exe" >/dev/null
-    config_default gi.fps_unlock.sleep "-" >/dev/null
+    config_default gi.fps_unlock.val 120
+    config_default gi.fps_unlock.interval 5000
+    config_default gi.fps_unlock.fifo "$TEMP_DIR/fpsunlock_fifo"
+    config_default gi.fps_unlock.prog "YuanShen.exe"
+    config_default gi.fps_unlock.sleep "-"
 
     local sleep
-    sleep="$(config_get gi.fps_unlock.sleep)"
+    config_read gi.fps_unlock.sleep sleep
     if [[ "$sleep" != "-" ]]; then
         if ! [[ "$sleep" =~ ^[0-9]+$ ]]; then
             die 1 gi-fps-unlock "gi.fps_unlock.sleep 必须是整数或 '-'"
@@ -108,7 +108,7 @@ gi_fps_unlock_prepare() {
         gi_fps_unlock_compile
 
     local sleep
-    sleep="$(config_get gi.fps_unlock.sleep)"
+    config_read gi.fps_unlock.sleep sleep
     if [[ "$sleep" != "-" ]]; then
         register_hook post_start gi_fps_unlock_post_start
     else
@@ -118,7 +118,7 @@ gi_fps_unlock_prepare() {
 
 gi_fps_unlock_post_start() {
     local sleep
-    sleep="$(config_get gi.fps_unlock.sleep)"
+    config_read gi.fps_unlock.sleep sleep
     log_info gi-fps-unlock "等待 $sleep 秒以确保游戏已启动"
     sleep "$sleep"
     gi_fps_unlock_start
@@ -128,10 +128,10 @@ gi_fps_unlock_start() {
     local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
     local prog fps interval fifo pid
 
-    prog="$(config_get gi.fps_unlock.prog)"
-    fps="$(config_get gi.fps_unlock.val)"
-    interval="$(config_get gi.fps_unlock.interval)"
-    fifo="$(config_get gi.fps_unlock.fifo)"
+    config_read gi.fps_unlock.prog prog
+    config_read gi.fps_unlock.val fps
+    config_read gi.fps_unlock.interval interval
+    config_read gi.fps_unlock.fifo fifo
 
     pid="$(find_pid_by_name -n "$prog")"
 
@@ -142,10 +142,10 @@ gi_fps_unlock_start() {
 # 注册表 HDR
 
 gi_reg_hdr_load_config() {
-    isy "$(config_get gi.reg_hdr.enabled)" || return 0
+    config_is_true gi.reg_hdr.enabled || return 0
 
-    config_default gi.reg_hdr.path "HKEY_CURRENT_USER\\Software\\miHoYo\\原神" >/dev/null
-    config_default gi.reg_hdr.key "WINDOWS_HDR_ON_h3132281285" >/dev/null
+    config_default gi.reg_hdr.path "HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
+    config_default gi.reg_hdr.key "WINDOWS_HDR_ON_h3132281285"
 
     register_hook prepare gi_reg_hdr_prepare
 }
@@ -153,11 +153,12 @@ gi_reg_hdr_load_config() {
 register_hook load_config gi_reg_hdr_load_config
 
 try_edit_prefix_reg() {
-    local prefix file key
+    local prefix file key game_prefix
 
-    prefix="$(find_wineprefix "$(config_get game.prefix)" || die 1 gi-reg-hdr "无法找到 WINEPREFIX")"
+    config_read game.prefix game_prefix
+    prefix="$(find_wineprefix "$game_prefix" || die 1 gi-reg-hdr "无法找到 WINEPREFIX")"
     file="$prefix/user.reg"
-    key="$(config_get gi.reg_hdr.key)"
+    config_read gi.reg_hdr.key key
 
     if [ ! -f  "$file" ]; then
         log_warn gi-reg-hdr "注册表文件 $file 不存在"
@@ -182,9 +183,12 @@ gi_reg_hdr_prepare() {
         log_info gi-reg-hdr "已设置注册表"
     else
         log_warn gi-reg-hdr "设置注册表失败，将在尝试在游戏启动前通过 wine reg 设置注册表（若第一次使用此功能，这是正常情况）"
+        local reg_path reg_key
+        config_read gi.reg_hdr.path reg_path
+        config_read gi.reg_hdr.key reg_key
         PREPARE_BATCH="$(cat << EOF
 $PREPARE_BATCH
-reg add "$(config_get gi.reg_hdr.path)" /v "$(config_get gi.reg_hdr.key)" /t REG_DWORD /d 1 /f
+reg add "$reg_path" /v "$reg_key" /t REG_DWORD /d 1 /f
 EOF
         )"
     fi
@@ -193,11 +197,11 @@ EOF
 # 强制 D3D12
 
 gi_patch_d3d12_load_config() {
-    isy "$(config_get gi.patch_d3d12.enabled)" || return 0
+    config_is_true gi.patch_d3d12.enabled || return 0
 
     # unitypy: 使用 UnityPy 重新序列化文件（默认）
     # bytes:   仅标准库，只改写 m_GraphicsAPIs 的 4 字节
-    GI_PATCH_D3D12_IMPL="$(config_get gi.patch_d3d12.impl unitypy)"
+    config_read gi.patch_d3d12.impl unitypy GI_PATCH_D3D12_IMPL
     case "$GI_PATCH_D3D12_IMPL" in
         unitypy) GI_PATCH_D3D12_PATCHER="patch-unitypy.py" ;;
         bytes) GI_PATCH_D3D12_PATCHER="patch-bytes.py" ;;
@@ -215,14 +219,14 @@ gi_patch_d3d12_prepare() {
 
     local game game_dir data_dir ggm_path ggm_remote_path overlay_upper
 
-    if isy "$(config_get overlay.enabled)"; then
+    if config_is_true overlay.enabled; then
         GI_PATCH_D3D12_MODE="overlay"
         game="$OVERLAY_ORIGINAL_GAME"
-        overlay_upper="$(config_get overlay.upper)"
+        config_read overlay.upper overlay_upper
     else
         log_warn gi-patch-d3d12 "当前未开启 overlay，使用 in-place 模式！"
         GI_PATCH_D3D12_MODE="in-place"
-        game="$(config_get game.exe)"
+        config_read game.exe game
     fi
 
     path_dirname "$game" game_dir
@@ -291,8 +295,9 @@ gi_patch_d3d12_prepare() {
 
     local target_ggm target_dir
     if [ "$GI_PATCH_D3D12_MODE" = "overlay" ]; then
-        local ggm_rel_path
-        ggm_rel_path="$(realpath --relative-to="$(config_get overlay.lower)" "$ggm_path")"
+        local ggm_rel_path overlay_lower
+        config_read overlay.lower overlay_lower
+        ggm_rel_path="$(realpath --relative-to="$overlay_lower" "$ggm_path")"
         target_ggm="$overlay_upper/$ggm_rel_path"
         [ -f "$target_ggm" ] && die 1 gi-patch-d3d12 "目标 globalgamemanagers 文件已存在: $target_ggm"
         path_dirname "$target_ggm" target_dir

@@ -7,7 +7,7 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
 
 feat_window_time_indicator_load_config() {
-    isy "$(config_get features.window_time_indicator.enabled)" || return 0
+    config_is_true features.window_time_indicator.enabled || return 0
     config_set features.xwin_watch.enabled true
     xwin_watch_on exists feat_window_time_indicator_on_exists
 }

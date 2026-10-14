@@ -4,7 +4,7 @@
 source "${SCRIPT_DIR:-.}/libs.sh"
 
 feat_kill_wineserver_load_config() {
-    isy "$(config_get prepare.kill_wineserver)" || return 0
+    config_is_true prepare.kill_wineserver || return 0
 
     register_hook pre_start feat_kill_wineserver_prepare
 
@@ -29,6 +29,8 @@ feat_kill_wineserver_load_config() {
 register_hook load_config feat_kill_wineserver_load_config
 
 feat_kill_wineserver_prepare() {
-    isy "$(config_get prepare.kill_wineserver)" || return 0
-    ensure_no_wineserver "$(config_get game.prefix)" kill "'prepare.kill_wineserver' 已启用"
+    config_is_true prepare.kill_wineserver || return 0
+    local game_prefix
+    config_read game.prefix game_prefix
+    ensure_no_wineserver "$game_prefix" kill "'prepare.kill_wineserver' 已启用"
 }

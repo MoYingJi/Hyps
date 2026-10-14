@@ -32,13 +32,13 @@ command_shader_cache_invalidate() {
     fi
 
     local prefix drive_c userprofile game_exe
-    prefix="$(config_get game.prefix)"
+    config_read game.prefix prefix
 
     ensure_no_wineserver "$prefix" error "清除着色器缓存前需要先关闭游戏"
 
     if [ "$has_game_fn" -eq 1 ]; then
         wine_resolve_user_dirs shader-cache "$prefix" drive_c userprofile
-        game_exe="$(config_get game.exe)"
+        config_read game.exe game_exe
     fi
 
     local answer

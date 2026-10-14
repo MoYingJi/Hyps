@@ -4,10 +4,10 @@
 source "${SCRIPT_DIR:-.}/libs.sh"
 
 feat_pfx_link_prepare() {
-    isy "$(config_get features.pfx_link)" || return 0
+    config_is_true features.pfx_link || return 0
 
     local prefix
-    prefix="$(config_get game.prefix)"
+    config_read game.prefix prefix
 
     if [ ! -d "$prefix" ]; then
         [ -e "$prefix" ] && die 1 pfx-link "游戏前缀路径 '$prefix' 已存在，但不是目录"

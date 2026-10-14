@@ -25,7 +25,7 @@ command_time_today() {
     fi
 
     local dir
-    dir="$(config_get features.time_record.dir)"
+    config_read features.time_record.dir dir
 
     local game game_name last_start last_start_time reset_time day_start today_status
 
@@ -44,7 +44,9 @@ command_time_today() {
                 [ -f "$game_impl" ] && source "$game_impl"
                 load_game_config "$game_name"
                 feat_time_record_load_config
-                config_get features.time_record.today.reset
+                local today_reset
+                config_read features.time_record.today.reset today_reset
+                echo "$today_reset"
             )" || {
                 log_error "无法加载游戏配置: $game_name"
                 continue
@@ -78,7 +80,7 @@ command_time_list() {
     feat_time_record_load_config
 
     local dir
-    dir="$(config_get features.time_record.dir)"
+    config_read features.time_record.dir dir
 
     {
         printf "%s\t%s\t  %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
@@ -113,7 +115,8 @@ command_time_report() {
     feat_time_record_load_config
 
     local dir total_dur
-    dir="$(config_get features.time_record.dir)/$game_name"
+    config_read features.time_record.dir dir
+    dir="$dir/$game_name"
 
     total_dur="$(time_record_total_dur "$dir")"
     last_start="$(time_record_last_start "$dir")"

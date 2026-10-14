@@ -6,11 +6,11 @@ source "${SCRIPT_DIR:-.}/libs.sh"
 TIME_RECORD_TODAY_RESET_DEFAULT="04:00 Asia/Shanghai"
 
 feat_time_record_load_config() {
-    config_default features.time_record.enabled true >/dev/null
-    isy "$(config_get features.time_record.enabled)" || return 0
+    config_default features.time_record.enabled true
+    config_is_true features.time_record.enabled || return 0
 
     config_require_realpath_mkdir features.time_record.dir "$DATA_DIR/time"
-    config_default features.time_record.min_sec 60 >/dev/null
+    config_default features.time_record.min_sec 60
 
     if ! config_has features.time_record.today.reset; then
         local reset_time
@@ -23,7 +23,9 @@ feat_time_record_load_config() {
         config_set features.time_record.today.reset "$reset_time"
     fi
 
-    [[ "$(config_get features.time_record.min_sec)" =~ [^0-9] ]] && die 1 time-record "'features.time_record.min_sec' 必须是整数"
+    local min_sec
+    config_read features.time_record.min_sec min_sec
+    [[ "$min_sec" =~ [^0-9] ]] && die 1 time-record "'features.time_record.min_sec' 必须是整数"
 
     register_hook pre_start feat_time_record_start
     register_hook cleanup feat_time_record_end
@@ -47,6 +49,7 @@ feat_time_record_end() {
     local total_dur
 
     local min_sec
+    local time_record_dir
     local time_record_data_dir
 
     if [ -z "$current_start" ]; then
@@ -59,8 +62,9 @@ feat_time_record_end() {
 
     log_debug time-record "记录游戏结束时间: $current_end"
 
-    min_sec="$(config_get features.time_record.min_sec)"
-    time_record_data_dir="$(config_get features.time_record.dir)/$GAME_NAME"
+    config_read features.time_record.min_sec min_sec
+    config_read features.time_record.dir time_record_dir
+    time_record_data_dir="$time_record_dir/$GAME_NAME"
 
     if [[ "$current_dur" -lt "$min_sec" ]]; then
         log_info time-record "游戏时间过短 ($((current_dur)) 秒 < $min_sec 秒)，不记录"

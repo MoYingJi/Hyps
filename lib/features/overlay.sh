@@ -4,10 +4,10 @@
 source "${SCRIPT_DIR:-.}/libs.sh"
 
 feat_overlay_load_config() {
-    isy "$(config_get overlay.enabled)" || return 0
+    config_is_true overlay.enabled || return 0
 
     local backend
-    backend="$(config_get overlay.backend fuse)"
+    config_read overlay.backend fuse backend
     case "$backend" in
         fuse)
             command_exists fuse-overlayfs \
@@ -25,8 +25,9 @@ feat_overlay_load_config() {
 
     if ! config_has overlay.lower && config_has overlay.lower_auto; then
         if [ "$(type -t overlay_auto_lower)" = "function" ]; then
-            local auto_lower
-            auto_lower="$(overlay_auto_lower "$(config_get game.exe)")" \
+            local auto_lower game_exe
+            config_read game.exe game_exe
+            auto_lower="$(overlay_auto_lower "$game_exe")" \
                 || die 1 overlay "overlay_auto_lower 函数执行失败"
             config_set overlay.lower "$auto_lower"
         else
@@ -38,7 +39,8 @@ feat_overlay_load_config() {
 
     local overlay_dir
     config_realpath overlay.dir "$DATA_DIR/overlays"
-    overlay_dir="$(config_get overlay.dir)/$GAME_NAME"
+    config_read overlay.dir overlay_dir
+    overlay_dir="$overlay_dir/$GAME_NAME"
 
     if [ -n "$overlay_dir" ]; then
         config_realpath overlay.mount "$overlay_dir/mount"
@@ -51,13 +53,13 @@ feat_overlay_load_config() {
     config_has overlay.work || die 1 overlay "overlay.work 未设置"
 
     local mount lower
-    mount="$(config_get overlay.mount)"
-    lower="$(config_get overlay.lower)"
+    config_read overlay.mount mount
+    config_read overlay.lower lower
 
-    OVERLAY_ORIGINAL_GAME="$(config_get game.exe)"
+    config_read game.exe OVERLAY_ORIGINAL_GAME
     config_set game.exe "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME")"
 
-    OVERLAY_ORIGINAL_GAME_CWD="$(config_get game.cwd)"
+    config_read game.cwd OVERLAY_ORIGINAL_GAME_CWD
     if [[ "$OVERLAY_ORIGINAL_GAME_CWD" == "$lower"* ]]; then
         config_set game.cwd "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME_CWD")"
     fi
@@ -68,27 +70,38 @@ feat_overlay_load_config() {
 register_hook load_config feat_overlay_load_config
 
 feat_overlay_mount() {
-    mkdir -p "$(config_get overlay.mount)" "$(config_get overlay.upper)" "$(config_get overlay.work)"
+    local mount upper work
+    config_read overlay.mount mount
+    config_read overlay.upper upper
+    config_read overlay.work work
+    mkdir -p "$mount" "$upper" "$work"
     config_require_realpath_mkdir overlay.mount
     config_require_realpath_mkdir overlay.upper
     config_require_realpath_mkdir overlay.work
+    config_read overlay.mount mount
+    config_read overlay.upper upper
+    config_read overlay.work work
+
+    local lower backend
+    config_read overlay.lower lower
+    config_read overlay.backend backend
 
     local cmd=()
     local options=()
 
     options+=(
-        "lowerdir=$(config_get overlay.lower)"
-        "upperdir=$(config_get overlay.upper)"
-        "workdir=$(config_get overlay.work)"
+        "lowerdir=$lower"
+        "upperdir=$upper"
+        "workdir=$work"
     )
 
-    case "$(config_get overlay.backend)" in
+    case "$backend" in
         fuse)
             cmd+=(
                 "fuse-overlayfs"
                 "-o"
                 "$(IFS=,; echo "${options[*]}")"
-                "$(config_get overlay.mount)"
+                "$mount"
             )
             ;;
         kernel)
@@ -100,7 +113,7 @@ feat_overlay_mount() {
                 "overlay"
                 "-o"
                 "$(IFS=,; echo "${options[*]}")"
-                "$(config_get overlay.mount)"
+                "$mount"
             )
             ;;
     esac
@@ -112,10 +125,11 @@ feat_overlay_mount() {
 }
 
 feat_overlay_umount() {
-    local mount
-    mount="$(config_get overlay.mount)"
+    local mount backend
+    config_read overlay.mount mount
+    config_read overlay.backend backend
 
-    case "$(config_get overlay.backend)" in
+    case "$backend" in
         fuse)
             if command_exists fusermount3; then
                 fusermount3 -uz "$mount" || log_error overlay "卸载 overlayfs 失败：$mount"

@@ -17,35 +17,41 @@ wrapper_load_config() {
 
 
     # 检测 Gamescope 搭配 MangoHud 使用的情况
-    if isy "$(config_get gamescope.enabled)" && isy "$(config_get mangohud.enabled)"; then
+    if config_is_true gamescope.enabled && config_is_true mangohud.enabled; then
         log_warn wrapper "Gamescope 搭配 MangoHud 使用，换用 '--mangoapp' 参数"
         gamescope_args+=("--mangoapp")
         config_set mangohud.enabled false
     fi
 
     # MangoHud
-    if isy "$(config_get mangohud.enabled)"; then
+    if config_is_true mangohud.enabled; then
         config_require_realpath_which_exe mangohud.exe "mangohud"
-        RUNNER_WRAPPER=("$(config_get mangohud.exe)" "${RUNNER_WRAPPER[@]}")
+        local mangohud_exe
+        config_read mangohud.exe mangohud_exe
+        RUNNER_WRAPPER=("$mangohud_exe" "${RUNNER_WRAPPER[@]}")
     fi
 
     # OBS Game Capture (wrapper)
-    if isy "$(config_get obs_vkcapture.wrapper.enabled)"; then
+    if config_is_true obs_vkcapture.wrapper.enabled; then
         log_warn wrapper "OBS Game Capture 不推荐使用 wrapper 模式。如果你知道你在做什么，请忽略此警告"
         log_warn wrapper "推荐禁用 'obs_vkcapture.wrapper.enabled' 并使用 'obs_vkcapture.env = true'"
 
         config_require_realpath_which_exe obs_vkcapture.wrapper.exe "obs-gamecapture"
-        RUNNER_WRAPPER=("$(config_get obs_vkcapture.wrapper.exe)" "${RUNNER_WRAPPER[@]}")
+        local obs_exe
+        config_read obs_vkcapture.wrapper.exe obs_exe
+        RUNNER_WRAPPER=("$obs_exe" "${RUNNER_WRAPPER[@]}")
     fi
 
     # Gamescope
-    if isy "$(config_get gamescope.enabled)"; then
+    if config_is_true gamescope.enabled; then
         config_require_realpath_which_exe gamescope.exe "gamescope"
-        RUNNER_WRAPPER=("$(config_get gamescope.exe)" "${gamescope_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        local gamescope_exe
+        config_read gamescope.exe gamescope_exe
+        RUNNER_WRAPPER=("$gamescope_exe" "${gamescope_args[@]}" -- "${RUNNER_WRAPPER[@]}")
     fi
 
     # Taskset
-    if isy "$(config_get taskset.enabled)"; then
+    if config_is_true taskset.enabled; then
         config_require_realpath_which_exe taskset.exe "taskset"
         local taskset_args=()
 
@@ -67,21 +73,27 @@ wrapper_load_config() {
         fi
 
         if config_has taskset.mask; then
-            taskset_args+=("--mask" "$(config_get taskset.mask)")
+            local taskset_mask
+            config_read taskset.mask taskset_mask
+            taskset_args+=("--mask" "$taskset_mask")
         fi
 
-        RUNNER_WRAPPER=("$(config_get taskset.exe)" "${taskset_args[@]}" "${RUNNER_WRAPPER[@]}")
+        local taskset_exe
+        config_read taskset.exe taskset_exe
+        RUNNER_WRAPPER=("$taskset_exe" "${taskset_args[@]}" "${RUNNER_WRAPPER[@]}")
     fi
 
     # GameMode (wrapper)
-    if isy "$(config_get gamemode.wrapper.enabled)"; then
+    if config_is_true gamemode.wrapper.enabled; then
         config_require_realpath_which_exe gamemode.wrapper.exe "gamemoderun"
-        RUNNER_WRAPPER=("$(config_get gamemode.wrapper.exe)" "${RUNNER_WRAPPER[@]}")
+        local gamemode_exe
+        config_read gamemode.wrapper.exe gamemode_exe
+        RUNNER_WRAPPER=("$gamemode_exe" "${RUNNER_WRAPPER[@]}")
     fi
 
     # GameMode (LD_PRELOAD)
-    if isy "$(config_get gamemode.ld_preload.enabled)"; then
-        config_default gamemode.ld_preload.libs "[ libgamemode.so, libgamemodeauto.so ]" >/dev/null
+    if config_is_true gamemode.ld_preload.enabled; then
+        config_default gamemode.ld_preload.libs "[ libgamemode.so, libgamemodeauto.so ]"
         local gamemode_libs
         config_read_array gamemode.ld_preload.libs gamemode_libs
         for lib in "${gamemode_libs[@]}"; do
@@ -90,29 +102,37 @@ wrapper_load_config() {
     fi
 
     # systemd-inhibit
-    if isy "$(config_get inhibit.enabled)"; then
+    if config_is_true inhibit.enabled; then
         config_require_realpath_which_exe inhibit.exe "systemd-inhibit"
-        inhibit_args+=("--what=$(config_get inhibit.what "idle:sleep")")
-        inhibit_args+=("--why=$(config_get inhibit.why "Hyps Game $GAME_NAME")")
-        RUNNER_WRAPPER=("$(config_get inhibit.exe)" "${inhibit_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        local inhibit_what inhibit_why inhibit_exe
+        config_read inhibit.what inhibit_what "idle:sleep"
+        config_read inhibit.why inhibit_why "Hyps Game $GAME_NAME"
+        config_read inhibit.exe inhibit_exe
+        inhibit_args+=("--what=$inhibit_what")
+        inhibit_args+=("--why=$inhibit_why")
+        RUNNER_WRAPPER=("$inhibit_exe" "${inhibit_args[@]}" -- "${RUNNER_WRAPPER[@]}")
     fi
 
     # systemd-run
-    if isy "$(config_get systemd_run.enabled)"; then
+    if config_is_true systemd_run.enabled; then
         config_require_realpath_which_exe systemd_run.exe "systemd-run"
         local systemd_run_args=() systemd_run_args_config=()
         config_has systemd_run.args && config_read_array systemd_run.args systemd_run_args_config
 
-        config_default systemd_run.unit "app-hyps-$(systemd-escape -- "hyps-$GAME_NAME")" >/dev/null
+        config_default systemd_run.unit "app-hyps-$(systemd-escape -- "hyps-$GAME_NAME")"
+
+        local systemd_run_unit systemd_run_exe
+        config_read systemd_run.unit systemd_run_unit
 
         systemd_run_args+=("--user")
         systemd_run_args+=("--scope")
-        systemd_run_args+=("--unit=$(config_get systemd_run.unit)-$$")
+        systemd_run_args+=("--unit=$systemd_run_unit-$$")
         systemd_run_args+=("--collect")
 
         systemd_run_args+=("${systemd_run_args_config[@]}")
 
-        RUNNER_WRAPPER=("$(config_get systemd_run.exe)" "${systemd_run_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        config_read systemd_run.exe systemd_run_exe
+        RUNNER_WRAPPER=("$systemd_run_exe" "${systemd_run_args[@]}" -- "${RUNNER_WRAPPER[@]}")
     fi
 
     # 日志

@@ -59,9 +59,6 @@ cleanup() {
 }
 
 load_config() {
-    local game_config_file
-    local runner_name
-
     load_common_config
     load_game_config "$GAME_NAME"
 

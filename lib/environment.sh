@@ -88,25 +88,7 @@ export_env_vars() {
         IFS='|' read -r conf_key env_name transform <<< "$entry"
         raw_value="${CONFIG[$conf_key]:-}"
         [[ -z "${CONFIG[$conf_key]+exists}" ]] && continue
-        final_value="$("env_transform_$transform" "$raw_value" "$conf_key")"
-        exit_code=$?
-        if [ "$exit_code" -ne 0 ]; then
-            if [ "$exit_code" -eq 1 ]; then
-                log_debug environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
-            elif [ "$exit_code" -eq 2 ]; then
-                log_info environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
-            elif [ "$exit_code" -eq 3 ]; then
-                log_warn environment "[显式] 跳过 export $env_name, transform: $transform, exit code: $exit_code"
-            elif [ "$exit_code" -eq 4 ]; then
-                die "$exit_code" environment "配置项 '$conf_key' 的值 '$raw_value' 无效: transform '$transform' 返回错误码 $exit_code"
-            fi
-            continue
-        fi
-        # transform 在子 shell 中执行，副作用无法带回，因此由此处登记待创建目录
-        if [[ "$transform" == path_mkdir && ! -d "$final_value" ]]; then
-            ENV_MKDIRS+=("$final_value")
-            log_debug environment "目录待创建: '$final_value'"
-        fi
+        "env_transform_$transform" "$raw_value" "final_value" "$conf_key"
         _export_env_var "$env_name" "$final_value" "显式"
     done
 
@@ -154,78 +136,87 @@ register_hook prepare env_mkdirs
 
 
 env_transform_noop() {
-    return 1
+    return 0
 }
 
 env_transform_string() {
     local value="$1"
-    echo "$value"
+    local -n result="$2"
+    result="$value"
 }
 
 env_transform_bool_to_01() {
     local value="$1"
+    local -n result="$2"
     [ -z "$value" ] && return 1
-    isy "$value" && echo "1" || echo "0"
+    isy "$value" && result="1" || result="0"
     return 0
 }
 
 env_transform_uint() {
     local value="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     [ -z "$value" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ "$value" =~ ^[0-9]+$ ]]; then
-        echo "$value"
+        result="$value"
     else
-        die 4 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
+        die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
     fi
 }
 
 env_transform_path_dir() {
     local dir_path="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$dir_path" ]]; then
-        realpath "$dir_path"
+        result="$(realpath "$dir_path")"
     else
-        die 4 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
+        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
     fi
 }
 
 env_transform_path_mkdir() {
     local dir_path="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$dir_path" ]]; then
-        realpath "$dir_path"
+        result="$(realpath "$dir_path")"
         return 0
     elif [[ -e "$dir_path" ]]; then
-        die 4 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
+        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
     else
-        realpath -m "$dir_path"
+        result="$(realpath -m "$dir_path")"
+        ENV_MKDIRS+=("$result")
+        log_debug environment "目录待创建: '$final_value'"
         return 0
     fi
 }
 
 env_transform_path_file() {
     local file_path="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     [ -z "$file_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -f "$file_path" ]]; then
-        realpath "$file_path"
+        result="$(realpath "$file_path")"
     else
-        die 4 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
+        die 1 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
     fi
 }
 
 env_transform_colon_separated_array_to_string() {
     local value="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=':' echo "${array[*]}"
+        IFS=':' result="${array[*]}"
     elif [[ -n "$value" ]]; then
-        echo "$value"
+        result="$value"
     else
         die 1 environment "配置项 '$conf_key' 的值为空"
     fi
@@ -233,13 +224,14 @@ env_transform_colon_separated_array_to_string() {
 
 env_transform_comma_separated_array_to_string() {
     local value="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=',' echo "${array[*]}"
+        IFS=',' result="${array[*]}"
     elif [[ -n "$value" ]]; then
-        echo "$value"
+        result="$value"
     else
         die 1 environment "配置项 '$conf_key' 的值为空"
     fi
@@ -247,13 +239,14 @@ env_transform_comma_separated_array_to_string() {
 
 env_transform_semicolon_separated_array_to_string() {
     local value="$1"
-    local conf_key="${2:-}"
+    local -n result="$2"
+    local conf_key="${3:-}"
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=';' echo "${array[*]}"
+        IFS=';' result="${array[*]}"
     elif [[ -n "$value" ]]; then
-        echo "$value"
+        result="$value"
     else
         die 1 environment "配置项 '$conf_key' 的值为空"
     fi
@@ -261,12 +254,13 @@ env_transform_semicolon_separated_array_to_string() {
 
 env_transform_protonpath() {
     local proton_path="$1"
-    local conf_key="${2:-}"
-    [ -z "$proton_path" ] && die 4 environment "配置项 '$conf_key' 的值为空"
+    local -n result="$2"
+    local conf_key="${3:-}"
+    [ -z "$proton_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
     if [[ -d "$proton_path" ]]; then
-        realpath "$proton_path"
+        result="$(realpath "$proton_path")"
     else
-        find_proton_by_name "$proton_path" || die 4 environment "未找到 Proton: '$proton_path'"
+        result="$(find_proton_by_name "$proton_path")" || die 1 environment "未找到 Proton: '$proton_path'"
     fi
 }
 

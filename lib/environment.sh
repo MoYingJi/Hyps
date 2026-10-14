@@ -42,6 +42,9 @@ declare -a ENV_EXPORTS=(
     "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
     "env.PROTON_USE_OPTISCALER|PROTON_USE_OPTISCALER|bool_to_01"
     "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
+    # Wine
+    "env.WINEDLLOVERRIDES|WINEDLLOVERRIDES|semicolon_separated_array_to_string"
+    "wine.dll_overrides|WINEDLLOVERRIDES|semicolon_separated_array_to_string"
     # MangoHud
     "env.MANGOHUD|MANGOHUD|bool_to_01"
     "mangohud.config|MANGOHUD_CONFIG|comma_separated_array_to_string"
@@ -235,6 +238,20 @@ env_transform_comma_separated_array_to_string() {
         local array=()
         parse_array "$value" array
         IFS=',' echo "${array[*]}"
+    elif [[ -n "$value" ]]; then
+        echo "$value"
+    else
+        die 1 environment "配置项 '$conf_key' 的值为空"
+    fi
+}
+
+env_transform_semicolon_separated_array_to_string() {
+    local value="$1"
+    local conf_key="${2:-}"
+    if is_array "$value"; then
+        local array=()
+        parse_array "$value" array
+        IFS=';' echo "${array[*]}"
     elif [[ -n "$value" ]]; then
         echo "$value"
     else

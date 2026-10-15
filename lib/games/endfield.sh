@@ -47,7 +47,7 @@ shader_cache_invalidate() {
 
 ENDFIELD_LAUNCHER_TOOL="$PROJECT_ROOT/tools/endfield-launcher"
 ENDFIELD_LAUNCHER_DEFAULT_CC="x86_64-w64-mingw32-gcc"
-ENDFIELD_LAUNCHER_FLAGS=(-municode -static)
+ENDFIELD_LAUNCHER_FLAGS=(-municode -mwindows -static)
 
 endfield_launcher_exe_path() {
     echo "$CACHE_DIR/endfield-launcher/endfield-launcher.exe"

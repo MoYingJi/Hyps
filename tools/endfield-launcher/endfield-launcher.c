@@ -7,7 +7,6 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
 
@@ -64,15 +63,24 @@ static WCHAR *build_cmdline(int argc, WCHAR **argv)
     return cmd;
 }
 
-static void print_error(const WCHAR *what)
+static void show_error(const WCHAR *message)
 {
-    fwprintf(stderr, L"%ls 失败，错误码: %lu\n", what, GetLastError());
+    MessageBoxW(NULL, message, L"Endfield Launcher", MB_OK | MB_ICONERROR);
+}
+
+static void show_win32_error(const WCHAR *what)
+{
+    WCHAR message[256];
+    DWORD error_code = GetLastError();
+    swprintf(message, sizeof(message) / sizeof(message[0]),
+             L"%ls 失败，错误码: %lu", what, error_code);
+    show_error(message);
 }
 
 int wmain(int argc, WCHAR **argv)
 {
     if (argc < 3) {
-        fwprintf(stderr, L"用法: %ls <launcher.exe> <game.exe> [args...]\n", argv[0]);
+        show_error(L"用法: endfield-launcher.exe <launcher.exe> <game.exe> [args...]");
         return 2;
     }
 
@@ -86,7 +94,7 @@ int wmain(int argc, WCHAR **argv)
     lcmd = build_cmdline(1, &argv[1]);
     gcmd = build_cmdline(argc - 2, &argv[2]);
     if (!lcmd || !gcmd) {
-        fwprintf(stderr, L"内存不足\n");
+        show_error(L"内存不足");
         goto cleanup;
     }
 
@@ -95,7 +103,7 @@ int wmain(int argc, WCHAR **argv)
     ZeroMemory(&lsi, sizeof(lsi));
     lsi.cb = sizeof(lsi);
     if (!CreateProcessW(NULL, lcmd, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &lsi, &lpi)) {
-        print_error(L"以挂起状态启动启动器");
+        show_win32_error(L"以挂起状态启动启动器");
         goto cleanup;
     }
     CloseHandle(lpi.hThread);
@@ -104,14 +112,14 @@ int wmain(int argc, WCHAR **argv)
     InitializeProcThreadAttributeList(NULL, 1, 0, &size);
     attrs = HeapAlloc(GetProcessHeap(), 0, size);
     if (!attrs || !InitializeProcThreadAttributeList(attrs, 1, 0, &size)) {
-        print_error(L"初始化进程属性列表");
+        show_win32_error(L"初始化进程属性列表");
         goto cleanup;
     }
 
     HANDLE parent = lpi.hProcess;
     if (!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
                                    &parent, sizeof(parent), NULL, NULL)) {
-        print_error(L"设置父进程属性");
+        show_win32_error(L"设置父进程属性");
         goto cleanup;
     }
 
@@ -121,7 +129,7 @@ int wmain(int argc, WCHAR **argv)
     si.lpAttributeList = attrs;
     if (!CreateProcessW(NULL, gcmd, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT,
                         NULL, NULL, &si.StartupInfo, &pi)) {
-        print_error(L"启动游戏");
+        show_win32_error(L"启动游戏");
         goto cleanup;
     }
     CloseHandle(pi.hThread);

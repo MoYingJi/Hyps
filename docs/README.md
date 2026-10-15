@@ -42,6 +42,7 @@
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
 - [x] 【原神】强制 D3D12 图形 API（默认需要 uv 或 python3 与 UnityPy；可设置 `gi.patch_d3d12.impl = "bytes"` 改用仅标准库的 python3）
 - [x] 【崩坏：星穹铁道】注册表解锁帧率（需要 python3）
+- [x] 【明日方舟：终末地】通过 GRYPHLINK 启动器启动游戏（需要 mingw-w64）
 
 目前 **不支持** 的功能：
 
@@ -70,6 +71,7 @@
  - `gcc`、`sha256sum`: 两个用 C 写的小工具 (`sha256sum` 用来校验源代码以重新编译)
     - `tools/fpsunlock/unlocker.c` (还额外需要 `setcap`、`getcap`)
     - `tools/xwin-watch/xwin-watch.c`
+ - `x86_64-w64-mingw32-gcc` (mingw-w64，仅配置 `endfield.launcher` 时需要): 交叉编译用于启动终末地的 Windows 小程序，无需在 Windows 上编译
  - `python3`: 一个用 python3 写的小工具
     - `tools/starrail-fps.py`
 

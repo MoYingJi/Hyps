@@ -305,52 +305,70 @@ env_get_ld_preload() {
 }
 
 env_parse_compile_settings() {
-    local cflags=()
-    local set_cflags=0
-    unset HYPS_CFLAGS
+    env_parse_compile_flags CFLAGS compile.CFLAGS HYPS_CFLAGS
+    env_parse_compile_cc CC compile.CC HYPS_CC
+    env_parse_compile_cc HYPS_WIN_CC compile.mingw.CC HYPS_WIN_CC
+    env_parse_compile_flags MINGW_CFLAGS compile.mingw.CFLAGS HYPS_MINGW_CFLAGS
+}
 
-    if [[ -n "$CFLAGS" ]] && config_has compile.CFLAGS; then
-        log_debug environment "CFLAGS 已在环境变量中设置，compile.CFLAGS 配置项将被忽略"
+env_parse_compile_flags() {
+    local env_name="$1"
+    local config_key="$2"
+    local output_name="$3"
+    local env_value="${!env_name:-}"
+    local env_attributes="${!env_name@a}"
+    local config_value
+    local -a flags=()
+
+    unset "$output_name"
+
+    if [[ -n "$env_value" ]] && config_has "$config_key"; then
+        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
     fi
 
-    if [[ -n "$CFLAGS" ]]; then
-        if [[ "${CFLAGS@a}" != *a* ]]; then
-            read -ra HYPS_CFLAGS <<< "$CFLAGS"
-            set_cflags=1
+    if [[ -n "$env_value" ]]; then
+        if [[ "$env_attributes" == *a* ]]; then
+            #shellcheck disable=SC2178
+            local -n env_flags="$env_name"
+            flags=("${env_flags[@]}")
         else
-            cflags=("${CFLAGS[@]}")
-            set_cflags=1
+            read -ra flags <<< "$env_value"
         fi
-    elif config_has compile.CFLAGS; then
-        local cflags_raw
-        config_read compile.CFLAGS cflags_raw
-        parse_array "$cflags_raw" cflags || read -ra cflags <<< "$cflags_raw"
-        set_cflags=1
+    elif config_has "$config_key"; then
+        config_read "$config_key" config_value
+        parse_array "$config_value" flags || read -ra flags <<< "$config_value"
+    else
+        return 0
     fi
 
-    if [ "$set_cflags" = 1 ]; then
-        HYPS_CFLAGS=("${cflags[@]}")
-        log_debug environment "应用内 CFLAGS: $(quote_args "${HYPS_CFLAGS[@]}")"
+    #shellcheck disable=SC2178
+    local -n output_flags="$output_name"
+    #shellcheck disable=SC2034
+    output_flags=("${flags[@]}")
+    log_debug environment "应用内 CFLAGS [$config_key]: $(quote_args "${flags[@]}")"
+}
+
+env_parse_compile_cc() {
+    local env_name="$1"
+    local config_key="$2"
+    local output_name="$3"
+    local env_value="${!env_name:-}"
+    local value=""
+
+    unset "$output_name"
+
+    if [[ -n "$env_value" ]] && config_has "$config_key"; then
+        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
     fi
 
-    local cc=""
-    local set_cc=0
-    unset HYPS_CC
-
-    if [[ -n "$CC" ]] && config_has compile.CC; then
-        log_debug environment "CC 已在环境变量中设置，compile.CC 配置项将被忽略"
+    if [[ -n "$env_value" ]]; then
+        value="$env_value"
+    elif config_has "$config_key"; then
+        config_read "$config_key" value
+    else
+        return 0
     fi
 
-    if [[ -n "$CC" ]]; then
-        cc="$CC"
-        set_cc=1
-    elif config_has compile.CC; then
-        config_read compile.CC cc
-        set_cc=1
-    fi
-
-    if [ "$set_cc" = 1 ]; then
-        HYPS_CC="$cc"
-        log_debug environment "应用内 CC: '$HYPS_CC'"
-    fi
+    printf -v "$output_name" '%s' "$value"
+    log_debug environment "应用内 CC [$config_key]: '$value'"
 }

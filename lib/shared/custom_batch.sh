@@ -6,6 +6,15 @@ __SHARED_CUSTOM_BATCH_SH_LOADED=1
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+# cmd.exe 不识别单引号，wrapper 路径可能含空格或特殊字符，因此用双引号包裹
+quote_cmd_args() {
+    local arg
+    for arg in "$@"; do
+        printf '"%s" ' "$arg"
+    done
+    echo
+}
+
 gen_custom_batch() {
     local script
     local content
@@ -22,7 +31,7 @@ Z:
 cd /d "$game_cwd_win"
 $PREPARE_BATCH
 $CUSTOM_BATCH_BEFORE_GAME
-start "" /WAIT /B $(quote_args "${WINE_SIDE_GAME_WRAPPER[@]}") "Z:\\$game_exe" $(quote_args "${GAME_ARGS[@]}")
+start "" /WAIT /B $(quote_cmd_args "${WINE_SIDE_GAME_WRAPPER[@]}") "Z:\\$game_exe" $(quote_args "${GAME_ARGS[@]}")
 $CUSTOM_BATCH_AFTER_GAME
 EOF
     )"
@@ -56,6 +65,11 @@ feat_custom_batch_prepare() {
         if isy "$UMU_USE_STEAM"; then
             log_error custom-batch "使用自定义批处理脚本时，UMU_USE_STEAM=1 时将不起作用。请检查配置中哪里出现了问题！"
         fi
+
+        local wrapper_arg
+        for wrapper_arg in "${WINE_SIDE_GAME_WRAPPER[@]}"; do
+            [[ "$wrapper_arg" == *\"* ]] && die 1 custom-batch "包装程序参数不能包含双引号: '$wrapper_arg'"
+        done
 
         CUSTOM_BATCH_SCRIPT="$(gen_custom_batch)"
     else

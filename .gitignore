@@ -34,6 +34,7 @@
 !/tools/nvidia-env.sh
 !/tools/starrail-fps.py
 
+!/tools/endfield-launcher/endfield-launcher.c
 !/tools/fpsunlock/unlocker.c
 !/tools/genshin-d3d12/patch-unitypy.py
 !/tools/genshin-d3d12/patch-bytes.py

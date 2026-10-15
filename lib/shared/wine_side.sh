@@ -6,10 +6,6 @@ __SHARED_WINE_SIDE_SH_LOADED=1
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-wine_side_windows_path() {
-    printf 'Z:%s' "${1//\//\\}"
-}
-
 wine_side_quote_cmd_args() {
     local arg
     for arg in "$@"; do
@@ -43,13 +39,13 @@ wine_side_generate_game_batch() {
     script="$(mktemp "$TEMP_DIR/start-game-XXXXXXX.bat")"
     config_read game.cwd game_cwd
     config_read game.exe game_exe
-    game_cwd_win="$(wine_side_windows_path "$game_cwd")"
-    game_exe="$(wine_side_windows_path "$game_exe")"
+    game_cwd_win="$(wine_unix_path_to_windows "$game_cwd")"
+    game_exe="$(wine_unix_path_to_windows "$game_exe")"
     if [[ "${outer_wrapper[0]:-}" == /* ]]; then
-        outer_wrapper[0]="$(wine_side_windows_path "${outer_wrapper[0]}")"
+        outer_wrapper[0]="$(wine_unix_path_to_windows "${outer_wrapper[0]}")"
     fi
     if [[ "${game_wrapper[0]:-}" == /* ]]; then
-        game_wrapper[0]="$(wine_side_windows_path "${game_wrapper[0]}")"
+        game_wrapper[0]="$(wine_unix_path_to_windows "${game_wrapper[0]}")"
     fi
 
     content="$(cat << EOF
@@ -105,15 +101,15 @@ wine_side_set_runner_target() {
         COMMAND_RUNNER_TARGET=("${outer_wrapper[@]}")
         if ((${#game_wrapper[@]})); then
             if [[ "${game_wrapper[0]}" == /* ]]; then
-                game_wrapper[0]="$(wine_side_windows_path "${game_wrapper[0]}")"
+                game_wrapper[0]="$(wine_unix_path_to_windows "${game_wrapper[0]}")"
             fi
             COMMAND_RUNNER_TARGET+=("${game_wrapper[@]}")
-            COMMAND_RUNNER_TARGET+=("$(wine_side_windows_path "$game_exe")" "${GAME_ARGS[@]}")
+            COMMAND_RUNNER_TARGET+=("$(wine_unix_path_to_windows "$game_exe")" "${GAME_ARGS[@]}")
         else
-            COMMAND_RUNNER_TARGET+=("$(wine_side_windows_path "$game_exe")" "${GAME_ARGS[@]}")
+            COMMAND_RUNNER_TARGET+=("$(wine_unix_path_to_windows "$game_exe")" "${GAME_ARGS[@]}")
         fi
     elif ((${#game_wrapper[@]})); then
-        COMMAND_RUNNER_TARGET=("${game_wrapper[@]}" "$(wine_side_windows_path "$game_exe")" "${GAME_ARGS[@]}")
+        COMMAND_RUNNER_TARGET=("${game_wrapper[@]}" "$(wine_unix_path_to_windows "$game_exe")" "${GAME_ARGS[@]}")
     else
         COMMAND_RUNNER_TARGET=("$game_exe" "${GAME_ARGS[@]}")
     fi

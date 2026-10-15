@@ -60,7 +60,7 @@ feat_endfield_launcher_load_config() {
 
     local launcher_linux launcher_win
     config_read endfield.launcher launcher_linux
-    launcher_win="$(wine_side_windows_path "$launcher_linux")"
+    launcher_win="$(wine_unix_path_to_windows "$launcher_linux")"
 
     WINE_SIDE_OUTER_WRAPPER+=("$(endfield_launcher_exe_path)" "$launcher_win")
 

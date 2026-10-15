@@ -60,6 +60,10 @@ find_wineprefix() {
     fi
 }
 
+wine_unix_path_to_windows() {
+    printf 'Z:%s' "${1//\//\\}"
+}
+
 # 解析 prefix 中的 drive_c 和用户目录，结果写入第 3、4 个参数指定的变量
 # 用法: wine_resolve_user_dirs <module> <prefix> <drive_c_var> <userprofile_var>
 wine_resolve_user_dirs() {

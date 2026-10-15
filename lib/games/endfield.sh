@@ -58,16 +58,11 @@ feat_endfield_launcher_load_config() {
 
     config_require_realpath_file endfield.launcher
 
-    local launcher_linux exe_win launcher_win
+    local launcher_linux launcher_win
     config_read endfield.launcher launcher_linux
-    exe_win="Z:$(endfield_launcher_exe_path)"
-    exe_win="${exe_win//\//\\}"
-    launcher_win="Z:${launcher_linux//\//\\}"
+    launcher_win="$(wine_side_windows_path "$launcher_linux")"
 
-    # NEEDS_CUSTOM_BATCH 由 shared/custom_batch.sh 读取
-    #shellcheck disable=SC2034
-    NEEDS_CUSTOM_BATCH=1
-    WINE_SIDE_GAME_WRAPPER+=("$exe_win" "$launcher_win")
+    WINE_SIDE_OUTER_WRAPPER+=("$(endfield_launcher_exe_path)" "$launcher_win")
 
     register_hook prepare feat_endfield_launcher_prepare
 }

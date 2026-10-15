@@ -10,15 +10,14 @@ feat_mod_reg_hostname_load_config() {
     local hostname
     config_read feat.reg_hostname.hostname hostname
 
-    CUSTOM_BATCH_BEFORE_GAME="$(cat << EOF
-$CUSTOM_BATCH_BEFORE_GAME
+    WINE_SIDE_BEFORE_GAME_BATCH="$(cat << EOF
+$WINE_SIDE_BEFORE_GAME_BATCH
 reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName /v ComputerName /t REG_SZ /d "$hostname" /f
 reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ComputerName /v ComputerName /t REG_SZ /d "$hostname" /f
 EOF
     )"
-    # NEEDS_CUSTOM_BATCH 由 shared/custom_batch.sh 读取
     #shellcheck disable=SC2034
-    NEEDS_CUSTOM_BATCH=1
+    WINE_SIDE_NEEDS_BATCH=1
 }
 
 register_hook load_config feat_mod_reg_hostname_load_config

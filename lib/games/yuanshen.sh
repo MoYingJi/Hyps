@@ -186,8 +186,8 @@ gi_reg_hdr_prepare() {
         local reg_path reg_key
         config_read gi.reg_hdr.path reg_path
         config_read gi.reg_hdr.key reg_key
-        PREPARE_BATCH="$(cat << EOF
-$PREPARE_BATCH
+        WINE_SIDE_PREPARE_BATCH="$(cat << EOF
+$WINE_SIDE_PREPARE_BATCH
 reg add "$reg_path" /v "$reg_key" /t REG_DWORD /d 1 /f
 EOF
         )"

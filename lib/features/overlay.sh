@@ -7,7 +7,7 @@ feat_overlay_load_config() {
     config_is_true overlay.enabled || return 0
 
     local backend
-    config_read overlay.backend fuse backend
+    config_read overlay.backend backend fuse
     case "$backend" in
         fuse)
             command_exists fuse-overlayfs \

@@ -70,32 +70,23 @@ load_config() {
     load_common_config
     load_game_config "$GAME_NAME"
 
+    #shellcheck disable=SC2034
     GAME_ARGS=()
     config_has game.args && config_read_array game.args GAME_ARGS
 }
 
 build_game_command() {
-    local -a cmd=()
+    GAME_COMMAND=("${RUNNER_WRAPPER[@]}")
 
-    cmd+=("${RUNNER_WRAPPER[@]}")
     local runner_exe
     config_read runner.exe runner_exe
-    cmd+=("$runner_exe")
+    GAME_COMMAND+=("$runner_exe")
 
     local -a runner_args=()
     config_has runner.args && config_read_array runner.args runner_args
-    cmd+=("${runner_args[@]}")
-
-    if isy "$NEEDS_CUSTOM_BATCH"; then
-        cmd+=("cmd" "/c" "$CUSTOM_BATCH_SCRIPT")
-    else
-        local game_exe
-        config_read game.exe game_exe
-        cmd+=("$game_exe")
-        cmd+=("${GAME_ARGS[@]}")
-    fi
-
-    GAME_COMMAND=("${cmd[@]}")
+    GAME_COMMAND+=("${runner_args[@]}")
+    # Wine-side preparation populates this explicit target slot.
+    GAME_COMMAND+=("${COMMAND_RUNNER_TARGET[@]}")
 }
 
 start_game_process() {

@@ -4,7 +4,7 @@
 __UTILS_CACHE_SH_LOADED=1
 
 #shellcheck source=string.sh
-source "${SCRIPT_DIR:-.}/utils/string.sh"
+source "$SCRIPT_DIR/utils/string.sh"
 
 check_cache_and_compile() {
     local name="$1"

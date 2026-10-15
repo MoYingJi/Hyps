@@ -1,10 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
-
-#shellcheck source=custom_batch.sh
-source "${SCRIPT_DIR:-.}/features/custom_batch.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 feat_mod_reg_hostname_load_config() {
     config_is_true feat.reg_hostname.enabled || return 0
@@ -19,6 +16,8 @@ reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerNa
 reg add HKLM\\System\\CurrentControlSet\\Control\\ComputerName\\ComputerName /v ComputerName /t REG_SZ /d "$hostname" /f
 EOF
     )"
+    # NEEDS_CUSTOM_BATCH 由 shared/custom_batch.sh 读取
+    #shellcheck disable=SC2034
     NEEDS_CUSTOM_BATCH=1
 }
 

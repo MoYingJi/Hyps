@@ -1,7 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 # Overlay
 

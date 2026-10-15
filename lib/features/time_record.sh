@@ -1,7 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 TIME_RECORD_TODAY_RESET_DEFAULT="04:00 Asia/Shanghai"
 

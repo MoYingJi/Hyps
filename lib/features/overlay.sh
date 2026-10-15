@@ -1,7 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 feat_overlay_load_config() {
     config_is_true overlay.enabled || return 0

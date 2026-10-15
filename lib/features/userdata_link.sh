@@ -1,7 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 feat_userdata_link_prepare() {
     config_is_true features.userdata_link.enabled || return 0

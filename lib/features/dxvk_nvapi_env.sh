@@ -1,10 +1,10 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=../environment.sh
-source "${SCRIPT_DIR:-.}/environment.sh"
+#shellcheck source=../config/environment.sh
+source "$SCRIPT_DIR/config/environment.sh"
 
 feat_dxvk_nvapi_load_config() {
     local key

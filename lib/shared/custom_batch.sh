@@ -1,10 +1,10 @@
 #!/hint/bash
 
-[[ -n "${__FEATURES_CUSTOM_BATCH_SH_LOADED:-}" ]] && return 0
-__FEATURES_CUSTOM_BATCH_SH_LOADED=1
+[[ -n "${__SHARED_CUSTOM_BATCH_SH_LOADED:-}" ]] && return 0
+__SHARED_CUSTOM_BATCH_SH_LOADED=1
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 gen_custom_batch() {
     local script

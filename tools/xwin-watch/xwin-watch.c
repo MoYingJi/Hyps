@@ -1,7 +1,7 @@
 // 部分代码取自 everything411 的 kill-genshin.c，灵感也来源于此
 // https://gist.github.com/everything411/a4ebb2e3479711bd6529e58bff553a34
 
-// 编译: 参考项目的 lib/features/xwin_watch.sh
+// 编译: 参考项目的 lib/shared/xwin_watch.sh
 //
 // 窗口检测完全事件驱动: 主循环 poll 各后端 (Wayland/X11) 的 fd，
 // 窗口出现/关闭事件立即唤醒；poll 仅在出现超时 (-a) 的剩余时间点唤醒以执行超时逻辑。

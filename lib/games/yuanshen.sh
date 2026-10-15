@@ -1,10 +1,10 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=../features/xwin_watch.sh
-source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
+#shellcheck source=../shared/xwin_watch.sh
+source "$SCRIPT_DIR/shared/xwin_watch.sh"
 
 # Overlay
 

@@ -7,9 +7,9 @@ declare -A TEMP_CONFIG
 declare -A CONFIG
 
 #shellcheck source=config/parse.sh
-source "${SCRIPT_DIR:-.}/config/parse.sh"
+source "$SCRIPT_DIR/config/parse.sh"
 #shellcheck source=config/using.sh
-source "${SCRIPT_DIR:-.}/config/using.sh"
+source "$SCRIPT_DIR/config/using.sh"
 
 load_common_config() {
     config_parse_file "$PROJECT_ROOT/config.conf"

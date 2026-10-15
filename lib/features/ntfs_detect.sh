@@ -1,7 +1,7 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
 feat_ntfs_detect_pre_start() {
     config_is_true features.ntfs_detect.enabled true || return 0

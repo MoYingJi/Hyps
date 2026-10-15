@@ -1,9 +1,9 @@
 #!/hint/bash
 
-#shellcheck source=../log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
 #shellcheck source=../utils.sh
-source "${SCRIPT_DIR:-.}/utils.sh"
+source "$SCRIPT_DIR/utils.sh"
 
 # 读取配置值到调用方变量 $2（不存在时使用默认值 $3），不创建子 Shell
 #shellcheck disable=SC2178
@@ -135,7 +135,6 @@ config_require_realpath_which_exe() {
     config_set "$key" "$path" "$target_map_name"
 }
 
-
 config_read_realpath_prefer_env() {
     local key="$1"
     local -n var="$2"
@@ -146,7 +145,6 @@ config_read_realpath_prefer_env() {
     var="$(realpath -m "$var")"
     config_set "$key" "$var" "$target_map_name"
 }
-
 
 #shellcheck disable=SC2034
 config_read_array() {
@@ -162,8 +160,6 @@ config_read_array() {
     config_read "$key" array_str "$default" "$target_map_name"
     parse_array "$array_str" "$var_array_name" || die 1 config "配置项 '$key' 的值 '$array_str' 无法解析为数组"
 }
-
-
 
 #shellcheck disable=SC2178
 config_print_all() {

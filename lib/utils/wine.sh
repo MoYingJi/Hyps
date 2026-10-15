@@ -3,8 +3,8 @@
 [[ -n "${__UTILS_WINE_SH_LOADED:-}" ]] && return 0
 __UTILS_WINE_SH_LOADED=1
 
-#shellcheck source=../log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
 
 ensure_no_wineserver() {
     local prefix="$1"

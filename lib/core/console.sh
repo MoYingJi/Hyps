@@ -1,7 +1,7 @@
 #!/hint/bash
 
-[[ -n "${__CONSOLE_SH_LOADED:-}" ]] && return 0
-__CONSOLE_SH_LOADED=1
+[[ -n "${__CORE_CONSOLE_SH_LOADED:-}" ]] && return 0
+__CORE_CONSOLE_SH_LOADED=1
 
 declare -A _CONSOLE_STYLES=(
     [reset]=$'\033[0m'

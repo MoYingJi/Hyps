@@ -20,6 +20,14 @@ SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 #shellcheck source=libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck source=config/environment.sh
+source "$SCRIPT_DIR/config/environment.sh"
+
+for shared_script in "$SCRIPT_DIR"/shared/*.sh; do
+    #shellcheck source=/dev/null
+    source "$shared_script"
+done
+
 for feature_script in "$SCRIPT_DIR"/features/*.sh; do
     #shellcheck source=/dev/null
     source "$feature_script"

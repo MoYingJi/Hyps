@@ -1,10 +1,10 @@
 #!/hint/bash
 
-[[ -n "${__LIFECYCLE_SH_LOADED:-}" ]] && return 0
-__LIFECYCLE_SH_LOADED=1
+[[ -n "${__CORE_LIFECYCLE_SH_LOADED:-}" ]] && return 0
+__CORE_LIFECYCLE_SH_LOADED=1
 
 #shellcheck source=log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+source "$SCRIPT_DIR/core/log.sh"
 
 # 特性:
 #   - 注册钩子: register_hook <phase> <function_name> [priority] [deps_spec]
@@ -20,7 +20,7 @@ source "${SCRIPT_DIR:-.}/log.sh"
 #     当传入 "continue" 参数时，某个钩子失败后仍会继续执行后续钩子
 #
 # 用法:
-#   source lifecycle.sh
+#   source core/lifecycle.sh
 #   register_hook prepare my_prepare_func 50 "depends_on:other_func before:later_func"
 #   run_hooks prepare
 #

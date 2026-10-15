@@ -1,13 +1,13 @@
 #!/hint/bash
 
-[[ -n "${__FEATURES_XWIN_WATCH_SH_LOADED:-}" ]] && return 0
-__FEATURES_XWIN_WATCH_SH_LOADED=1
+[[ -n "${__SHARED_XWIN_WATCH_SH_LOADED:-}" ]] && return 0
+__SHARED_XWIN_WATCH_SH_LOADED=1
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=../environment.sh
-source "${SCRIPT_DIR:-.}/environment.sh"
+#shellcheck source=../config/environment.sh
+source "$SCRIPT_DIR/config/environment.sh"
 
 XWIN_WATCH_TOOL="$PROJECT_ROOT/tools/xwin-watch"
 XWIN_WATCH_CMD=()

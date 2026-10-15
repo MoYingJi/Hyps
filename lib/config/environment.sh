@@ -1,9 +1,9 @@
 #!/hint/bash
 
-[[ -n "${__ENVIRONMENT_SH_LOADED:-}" ]] && return 0
-__ENVIRONMENT_SH_LOADED=1
+[[ -n "${__CONFIG_ENVIRONMENT_SH_LOADED:-}" ]] && return 0
+__CONFIG_ENVIRONMENT_SH_LOADED=1
 
-#shellcheck source=libs.sh
+#shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
 declare -a ENV_EXPORTS=(

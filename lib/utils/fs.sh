@@ -3,8 +3,8 @@
 [[ -n "${__UTILS_FS_SH_LOADED:-}" ]] && return 0
 __UTILS_FS_SH_LOADED=1
 
-#shellcheck source=../log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
 
 path_dirname() {
     local path="$1"

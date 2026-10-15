@@ -1,10 +1,10 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=../environment.sh
-source "${SCRIPT_DIR:-.}/environment.sh"
+#shellcheck source=../config/environment.sh
+source "$SCRIPT_DIR/config/environment.sh"
 
 RUNNER_WRAPPER=()
 
@@ -14,7 +14,6 @@ wrapper_load_config() {
 
     local inhibit_args=()
     config_has inhibit.args && config_read_array inhibit.args inhibit_args
-
 
     # 检测 Gamescope 搭配 MangoHud 使用的情况
     if config_is_true gamescope.enabled && config_is_true mangohud.enabled; then

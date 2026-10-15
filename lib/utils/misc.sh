@@ -3,13 +3,13 @@
 [[ -n "${__UTILS_MISC_SH_LOADED:-}" ]] && return 0
 __UTILS_MISC_SH_LOADED=1
 
-#shellcheck source=../log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
 
 #shellcheck source=command.sh
-source "${SCRIPT_DIR:-.}/utils/command.sh"
+source "$SCRIPT_DIR/utils/command.sh"
 #shellcheck source=string.sh
-source "${SCRIPT_DIR:-.}/utils/string.sh"
+source "$SCRIPT_DIR/utils/string.sh"
 
 sudo_request() {
     local why="$1"

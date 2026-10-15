@@ -41,6 +41,7 @@ command_time_today() {
 
             reset_time="$(
                 local game_impl="$SCRIPT_DIR/games/$game_name.sh"
+                #shellcheck source=/dev/null
                 [ -f "$game_impl" ] && source "$game_impl"
                 load_game_config "$game_name"
                 feat_time_record_load_config

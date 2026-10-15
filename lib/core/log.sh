@@ -1,10 +1,10 @@
 #!/hint/bash
 
-[[ -n "${__LOG_SH_LOADED:-}" ]] && return 0
-__LOG_SH_LOADED=1
+[[ -n "${__CORE_LOG_SH_LOADED:-}" ]] && return 0
+__CORE_LOG_SH_LOADED=1
 
 #shellcheck source=console.sh
-source "${SCRIPT_DIR:-.}/console.sh"
+source "$SCRIPT_DIR/core/console.sh"
 
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 

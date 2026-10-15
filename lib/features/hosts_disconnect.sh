@@ -1,10 +1,10 @@
 #!/hint/bash
 
 #shellcheck source=../libs.sh
-source "${SCRIPT_DIR:-.}/libs.sh"
+source "$SCRIPT_DIR/libs.sh"
 
-#shellcheck source=xwin_watch.sh
-source "${SCRIPT_DIR:-.}/features/xwin_watch.sh"
+#shellcheck source=../shared/xwin_watch.sh
+source "$SCRIPT_DIR/shared/xwin_watch.sh"
 
 feat_hosts_disconnect_load_config() {
     config_is_true features.hosts_disconnect.enabled || return 0

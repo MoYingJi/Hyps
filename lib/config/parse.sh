@@ -1,9 +1,9 @@
 #!/hint/bash
 
-#shellcheck source=../log.sh
-source "${SCRIPT_DIR:-.}/log.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
 #shellcheck source=../utils.sh
-source "${SCRIPT_DIR:-.}/utils.sh"
+source "$SCRIPT_DIR/utils.sh"
 
 # 本文件部分使用 LLM 生成
 
@@ -167,7 +167,6 @@ _strip_trailing_comment() {
     str_ref="$str"
 }
 
-
 _config_store_value() {
     local -n map_ref="$1"
     local key="$2"
@@ -180,7 +179,6 @@ _config_store_value() {
     #shellcheck disable=SC2034
     map_ref["$key"]="$value"
 }
-
 
 config_parse_to_temp() {
     local file="$1"

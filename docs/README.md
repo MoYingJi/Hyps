@@ -40,7 +40,7 @@
 - [x] 【原神/通用】通过注册表伪装 Hostname
 - [x] 【原神/通用】游戏窗口关闭时杀死进程
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
-- [x] 【原神】强制 D3D12 图形 API（默认需要 uv 或 python3 与 UnityPy；可设置 `gi.patch_d3d12.impl = "bytes"` 改用仅标准库的 python3）
+- [x] 【原神】强制 D3D12 图形 API（需要额外依赖）
 - [x] 【崩坏：星穹铁道】注册表解锁帧率（需要 python3）
 - [x] 【明日方舟：终末地】通过 GRYPHLINK 启动器启动游戏（需要 mingw-w64）
 
@@ -68,12 +68,16 @@
  - `bash`: 主要的脚本用它编写
  - 一些基础的工具，如 `coreutils`、`grep`、`awk`、`sed`、`pkill`、`pgrep`、`sudo` 等
  - 下面列出的 Runner 中的依赖。主要就是一些版本的 Proton 和 umu-launcher
- - `gcc`、`sha256sum`: 两个用 C 写的小工具 (`sha256sum` 用来校验源代码以重新编译)
+ - `sha256sum`、`md5sum`: 用来校验要编译的小工具，和验证游戏文件完整性
+ - `gcc`: 两个用 C 写的小工具
     - `tools/fpsunlock/unlocker.c` (还额外需要 `setcap`、`getcap`)
     - `tools/xwin-watch/xwin-watch.c`
  - `x86_64-w64-mingw32-gcc` (mingw-w64，仅配置 `endfield.launcher` 时需要): 交叉编译用于启动终末地的 Windows 小程序，无需在 Windows 上编译
+    - `tools/endfield-launcher/endfield-launcher.c`
  - `python3`: 一个用 python3 写的小工具
     - `tools/starrail-fps.py`
+    - `tools/genshin-d3d12/patch-unitypy.py` (还额外需要 UnityPy，系统中安装了 uv 时会自动处理)
+    - `tools/genshin-d3d12/patch-bytes.py` (另一个原生实现，直接按字节改)
 
 ## Runner
 

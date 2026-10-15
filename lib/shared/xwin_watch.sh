@@ -69,7 +69,7 @@ feat_xwin_watch_backend_enabled() {
     local module="$backend"
     [[ "$backend" == wayland ]] && module="wayland-client"
     local cfg
-    config_read "features.xwin_watch.$backend" auto cfg
+    config_read "features.xwin_watch.$backend" cfg auto
     if [[ "$cfg" == auto ]]; then
         if pkg-config --exists "$module"; then
             echo true
@@ -126,6 +126,10 @@ feat_xwin_watch_compile() {
     x11="$(feat_xwin_watch_backend_enabled x11)"
     wayland="$(feat_xwin_watch_backend_enabled wayland)"
 
+    if ! isy "$x11" && ! isy "$wayland"; then
+        die 1 xwin-watch "x11 和 wayland 后端均被禁用，至少需要启用一个"
+    fi
+
     if isy "$x11"; then
         log_debug xwin-watch "启用 X11 后端"
     else
@@ -142,7 +146,7 @@ feat_xwin_watch_compile() {
     local -a cflags=()
     local -a libs=()
 
-    cflags+=("${HYPS_CFLAGS[@]:-}")
+    cflags+=("${HYPS_CFLAGS[@]}")
 
     sources+=("$tool/xwin-watch.c")
     cflags+=("-I$tool")

@@ -201,7 +201,7 @@ gi_patch_d3d12_load_config() {
 
     # unitypy: 使用 UnityPy 重新序列化文件（默认）
     # bytes:   仅标准库，只改写 m_GraphicsAPIs 的 4 字节
-    config_read gi.patch_d3d12.impl unitypy GI_PATCH_D3D12_IMPL
+    config_read gi.patch_d3d12.impl GI_PATCH_D3D12_IMPL unitypy
     case "$GI_PATCH_D3D12_IMPL" in
         unitypy) GI_PATCH_D3D12_PATCHER="patch-unitypy.py" ;;
         bytes) GI_PATCH_D3D12_PATCHER="patch-bytes.py" ;;

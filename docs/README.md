@@ -150,7 +150,8 @@ overlay.lower = "/path/to/game"
  - `/tmp/hypsc` (临时文件)
  - `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`)
     - 着色器缓存 (`cache.shader.enabled` 和 `cache.dx.enabled`)
-    - 源码变更检测 (一些需要编译的小工具)
+    - 源码变更检测 (一些需要编译的小工具，校验和在 `checksums/`)
+    - 需要编译的小工具的产物 (`bin/`)，删除后下次启动会重新编译 (fpsunlock 还需要 sudo 设置权限)
  - `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`)
     - OverlayFS
     - Wine Prefix / Proton Compat Data

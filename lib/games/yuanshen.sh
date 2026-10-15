@@ -99,7 +99,8 @@ gi_fps_unlock_compile() {
 }
 
 gi_fps_unlock_prepare() {
-    local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
+    local bin
+    bin="$(cache_bin_path unlocker)"
 
     check_cache_and_compile "fpsunlock" \
         "$bin" \
@@ -125,7 +126,8 @@ gi_fps_unlock_post_start() {
 }
 
 gi_fps_unlock_start() {
-    local bin="$GI_FPS_UNLOCK_TOOL/unlocker"
+    local bin
+    bin="$(cache_bin_path unlocker)"
     local prog fps interval fifo pid
 
     config_read gi.fps_unlock.prog prog

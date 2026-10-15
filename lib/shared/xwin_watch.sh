@@ -191,7 +191,8 @@ feat_xwin_watch_compile() {
 }
 
 feat_xwin_watch_prepare() {
-    local bin="$XWIN_WATCH_TOOL/xwin-watch"
+    local bin
+    bin="$(cache_bin_path xwin-watch)"
 
     check_cache_and_compile "xwin-watch" \
         "$bin" \

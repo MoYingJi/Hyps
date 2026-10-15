@@ -6,6 +6,11 @@ __UTILS_CACHE_SH_LOADED=1
 #shellcheck source=string.sh
 source "$SCRIPT_DIR/utils/string.sh"
 
+# 编译产物统一放在 $CACHE_DIR/bin 下
+cache_bin_path() {
+    echo "$CACHE_DIR/bin/$1"
+}
+
 check_cache_and_compile() {
     local name="$1"
     local output_file="$2"
@@ -41,6 +46,7 @@ check_cache_and_compile() {
     fi
 
     log "$log_level" utils "[$name] 重新编译"
+    mkdir -p "$(dirname "$output_file")" || die 1 utils "[$name] 无法创建输出目录"
     "$compile_fn" "$output_file" || die 1 utils "[$name] 编译失败"
     "$verify_output_fn" "$output_file" || die 1 utils "[$name] 编译后验证失败"
 

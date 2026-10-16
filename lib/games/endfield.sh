@@ -53,13 +53,28 @@ endfield_launcher_exe_path() {
     cache_bin_path endfield-launcher.exe
 }
 
+endfield_launcher_validate_path() {
+    local launcher_path="$1"
+    local filename
+
+    launcher_path="$(realpath -m -- "$launcher_path")"
+    filename="${launcher_path##*/}"
+    if [[ -d "$launcher_path" ]]; then
+        printf '%s\n' "$launcher_path"
+    elif [[ -f "$launcher_path" && "${filename,,}" == *.exe ]]; then
+        printf '%s\n' "$launcher_path"
+    else
+        die 1 config "配置项 'endfield.launcher' 必须是启动器目录或 exe 文件：'$launcher_path'"
+    fi
+}
+
 feat_endfield_launcher_load_config() {
     config_has endfield.launcher || return 0
 
-    config_require_realpath_file endfield.launcher
-
     local launcher_linux launcher_win
     config_read endfield.launcher launcher_linux
+    launcher_linux="$(endfield_launcher_validate_path "$launcher_linux")" || return 1
+    config_set endfield.launcher "$launcher_linux"
     launcher_win="$(wine_unix_path_to_windows "$launcher_linux")"
 
     WINE_SIDE_OUTER_WRAPPER+=("$(endfield_launcher_exe_path)" "$launcher_win")

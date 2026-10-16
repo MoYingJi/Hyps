@@ -13,12 +13,12 @@ typedef struct wlr_toplevel {
     bool dead;
 } wlr_toplevel_t;
 
-static struct zwlr_foreign_toplevel_manager_v1 *g_wlr_manager = NULL;
-static wlr_toplevel_t *g_wlr_toplevels = NULL;
+static struct zwlr_foreign_toplevel_manager_v1 *g_wlr_manager = nullptr;
+static wlr_toplevel_t *g_wlr_toplevels = nullptr;
 
 static void wlr_handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    auto const node = (wlr_toplevel_t *)data;
+    wlr_toplevel_t* const node = data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -55,10 +55,10 @@ static void wlr_noop_parent(void *data, struct zwlr_foreign_toplevel_handle_v1 *
 
 static void wlr_handle_closed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    auto const node = (wlr_toplevel_t *)data;
+    wlr_toplevel_t* const node = data;
     if (node->handle) {
         zwlr_foreign_toplevel_handle_v1_destroy(node->handle);
-        node->handle = NULL;
+        node->handle = nullptr;
     }
     node->dead = true;
 }
@@ -104,7 +104,7 @@ static void wlr_bind(struct wl_registry *registry, const uint32_t name, const ui
 
 static bool wlr_check(const char *target_window) {
     bool found = false;
-    wlr_toplevel_t *prev = NULL;
+    wlr_toplevel_t *prev = nullptr;
     wlr_toplevel_t *node = g_wlr_toplevels;
     while (node) {
         if (node->dead) {
@@ -128,10 +128,10 @@ static bool wlr_check(const char *target_window) {
     return found;
 }
 
-static void wlr_close(void) {
+static void wlr_close() {
     if (g_wlr_manager) {
         zwlr_foreign_toplevel_manager_v1_destroy(g_wlr_manager);
-        g_wlr_manager = NULL;
+        g_wlr_manager = nullptr;
     }
     wlr_toplevel_t *node = g_wlr_toplevels;
     while (node) {
@@ -143,7 +143,7 @@ static void wlr_close(void) {
         free(node);
         node = next;
     }
-    g_wlr_toplevels = NULL;
+    g_wlr_toplevels = nullptr;
 }
 
 static wayland_extension_t g_wlr_extension = {
@@ -154,8 +154,8 @@ static wayland_extension_t g_wlr_extension = {
     .close = wlr_close,
 };
 
-static void wlr_register(void) __attribute__((constructor));
-static void wlr_register(void) {
+static void wlr_register() __attribute__((constructor));
+static void wlr_register() {
     g_wlr_extension.interface_name = zwlr_foreign_toplevel_manager_v1_interface.name;
     wayland_register_extension(&g_wlr_extension);
 }

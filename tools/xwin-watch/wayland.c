@@ -1,5 +1,4 @@
 #ifdef HAVE_WAYLAND
-#include <poll.h>
 #include <stdio.h>
 #include <string.h>
 #include <wayland-client.h>
@@ -9,8 +8,8 @@
 
 #define WAYLAND_MAX_EXTENSIONS 8
 
-static struct wl_display *g_display = NULL;
-static struct wl_registry *g_registry = NULL;
+static struct wl_display *g_display = nullptr;
+static struct wl_registry *g_registry = nullptr;
 
 static wayland_extension_t *g_extensions[WAYLAND_MAX_EXTENSIONS];
 static bool g_bound[WAYLAND_MAX_EXTENSIONS];
@@ -53,10 +52,10 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = registry_global_remove,
 };
 
-static void wayland_close(void);
+static void wayland_close();
 
-static bool wayland_init(void) {
-    g_display = wl_display_connect(NULL);
+static bool wayland_init() {
+    g_display = wl_display_connect(nullptr);
     if (!g_display) {
         return false;
     }
@@ -83,14 +82,14 @@ static bool wayland_init(void) {
     return true;
 }
 
-static int wayland_fd(void) {
+static int wayland_fd() {
     if (!g_display) {
         return -1;
     }
     return wl_display_get_fd(g_display);
 }
 
-static void wayland_dispatch(void) {
+static void wayland_dispatch() {
     if (!g_display) {
         return;
     }
@@ -110,7 +109,7 @@ static bool wayland_check(const char *target_window) {
     return false;
 }
 
-static void wayland_close(void) {
+static void wayland_close() {
     for (int i = 0; i < g_extension_count; i++) {
         if (g_bound[i] && g_extensions[i]->close) {
             g_extensions[i]->close();
@@ -119,15 +118,15 @@ static void wayland_close(void) {
     }
     if (g_registry) {
         wl_registry_destroy(g_registry);
-        g_registry = NULL;
+        g_registry = nullptr;
     }
     if (g_display) {
         wl_display_disconnect(g_display);
-        g_display = NULL;
+        g_display = nullptr;
     }
 }
 
-static const char *wayland_backend_name(void) {
+static const char *wayland_backend_name() {
     static char name[160];
     snprintf(name, sizeof(name), "Wayland (%s)", g_protocol_name);
     return name;

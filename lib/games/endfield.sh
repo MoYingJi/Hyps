@@ -47,7 +47,7 @@ shader_cache_invalidate() {
 
 ENDFIELD_LAUNCHER_TOOL="$PROJECT_ROOT/tools/endfield-launcher"
 ENDFIELD_LAUNCHER_DEFAULT_CC="x86_64-w64-mingw32-gcc"
-ENDFIELD_LAUNCHER_FLAGS=(-municode -mwindows -static)
+ENDFIELD_LAUNCHER_FLAGS=(-std=gnu23 -municode -mwindows -static)
 
 endfield_launcher_exe_path() {
     cache_bin_path endfield-launcher.exe
@@ -81,7 +81,7 @@ endfield_launcher_verify_output() {
 endfield_launcher_compile() {
     local output="$1"
     local cc="${HYPS_WIN_CC:-$ENDFIELD_LAUNCHER_DEFAULT_CC}"
-    local -a flags=("${ENDFIELD_LAUNCHER_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}")
+    local -a flags=("${ENDFIELD_LAUNCHER_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}" "-std=gnu23")
 
     if ! command -v "$cc" > /dev/null 2>&1; then
         log_error endfield-launcher "未找到 Windows 交叉编译器 '$cc'，请检查 compile.mingw.CC 配置或安装 mingw-w64"

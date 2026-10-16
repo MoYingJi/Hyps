@@ -15,22 +15,22 @@ typedef struct plasma_toplevel {
     bool dead;
 } plasma_toplevel_t;
 
-static struct org_kde_plasma_window_management *g_plasma_wm = NULL;
-static plasma_toplevel_t *g_plasma_toplevels = NULL;
+static struct org_kde_plasma_window_management *g_plasma_wm = nullptr;
+static plasma_toplevel_t *g_plasma_toplevels = nullptr;
 
 static void plasma_handle_title(void *data, struct org_kde_plasma_window *window, const char *title) {
     (void)window;
-    auto const node = (plasma_toplevel_t *)data;
+    plasma_toplevel_t* const node = data;
     free(node->title);
     node->title = strdup(title);
 }
 
 static void plasma_handle_unmapped(void *data, struct org_kde_plasma_window *window) {
     (void)window;
-    auto const node = (plasma_toplevel_t *)data;
+    plasma_toplevel_t* const node = data;
     if (node->handle) {
         org_kde_plasma_window_destroy(node->handle);
-        node->handle = NULL;
+        node->handle = nullptr;
     }
     node->dead = true;
 }
@@ -164,7 +164,7 @@ static void plasma_bind(struct wl_registry *registry, uint32_t name, uint32_t ve
 
 static bool plasma_check(const char *target_window) {
     bool found = false;
-    plasma_toplevel_t *prev = NULL;
+    plasma_toplevel_t *prev = nullptr;
     plasma_toplevel_t *node = g_plasma_toplevels;
     while (node) {
         if (node->dead) {
@@ -188,10 +188,10 @@ static bool plasma_check(const char *target_window) {
     return found;
 }
 
-static void plasma_close(void) {
+static void plasma_close() {
     if (g_plasma_wm) {
         org_kde_plasma_window_management_destroy(g_plasma_wm);
-        g_plasma_wm = NULL;
+        g_plasma_wm = nullptr;
     }
     plasma_toplevel_t *node = g_plasma_toplevels;
     while (node) {
@@ -203,7 +203,7 @@ static void plasma_close(void) {
         free(node);
         node = next;
     }
-    g_plasma_toplevels = NULL;
+    g_plasma_toplevels = nullptr;
 }
 
 static wayland_extension_t g_plasma_extension = {
@@ -214,8 +214,8 @@ static wayland_extension_t g_plasma_extension = {
     .close = plasma_close,
 };
 
-static void plasma_register(void) __attribute__((constructor));
-static void plasma_register(void) {
+static void plasma_register() __attribute__((constructor));
+static void plasma_register() {
     g_plasma_extension.interface_name = org_kde_plasma_window_management_interface.name;
     wayland_register_extension(&g_plasma_extension);
 }

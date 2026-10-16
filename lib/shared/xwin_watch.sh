@@ -107,6 +107,7 @@ feat_xwin_watch_all_source() {
     #shellcheck disable=SC2153
     echo "${HYPS_CC:-}"
     echo "${HYPS_CFLAGS[@]:-}"
+    echo "-std=gnu23"
 }
 feat_xwin_watch_verify_output() {
     local output="$1"
@@ -147,6 +148,7 @@ feat_xwin_watch_compile() {
     local -a libs=()
 
     cflags+=("${HYPS_CFLAGS[@]}")
+    cflags+=("-std=gnu23")
 
     sources+=("$tool/xwin-watch.c")
     cflags+=("-I$tool")

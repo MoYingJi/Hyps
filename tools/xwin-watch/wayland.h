@@ -11,7 +11,7 @@ typedef struct wayland_extension {
     uint32_t max_version;
     void (*bind)(struct wl_registry *registry, uint32_t name, uint32_t version);
     bool (*check)(const char *target_window);
-    void (*close)(void);
+    void (*close)();
 } wayland_extension_t;
 
 void wayland_register_extension(wayland_extension_t *ext);

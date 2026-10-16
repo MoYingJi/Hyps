@@ -1,5 +1,7 @@
 .idea/
 .vscode/
+.cache/
+compile_commands.json
 
 /config/*
 

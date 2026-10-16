@@ -10,86 +10,31 @@
 #include <stdlib.h>
 #include <wchar.h>
 
-// 按 MSVCRT/CommandLineToArgvW 的规则拼接一个参数，结果需要 3 * len + 3 个字符
-static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg)
-{
-    size_t i;
-    size_t backslashes;
+static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg);
+static WCHAR *build_cmdline(int argc, WCHAR **argv);
+static void show_error(const WCHAR *message);
+static void show_win32_error(const WCHAR *what, DWORD code);
 
-    *dst++ = L'"';
-    for (;; arg++) {
-        backslashes = 0;
-        while (*arg == L'\\') {
-            arg++;
-            backslashes++;
-        }
+int wmain(const int argc, WCHAR *argv[]) {
+    PROCESS_INFORMATION launcher;
+    PROCESS_INFORMATION game;
+    STARTUPINFOW si;
+    STARTUPINFOEXW siex;
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = nullptr;
+    BOOL attrs_ready = FALSE;
+    SIZE_T attrs_size = 0;
+    WCHAR *lcmd = nullptr;
+    WCHAR *gcmd = nullptr;
+    DWORD code = 0;
+    int rc = 1;
 
-        if (*arg == L'\0') {
-            for (i = 0; i < backslashes * 2; i++)
-                *dst++ = L'\\';
-            break;
-        } else if (*arg == L'"') {
-            for (i = 0; i < backslashes * 2 + 1; i++)
-                *dst++ = L'\\';
-            *dst++ = L'"';
-        } else {
-            for (i = 0; i < backslashes; i++)
-                *dst++ = L'\\';
-            *dst++ = *arg;
-        }
-    }
-    *dst++ = L'"';
-    return dst;
-}
+    ZeroMemory(&launcher, sizeof(launcher));
+    ZeroMemory(&game, sizeof(game));
 
-static WCHAR *build_cmdline(int argc, WCHAR **argv)
-{
-    size_t total = 1;
-    int i;
-    for (i = 0; i < argc; i++)
-        total += wcslen(argv[i]) * 3 + 4;
-
-    WCHAR *cmd = malloc(total * sizeof(WCHAR));
-    if (!cmd)
-        return NULL;
-
-    WCHAR *p = cmd;
-    for (i = 0; i < argc; i++) {
-        if (i > 0)
-            *p++ = L' ';
-        p = append_quoted_arg(p, argv[i]);
-    }
-    *p = L'\0';
-    return cmd;
-}
-
-static void show_error(const WCHAR *message)
-{
-    MessageBoxW(NULL, message, L"Endfield Launcher", MB_OK | MB_ICONERROR);
-}
-
-static void show_win32_error(const WCHAR *what)
-{
-    WCHAR message[256];
-    DWORD error_code = GetLastError();
-    swprintf(message, sizeof(message) / sizeof(message[0]),
-             L"%ls 失败，错误码: %lu", what, error_code);
-    show_error(message);
-}
-
-int wmain(int argc, WCHAR **argv)
-{
     if (argc < 3) {
         show_error(L"用法: endfield-launcher.exe <launcher.exe> <game.exe> [args...]");
         return 2;
     }
-
-    int exit_code = 1;
-    WCHAR *lcmd = NULL;
-    WCHAR *gcmd = NULL;
-    LPPROC_THREAD_ATTRIBUTE_LIST attrs = NULL;
-    PROCESS_INFORMATION lpi = { 0 };
-    PROCESS_INFORMATION pi = { 0 };
 
     lcmd = build_cmdline(1, &argv[1]);
     gcmd = build_cmdline(argc - 2, &argv[2]);
@@ -98,58 +43,141 @@ int wmain(int argc, WCHAR **argv)
         goto cleanup;
     }
 
-    // 启动器以挂起状态创建且永不恢复，仅作为父进程句柄使用
-    STARTUPINFOW lsi;
-    ZeroMemory(&lsi, sizeof(lsi));
-    lsi.cb = sizeof(lsi);
-    if (!CreateProcessW(NULL, lcmd, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &lsi, &lpi)) {
-        show_win32_error(L"以挂起状态启动启动器");
-        goto cleanup;
-    }
-    CloseHandle(lpi.hThread);
-
-    SIZE_T size = 0;
-    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
-    attrs = HeapAlloc(GetProcessHeap(), 0, size);
-    if (!attrs || !InitializeProcThreadAttributeList(attrs, 1, 0, &size)) {
-        show_win32_error(L"初始化进程属性列表");
-        goto cleanup;
-    }
-
-    HANDLE parent = lpi.hProcess;
-    if (!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
-                                   &parent, sizeof(parent), NULL, NULL)) {
-        show_win32_error(L"设置父进程属性");
-        goto cleanup;
-    }
-
-    STARTUPINFOEXW si;
+    // 挂起的启动器只用于提供父进程句柄，主线程不恢复运行
     ZeroMemory(&si, sizeof(si));
-    si.StartupInfo.cb = sizeof(si);
-    si.lpAttributeList = attrs;
-    if (!CreateProcessW(NULL, gcmd, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT,
-                        NULL, NULL, &si.StartupInfo, &pi)) {
-        show_win32_error(L"启动游戏");
+    si.cb = sizeof(si);
+    if (!CreateProcessW(nullptr, lcmd, nullptr, nullptr, FALSE, CREATE_SUSPENDED,
+                        NULL, nullptr, &si, &launcher)) {
+        show_win32_error(L"无法启动官方启动器", GetLastError());
         goto cleanup;
     }
-    CloseHandle(pi.hThread);
+    CloseHandle(launcher.hThread);
+    launcher.hThread = NULL;
 
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    DWORD game_code = 0;
-    if (GetExitCodeProcess(pi.hProcess, &game_code))
-        exit_code = (int)game_code;
-    CloseHandle(pi.hProcess);
+    InitializeProcThreadAttributeList(nullptr, 1, 0, &attrs_size);
+    attrs = HeapAlloc(GetProcessHeap(), 0, attrs_size);
+    if (!attrs) {
+        show_error(L"内存不足");
+        goto cleanup;
+    }
+    if (!InitializeProcThreadAttributeList(attrs, 1, 0, &attrs_size)) {
+        show_win32_error(L"无法初始化进程属性", GetLastError());
+        goto cleanup;
+    }
+    attrs_ready = TRUE;
+
+    if (!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
+                                   &launcher.hProcess, sizeof(launcher.hProcess),
+                                   NULL, nullptr)) {
+        show_win32_error(L"无法设置游戏父进程", GetLastError());
+        goto cleanup;
+    }
+
+    ZeroMemory(&siex, sizeof(siex));
+    siex.StartupInfo.cb = sizeof(siex);
+    siex.lpAttributeList = attrs;
+    if (!CreateProcessW(nullptr, gcmd, nullptr, nullptr, FALSE, EXTENDED_STARTUPINFO_PRESENT,
+                        NULL, nullptr, &siex.StartupInfo, &game)) {
+        show_win32_error(L"无法启动游戏", GetLastError());
+        goto cleanup;
+    }
+    CloseHandle(game.hThread);
+    game.hThread = NULL;
+
+    if (WaitForSingleObject(game.hProcess, INFINITE) != WAIT_OBJECT_0) {
+        show_win32_error(L"等待游戏进程失败", GetLastError());
+        goto cleanup;
+    }
+    if (!GetExitCodeProcess(game.hProcess, &code)) {
+        show_win32_error(L"无法读取游戏退出码", GetLastError());
+        goto cleanup;
+    }
+    rc = (int)code;
 
 cleanup:
-    if (lpi.hProcess) {
-        TerminateProcess(lpi.hProcess, 0);
-        CloseHandle(lpi.hProcess);
+    if (launcher.hProcess) {
+        TerminateProcess(launcher.hProcess, 0);
+        CloseHandle(launcher.hProcess);
+    }
+    if (game.hProcess) {
+        CloseHandle(game.hProcess);
     }
     if (attrs) {
-        DeleteProcThreadAttributeList(attrs);
+        if (attrs_ready) {
+            DeleteProcThreadAttributeList(attrs);
+        }
         HeapFree(GetProcessHeap(), 0, attrs);
     }
     free(lcmd);
     free(gcmd);
-    return exit_code;
+    return rc;
+}
+
+// 按 MSVCRT/CommandLineToArgvW 的规则拼接一个参数，结果需要 3 * len + 3 个字符
+static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg) {
+    size_t i;
+
+    *dst++ = L'"';
+    for (;; arg++) {
+        size_t backslashes = 0;
+        while (*arg == L'\\') {
+            arg++;
+            backslashes++;
+        }
+
+        if (*arg == L'\0') {
+            for (i = 0; i < backslashes * 2; i++) {
+                *dst++ = L'\\';
+            }
+            break;
+        }
+        if (*arg == L'"') {
+            for (i = 0; i < backslashes * 2 + 1; i++) {
+                *dst++ = L'\\';
+            }
+            *dst++ = L'"';
+        } else {
+            for (i = 0; i < backslashes; i++) {
+                *dst++ = L'\\';
+            }
+            *dst++ = *arg;
+        }
+    }
+    *dst++ = L'"';
+    return dst;
+}
+
+static WCHAR *build_cmdline(const int argc, WCHAR **argv) {
+    size_t total = 1;
+    int i;
+
+    for (i = 0; i < argc; i++) {
+        total += wcslen(argv[i]) * 3 + 4;
+    }
+
+    WCHAR *cmd = malloc(total * sizeof(WCHAR));
+    if (!cmd) {
+        return nullptr;
+    }
+
+    WCHAR *p = cmd;
+    for (i = 0; i < argc; i++) {
+        if (i > 0) {
+            *p++ = L' ';
+        }
+        p = append_quoted_arg(p, argv[i]);
+    }
+    *p = L'\0';
+    return cmd;
+}
+
+static void show_error(const WCHAR *message) {
+    MessageBoxW(nullptr, message, L"Endfield Launcher", MB_OK | MB_ICONERROR);
+}
+
+static void show_win32_error(const WCHAR *what, const DWORD code) {
+    WCHAR buf[256];
+    _snwprintf(buf, ARRAYSIZE(buf), L"%ls\n错误码: %lu", what, code);
+    buf[ARRAYSIZE(buf) - 1] = L'\0';
+    show_error(buf);
 }

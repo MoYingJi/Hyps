@@ -1,4 +1,4 @@
-// 部分代码取自 everything411 的 kill-genshin.c，灵感也来源于此
+// 灵感来源于 everything411 的 kill-genshin.c
 // https://gist.github.com/everything411/a4ebb2e3479711bd6529e58bff553a34
 
 // 编译: 参考项目的 lib/shared/xwin_watch.sh
@@ -12,9 +12,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include <time.h>
-#include <unistd.h>
 #include <locale.h>
+#include <getopt.h>
 
 #include "backends.h"
 
@@ -29,12 +31,15 @@ typedef struct {
 // 函数声明
 static bool parse_arguments(int argc, char *argv[]);
 static void print_usage(const char *program_name);
-static void print_arguments(void);
+static void print_arguments();
 static void log_timestamped(const char *fmt, ...);
 static void emit_event(const char *event);
 static bool check_window_exists(const char *target_window);
-static void close_displays(void);
+static void close_displays();
 static void handle_signal_and_exit(int signum);
+static void signal_handler(int signum);
+static void add_backend(window_backend_t *backend);
+static int wait_poll_timeout_ms();
 
 // 全局变量
 static volatile sig_atomic_t g_signal_received = 0;
@@ -48,44 +53,10 @@ static int g_backend_count = 0;
 static int handle_state(bool found);
 
 static app_config_t g_config = {
-    .target_window = NULL,
+    .target_window = nullptr,
     .appear_timeout = 0,
     .watch_closed = false
 };
-
-// 窗口出现超时判断: 返回 true 表示已超时
-static bool wait_timed_out(void) {
-    if (g_config.appear_timeout <= 0 || g_wait_start == 0) {
-        return false;
-    }
-    return (time(NULL) - g_wait_start) >= g_config.appear_timeout;
-}
-
-// poll 的超时毫秒数:
-// - 已找到窗口: 阻塞等待关闭事件，不设超时
-// - 等待窗口出现: 若有出现超时 (-a)，在剩余时间点唤醒以执行超时逻辑
-static int wait_poll_timeout_ms(void) {
-    if (g_window_found || g_config.appear_timeout <= 0 || g_wait_start == 0) {
-        return -1;
-    }
-    const int remaining = g_config.appear_timeout - (int)(time(NULL) - g_wait_start);
-    return remaining <= 0 ? 0 : remaining * 1000;
-}
-
-// 尝试初始化一个后端，成功则加入列表；只打印当前实际应用的那个 (第一个成功初始化的后端)
-static void add_backend(window_backend_t *backend) {
-    if (g_backend_count >= MAX_BACKENDS || !backend->init()) {
-        return;
-    }
-    if (g_backend_count == 0) {
-        fprintf(stderr, "窗口检测: %s\n", backend->name());
-    }
-    g_backends[g_backend_count++] = backend;
-}
-
-static void signal_handler(const int signum) {
-    g_signal_received = signum;
-}
 
 int main(const int argc, char *argv[]) {
     // 必须设置 locale，否则 Xutf8TextPropertyToTextList 无法转换 UTF-8 窗口标题
@@ -114,7 +85,7 @@ int main(const int argc, char *argv[]) {
     }
 
     // 进入事件循环前先派发并检查一次，避免已存在的窗口要等事件
-    g_wait_start = time(NULL);
+    g_wait_start = time(nullptr);
     for (int i = 0; i < g_backend_count; i++) {
         g_backends[i]->dispatch();
     }
@@ -162,6 +133,40 @@ int main(const int argc, char *argv[]) {
     }
 }
 
+// 窗口出现超时判断: 返回 true 表示已超时
+static bool wait_timed_out() {
+    if (g_config.appear_timeout <= 0 || g_wait_start == 0) {
+        return false;
+    }
+    return (time(nullptr) - g_wait_start) >= g_config.appear_timeout;
+}
+
+// poll 的超时毫秒数:
+// - 已找到窗口: 阻塞等待关闭事件，不设超时
+// - 等待窗口出现: 若有出现超时 (-a)，在剩余时间点唤醒以执行超时逻辑
+static int wait_poll_timeout_ms() {
+    if (g_window_found || g_config.appear_timeout <= 0 || g_wait_start == 0) {
+        return -1;
+    }
+    const int remaining = g_config.appear_timeout - (int)(time(nullptr) - g_wait_start);
+    return remaining <= 0 ? 0 : remaining * 1000;
+}
+
+// 尝试初始化一个后端，成功则加入列表；只打印当前实际应用的那个 (第一个成功初始化的后端)
+static void add_backend(window_backend_t *backend) {
+    if (g_backend_count >= MAX_BACKENDS || !backend->init()) {
+        return;
+    }
+    if (g_backend_count == 0) {
+        fprintf(stderr, "窗口检测: %s\n", backend->name());
+    }
+    g_backends[g_backend_count++] = backend;
+}
+
+static void signal_handler(const int signum) {
+    g_signal_received = signum;
+}
+
 // 状态机: 处理一次检查结果，返回 -1 表示继续，>=0 表示退出码
 // 事件通过 stdout 逐行输出 (exists/closed/failed)，由调用方 (bash) 读取并分发回调
 static int handle_state(const bool found) {
@@ -175,7 +180,7 @@ static int handle_state(const bool found) {
     } else {
         if (found) {
             if (g_config.appear_timeout > 0) {
-                log_timestamped("窗口出现，监测已开始 (等待 %ld 秒)", (long)(time(NULL) - g_wait_start));
+                log_timestamped("窗口出现，监测已开始 (等待 %ld 秒)", (long)(time(nullptr) - g_wait_start));
             } else {
                 log_timestamped("窗口出现，监测已开始");
             }
@@ -203,19 +208,31 @@ static bool parse_arguments(const int argc, char *argv[]) {
     int opt;
     while ((opt = getopt(argc, argv, "w:a:c")) != -1) {
         switch (opt) {
-            case 'w':
+            case 'w': {
                 g_config.target_window = optarg;
-                w_flag = true; break;
-            case 'a':
-                g_config.appear_timeout = atoi(optarg);
+                w_flag = true;
                 break;
-            case 'c':
+            }
+            case 'a': {
+                char *endptr;
+                errno = 0;
+                const long timeout = strtol(optarg, &endptr, 10);
+                if (endptr == optarg || *endptr != '\0' || errno == ERANGE ||
+                    timeout < INT_MIN || timeout > INT_MAX) {
+                    fprintf(stderr, "错误: 无效的窗口出现超时时间: %s\n", optarg);
+                    return false;
+                }
+                g_config.appear_timeout = (int)timeout;
+                break;
+            }
+            case 'c': {
                 g_config.watch_closed = true;
                 break;
-
-            default:
+            }
+            default: {
                 print_usage(argv[0]);
                 return false;
+            }
         }
     }
 
@@ -239,7 +256,7 @@ static void print_usage(const char *program_name) {
     fprintf(stderr, "\n事件通过 stdout 逐行输出: exists / closed / failed，其余日志输出到 stderr\n");
 }
 
-static void print_arguments(void) {
+static void print_arguments() {
     fprintf(stderr, "窗口名称: %s\n", g_config.target_window);
     if (g_config.appear_timeout > 0) {
         fprintf(stderr, "窗口出现超时: %d 秒\n", g_config.appear_timeout);
@@ -265,17 +282,19 @@ static void handle_signal_and_exit(const int signum) {
 
 // 输出带时间戳的日志到 stderr，不干扰 stdout 上的事件流
 static void log_timestamped(const char *fmt, ...) {
-    const time_t now = time(NULL);
+    const time_t now = time(nullptr);
     const struct tm *tm_info = localtime(&now);
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%H:%M:%S", tm_info);
     fprintf(stderr, "[%s] ", time_str);
 
+    // ReSharper Disable CppLocalVariableMightNotBeInitialized
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
     va_end(args);
     fputc('\n', stderr);
+    // ReSharper Restore CppLocalVariableMightNotBeInitialized
 }
 
 // 向 stdout 输出一行事件 (exists/closed/failed)，供调用方读取分发
@@ -284,7 +303,7 @@ static void emit_event(const char *event) {
     fflush(stdout);
 }
 
-static void close_displays(void) {
+static void close_displays() {
     for (int i = 0; i < g_backend_count; i++) {
         g_backends[i]->close();
     }

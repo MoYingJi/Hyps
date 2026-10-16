@@ -1,15 +1,15 @@
 #ifdef HAVE_X11
-#include <string.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <string.h>
 
 #include "backends.h"
 
-static Display *g_x11_display = NULL;
+static Display *g_x11_display = nullptr;
 
-static bool x11_backend_init(void) {
-    g_x11_display = XOpenDisplay(NULL);
+static bool x11_backend_init() {
+    g_x11_display = XOpenDisplay(nullptr);
     if (!g_x11_display) {
         return false;
     }
@@ -19,14 +19,14 @@ static bool x11_backend_init(void) {
     return true;
 }
 
-static int x11_backend_fd(void) {
+static int x11_backend_fd() {
     if (!g_x11_display) {
         return -1;
     }
     return ConnectionNumber(g_x11_display);
 }
 
-static void x11_backend_dispatch(void) {
+static void x11_backend_dispatch() {
     if (!g_x11_display) {
         return;
     }
@@ -37,59 +37,86 @@ static void x11_backend_dispatch(void) {
     }
 }
 
+// 窗口在列表读取后可能已被销毁，此时的 X 错误应视为读取失败并跳过，而不是让 Xlib 默认处理函数终止进程
+static volatile bool g_x11_request_failed = false;
+
+static int x11_error_handler(Display *display, XErrorEvent *event) {
+    (void)display;
+    (void)event;
+    g_x11_request_failed = true;
+    return 0;
+}
+
+// 读取窗口的 WM_NAME，按 UTF-8 转换后取第一项与目标做逐字节比较
+static bool window_title_equals(Display *display, Window window, const char *target_window) {
+    XTextProperty prop = {0};
+    char **list = nullptr;
+    int count = 0;
+    bool equal = false;
+
+    g_x11_request_failed = false;
+    const bool got_prop = XGetTextProperty(display, window, &prop, XA_WM_NAME);
+    if (!g_x11_request_failed && got_prop && prop.value && prop.nitems > 0) {
+        if (Xutf8TextPropertyToTextList(display, &prop, &list, &count) == Success && list && count > 0) {
+            equal = strcmp(list[0], target_window) == 0;
+        }
+    }
+
+    if (list) {
+        XFreeStringList(list);
+    }
+    if (prop.value) {
+        XFree(prop.value);
+    }
+    return equal;
+}
+
 static bool x11_backend_check(const char *target_window) {
     if (!g_x11_display) {
         return false;
     }
-    const Window root = DefaultRootWindow(g_x11_display);
-    const Atom net_client_list = XInternAtom(g_x11_display, "_NET_CLIENT_LIST", False);
 
-    Atom type;
-    int format;
-    unsigned long nitems, bytes_after;
-    unsigned char *data = NULL;
-
-    if (XGetWindowProperty(g_x11_display, root, net_client_list, 0, 1024, False, XA_WINDOW,
-                           &type, &format, &nitems, &bytes_after, &data) != Success) {
+    // only_if_exists 为 True: 属性名不存在时返回 None，不会在 X 服务器上新建 atom
+    const Atom client_list = XInternAtom(g_x11_display, "_NET_CLIENT_LIST", True);
+    if (client_list == None) {
         return false;
     }
 
-    if (!data || nitems == 0) {
-        XFree(data);
-        return false;
-    }
+    g_x11_request_failed = false;
+    Atom actual_type = None;
+    int actual_format = 0;
+    unsigned long count = 0;
+    unsigned long bytes_after = 0;
+    unsigned char *data = nullptr;
+    XErrorHandler previous_handler = XSetErrorHandler(x11_error_handler);
+    const int status = XGetWindowProperty(g_x11_display, DefaultRootWindow(g_x11_display),
+                                          client_list, 0, 1024, False, XA_WINDOW,
+                                          &actual_type, &actual_format,
+                                          &count, &bytes_after, &data);
 
-    const Window *windows = (Window *)data;
     bool found = false;
-
-    for (unsigned long i = 0; i < nitems; i++) {
-        XTextProperty text_prop;
-        if (XGetWMName(g_x11_display, windows[i], &text_prop) && text_prop.value) {
-            char **list = NULL;
-            int count = 0;
-            if (Xutf8TextPropertyToTextList(g_x11_display, &text_prop, &list, &count) == Success) {
-                if (count > 0 && list[0] && strcmp(list[0], target_window) == 0) {
-                    found = true;
-                }
-                XFreeStringList(list);
-            }
-            XFree(text_prop.value);
+    if (status == Success && !g_x11_request_failed && data && count > 0 && actual_format == 32) {
+        const Window *windows = (const Window *)data;
+        for (unsigned long i = 0; i < count && !found; i++) {
+            found = window_title_equals(g_x11_display, windows[i], target_window);
         }
-        if (found) break;
     }
+    XSetErrorHandler(previous_handler);
 
-    XFree(data);
+    if (data) {
+        XFree(data);
+    }
     return found;
 }
 
-static void x11_backend_close(void) {
+static void x11_backend_close() {
     if (g_x11_display) {
         XCloseDisplay(g_x11_display);
-        g_x11_display = NULL;
+        g_x11_display = nullptr;
     }
 }
 
-static const char *x11_backend_name(void) {
+static const char *x11_backend_name() {
     return "X11 (_NET_CLIENT_LIST)";
 }
 

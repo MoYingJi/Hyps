@@ -13,12 +13,12 @@ typedef struct ext_toplevel {
     bool dead;
 } ext_toplevel_t;
 
-static struct ext_foreign_toplevel_list_v1 *g_ext_list = NULL;
-static ext_toplevel_t *g_ext_toplevels = NULL;
+static struct ext_foreign_toplevel_list_v1 *g_ext_list = nullptr;
+static ext_toplevel_t *g_ext_toplevels = nullptr;
 
 static void ext_handle_title(void *data, struct ext_foreign_toplevel_handle_v1 *handle, const char *title) {
     (void)handle;
-    auto const node = (ext_toplevel_t *)data;
+    ext_toplevel_t* const node = data;
     free(node->title);
     node->title = strdup(title);
 }
@@ -30,10 +30,10 @@ static void ext_handle_done(void *data, struct ext_foreign_toplevel_handle_v1 *h
 
 static void ext_handle_closed(void *data, struct ext_foreign_toplevel_handle_v1 *handle) {
     (void)handle;
-    auto const node = (ext_toplevel_t *)data;
+    ext_toplevel_t* const node = data;
     if (node->handle) {
         ext_foreign_toplevel_handle_v1_destroy(node->handle);
-        node->handle = NULL;
+        node->handle = nullptr;
     }
     node->dead = true;
 }
@@ -82,7 +82,7 @@ static void ext_bind(struct wl_registry *registry, const uint32_t name, const ui
 
 static bool ext_check(const char *target_window) {
     bool found = false;
-    ext_toplevel_t *prev = NULL;
+    ext_toplevel_t *prev = nullptr;
     ext_toplevel_t *node = g_ext_toplevels;
     while (node) {
         if (node->dead) {
@@ -106,10 +106,10 @@ static bool ext_check(const char *target_window) {
     return found;
 }
 
-static void ext_close(void) {
+static void ext_close() {
     if (g_ext_list) {
         ext_foreign_toplevel_list_v1_destroy(g_ext_list);
-        g_ext_list = NULL;
+        g_ext_list = nullptr;
     }
     ext_toplevel_t *node = g_ext_toplevels;
     while (node) {
@@ -121,7 +121,7 @@ static void ext_close(void) {
         free(node);
         node = next;
     }
-    g_ext_toplevels = NULL;
+    g_ext_toplevels = nullptr;
 }
 
 static wayland_extension_t g_ext_extension = {
@@ -132,8 +132,8 @@ static wayland_extension_t g_ext_extension = {
     .close = ext_close,
 };
 
-static void ext_register(void) __attribute__((constructor));
-static void ext_register(void) {
+static void ext_register() __attribute__((constructor));
+static void ext_register() {
     g_ext_extension.interface_name = ext_foreign_toplevel_list_v1_interface.name;
     wayland_register_extension(&g_ext_extension);
 }

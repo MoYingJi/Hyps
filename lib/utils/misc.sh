@@ -18,7 +18,19 @@ sudo_request() {
     echo "[Hyps] [sudo 请求] $why"
     echo -n "[Hyps] $ "
     quote_args "$@"
-    sudo "$@"
+
+    if command_exists sudo && [ -t 0 ]; then
+        # 有 sudo 命令，有终端
+        sudo "$@"
+        return "$?"
+    elif command -v pkexec >/dev/null 2>&1 && { [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; }; then
+        # 有 pkexec 命令，有显示环境
+        pkexec "$@"
+        return "$?"
+    else
+        die 1 utils "无法获取管理员权限"
+        return 1
+    fi
 }
 
 run_and_log() {
@@ -47,6 +59,7 @@ nvidia_version() {
     fi
 
     echo "unknown"
+    return 1
 }
 
 extract_pkg_version() {

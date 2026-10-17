@@ -22,7 +22,6 @@ declare -a ENV_EXPORTS=(
     # UMU
     "runner.protonpath|PROTONPATH|protonpath"
     "env.PROTONPATH|PROTONPATH|protonpath"
-    "env.GAMEID|GAMEID|string"
     "env.UMU_LOG|UMU_LOG|string"
     "env.PROTON_VERB|PROTON_VERB|string"
     "env.UMU_RUNTIME_UPDATE|UMU_RUNTIME_UPDATE|bool_to_01"
@@ -87,6 +86,8 @@ register_hook load_config env_load_config
 export_env_vars() {
     local key raw_value final_value env_name
 
+    env_export_game_umu_id
+
     for entry in "${ENV_EXPORTS[@]}"; do
         IFS='|' read -r conf_key env_name transform <<< "$entry"
         raw_value="${CONFIG[$conf_key]:-}"
@@ -107,6 +108,36 @@ export_env_vars() {
         env_name="${key#env.}"
         _export_env_var "$env_name" "$raw_value" "自动"
     done
+}
+
+env_export_game_umu_id() {
+    config_has game.umu_id || return 0
+
+    local configured_id gameid_env umu_id_env game_id
+    config_read game.umu_id configured_id
+    [[ -n "$configured_id" ]] || die 1 environment "配置项 'game.umu_id' 不能为空"
+
+    gameid_env="${GAMEID:-}"
+    umu_id_env="${UMU_ID:-}"
+    if [[ -n "$gameid_env" && -n "$umu_id_env" && "$gameid_env" != "$umu_id_env" ]]; then
+        die 1 environment "环境变量 GAMEID ('$gameid_env') 与 UMU_ID ('$umu_id_env') 不一致"
+    fi
+
+    if [[ -n "$gameid_env" ]]; then
+        game_id="$gameid_env"
+    elif [[ -n "$umu_id_env" ]]; then
+        game_id="$umu_id_env"
+    else
+        game_id="$configured_id"
+    fi
+
+    if [[ "$game_id" != "$configured_id" ]]; then
+        log_debug environment "环境变量中的 UMU 游戏 ID '$game_id' 覆盖配置 game.umu_id='$configured_id'"
+    fi
+
+    export GAMEID="$game_id"
+    export UMU_ID="$game_id"
+    log_debug environment "统一 UMU 游戏 ID: GAMEID=UMU_ID='$game_id'"
 }
 
 _export_env_var() {

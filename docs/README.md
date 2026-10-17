@@ -72,8 +72,8 @@
  - `gcc`: 两个用 C 写的小工具
     - `tools/fpsunlock/unlocker.c` (还额外需要 `setcap`、`getcap`)
     - `tools/xwin-watch/xwin-watch.c`
- - `x86_64-w64-mingw32-gcc` (mingw-w64，仅配置 `endfield.launcher` 时需要): 交叉编译用于启动终末地的 Windows 小程序，无需在 Windows 上编译
-    - `tools/endfield-launcher/endfield-launcher.c`
+ - `x86_64-w64-mingw32-gcc` (mingw-w64，配置了终末地启动桥或父进程替身时需要): 交叉编译 Windows 小程序，无需在 Windows 上编译
+    - `tools/gryph-surrogate/gryph-surrogate.c`
  - `python3`: 一个用 python3 写的小工具
     - `tools/starrail-fps.py`
     - `tools/genshin-d3d12/patch-unitypy.py` (还额外需要 UnityPy，系统中安装了 uv 时会自动处理)

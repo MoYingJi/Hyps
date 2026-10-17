@@ -33,16 +33,16 @@ output() {
     jq -s '.' "$TEMP" > "$OUTPUT"
 }
 
-# endfield-launcher
+# gryph-surrogate
 
-ENDFIELD_LAUNCHER_TOOL="$ROOT/tools/endfield-launcher"
-ENDFIELD_LAUNCHER_SOURCE="$ENDFIELD_LAUNCHER_TOOL/endfield-launcher.c"
-ENDFIELD_LAUNCHER_FLAGS=("${DEFAULT_FLAGS[@]}" -std=gnu23 -municode -mwindows -static)
+GRYPH_SURROGATE_TOOL="$ROOT/tools/gryph-surrogate"
+GRYPH_SURROGATE_SOURCE="$GRYPH_SURROGATE_TOOL/gryph-surrogate.c"
+GRYPH_SURROGATE_FLAGS=("${DEFAULT_FLAGS[@]}" -std=gnu23 -municode -mwindows -static)
 
 record_compile \
-    "$ENDFIELD_LAUNCHER_TOOL" \
-    "$ENDFIELD_LAUNCHER_SOURCE" \
-    "$HYPS_WIN_CC" "${ENDFIELD_LAUNCHER_FLAGS[@]}" "$ENDFIELD_LAUNCHER_SOURCE"
+    "$GRYPH_SURROGATE_TOOL" \
+    "$GRYPH_SURROGATE_SOURCE" \
+    "$HYPS_WIN_CC" "${GRYPH_SURROGATE_FLAGS[@]}" "$GRYPH_SURROGATE_SOURCE"
 
 # fpsunlock
 

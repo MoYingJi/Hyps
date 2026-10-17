@@ -61,7 +61,24 @@
 
 5. 运行 `scripts` 文件夹下对应游戏的脚本
 
+或者直接运行 `./init.sh` 自动完成第 3～4 步（见下文「初始化」）
+
 常来看示例配置！我会经常更新一些有用内容的（
+
+### 初始化
+
+`./init.sh`（等价于 `./scripts/_Hyps init`）会检测基础环境并生成配置，省去手动复制示例配置的步骤：
+
+```bash
+./init.sh                  # 检测环境 + 初始化基础配置，并交互式选择要玩的游戏
+./init.sh endfield         # 同上，并复制 endfield 的示例配置
+./init.sh --check          # 只检测，不写入任何文件；必需项缺失时返回非 0
+./init.sh --list           # 查看各游戏的示例配置与当前配置状态
+./init.sh --force endfield # 覆盖已有配置前先备份为 .bak.<时间戳>
+./init.sh --no-game        # 只初始化基础配置
+```
+
+初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后仍需要按提示修改游戏配置里的 `game.exe` 和 `runner.name`，然后运行 `scripts` 下对应的脚本。
 
 ## 依赖
 

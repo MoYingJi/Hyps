@@ -410,13 +410,13 @@ init_check_config() {
     fi
 
     if [[ "$(realpath -m "$CONFIG_DIR/runners")" != "$(realpath -m "$PROJECT_ROOT/config/runners")" ]]; then
-        local missing=0 runner_file
+        local runner_missing_count=0 runner_file
         for runner_file in "$PROJECT_ROOT/config/runners"/*.conf; do
             [[ -f "$runner_file" ]] || continue
-            [[ -f "$CONFIG_DIR/runners/${runner_file##*/}" ]] || missing=$(( missing + 1 ))
+            [[ -f "$CONFIG_DIR/runners/${runner_file##*/}" ]] || runner_missing_count=$(( runner_missing_count + 1 ))
         done
-        if [[ "$missing" -gt 0 ]]; then
-            init_check_add config warn "运行器配置" "自定义配置目录缺少 $missing 个 runner 配置（初始化时复制）"
+        if [[ "$runner_missing_count" -gt 0 ]]; then
+            init_check_add config warn "运行器配置" "自定义配置目录缺少 $runner_missing_count 个 runner 配置（初始化时复制）"
         else
             init_check_add config ok "运行器配置" "已同步"
         fi

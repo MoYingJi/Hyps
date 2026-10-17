@@ -99,7 +99,7 @@ command_init() {
     _init_load_common_config
 
     if [[ "$do_list" -eq 1 ]]; then
-        command_init_list
+        command_init_list "$@"
         return
     fi
     if [[ "$do_check" -eq 1 ]]; then

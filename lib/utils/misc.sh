@@ -45,17 +45,17 @@ run_and_log() {
 }
 
 nvidia_version() {
-    # if command -v nvidia-smi >/dev/null 2>&1; then
-    #     nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null \
-    #         | head -n1 | tr -d '[:space:]'
-    #     return
-    # fi
-
     if [ -r /sys/module/nvidia/version ]; then
         local version
         IFS= read -r version < /sys/module/nvidia/version || [[ -n "$version" ]] || return 1
         printf '%s\n' "$version"
-        return
+        return 0
+    fi
+
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null \
+            | head -n1 | tr -d '[:space:]'
+        return 0
     fi
 
     echo "unknown"

@@ -322,12 +322,9 @@ init_check_graphics() {
     fi
 
     if [[ -n "${seen[0x10de]:-}" ]]; then
-        if [[ -r /sys/module/nvidia/version ]]; then
-            local nvidia_version
-            IFS= read -r nvidia_version < /sys/module/nvidia/version
+        local nvidia_version
+        if nvidia_version="$(nvidia_version)"; then
             init_check_add graphics ok "NVIDIA 驱动" "$nvidia_version"
-        elif command_exists nvidia-smi; then
-            init_check_add graphics ok "NVIDIA 驱动" "$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n 1)"
         else
             init_check_add graphics warn "NVIDIA 驱动" "检测到 NVIDIA GPU，但未找到驱动版本"
         fi

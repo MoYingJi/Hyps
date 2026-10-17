@@ -156,7 +156,7 @@ gryph_surrogate_verify_output() {
 gryph_surrogate_compile() {
     local output="$1"
     local cc="${HYPS_WIN_CC:-$GRYPH_SURROGATE_DEFAULT_CC}"
-    local -a flags=("${GRYPH_SURROGATE_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}" "-std=gnu23")
+    local -a flags=("${GRYPH_SURROGATE_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}")
 
     if ! command -v "$cc" > /dev/null 2>&1; then
         log_error gryph-surrogate "未找到 Windows 交叉编译器 '$cc'，请检查 compile.mingw.CC 配置或安装 mingw-w64"

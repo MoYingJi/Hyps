@@ -1,5 +1,6 @@
 // 基于 everything411 的 unlocker.c 修改
 // https://github.com/everything411/fpsunlock
+// 本修改版尊重并继承原项目许可证，按 MIT 许可，见项目的 licenses/MIT-fpsunlock.txt
 
 // unlocker.c - 为 Linux 原生环境重构的 FPS 解锁工具
 //

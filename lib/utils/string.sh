@@ -52,8 +52,8 @@ bool_str() {
 quote_args() {
     local arg
     for arg in "$@"; do
-        # 匹配安全字符：字母数字下划线点斜杠横杠
-        if [[ "$arg" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+        # 匹配安全字符：字母数字下划线点斜杠等号横杠
+        if [[ "$arg" =~ ^[a-zA-Z0-9_./=-]+$ ]]; then
             printf '%s ' "$arg"
         else
             # 将参数中的单引号 ' 替换为 '\''（结束引号、转义单引号、重新开始引号）
@@ -61,4 +61,19 @@ quote_args() {
         fi
     done
     echo # 最后换行
+}
+
+# 用于生成 Windows cmd 批处理命令行：cmd.exe 不识别单引号，并需转义百分号和结尾反斜杠
+quote_args_bat() {
+    local arg escaped_arg trailing_slashes
+    for arg in "$@"; do
+        escaped_arg="${arg//%/%%}"
+        trailing_slashes=""
+        while [[ "$escaped_arg" == *\\ ]]; do
+            escaped_arg="${escaped_arg%\\}"
+            trailing_slashes+="\\"
+        done
+        printf '"%s%s%s" ' "$escaped_arg" "$trailing_slashes" "$trailing_slashes"
+    done
+    echo
 }

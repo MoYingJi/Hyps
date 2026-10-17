@@ -6,14 +6,6 @@ __SHARED_WINE_SIDE_SH_LOADED=1
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-wine_side_quote_cmd_args() {
-    local arg
-    for arg in "$@"; do
-        printf '"%s" ' "$arg"
-    done
-    echo
-}
-
 wine_side_append_runner_command() {
     #shellcheck disable=SC2178
     local -n command_ref="$1"
@@ -49,12 +41,14 @@ wine_side_generate_game_batch() {
     fi
 
     content="$(cat << EOF
+setlocal DisableDelayedExpansion
 chcp 65001
 Z:
-cd /d "$game_cwd_win"
+cd /d $(quote_args_bat "$game_cwd_win")
 $WINE_SIDE_PREPARE_BATCH
 $WINE_SIDE_BEFORE_GAME_BATCH
-start "" /WAIT /B $(wine_side_quote_cmd_args "${outer_wrapper[@]}" "${game_wrapper[@]}") "$game_exe" $(quote_args "${GAME_ARGS[@]}")
+setlocal DisableDelayedExpansion
+start "" /WAIT /B $(quote_args_bat "${outer_wrapper[@]}" "${game_wrapper[@]}" "$game_exe" "${GAME_ARGS[@]}")
 $WINE_SIDE_AFTER_GAME_BATCH
 EOF
     )"
@@ -125,8 +119,8 @@ wine_side_prepare() {
     if isy "$WINE_SIDE_NEEDS_BATCH" \
         && { ((${#WINE_SIDE_OUTER_WRAPPER[@]} + ${#WINE_SIDE_GAME_WRAPPER[@]} == 0)) || [[ -n "$WINE_SIDE_AFTER_GAME_BATCH" ]]; }; then
         local wrapper_arg
-        for wrapper_arg in "${WINE_SIDE_OUTER_WRAPPER[@]}" "${WINE_SIDE_GAME_WRAPPER[@]}"; do
-            [[ "$wrapper_arg" == *\"* ]] && die 1 wine-side "包装程序参数不能包含双引号: '$wrapper_arg'"
+        for wrapper_arg in "${WINE_SIDE_OUTER_WRAPPER[@]}" "${WINE_SIDE_GAME_WRAPPER[@]}" "${GAME_ARGS[@]}"; do
+            [[ "$wrapper_arg" == *\"* ]] && die 1 wine-side "包装程序或游戏参数不能包含双引号: '$wrapper_arg'"
         done
         WINE_SIDE_GAME_BATCH_SCRIPT="$(wine_side_generate_game_batch)"
     else

@@ -86,6 +86,7 @@ init_find_launcher_script() {
 }
 
 # 只读解析游戏配置，输出状态（不修改任何配置）
+# runner.name 不是必需的：与 lib/config.sh 一致，runner.exe 或 runner.protonpath 有任意其一即可
 init_game_config_state() {
     local slug="$1"
     local file="$CONFIG_DIR/games/$slug.conf"
@@ -99,6 +100,8 @@ init_game_config_state() {
 
     local exe="${TEMP_CONFIG[game.exe]:-}"
     local runner="${TEMP_CONFIG[runner.name]:-}"
+    local runner_exe="${TEMP_CONFIG[runner.exe]:-}"
+    local runner_proton="${TEMP_CONFIG[runner.protonpath]:-}"
 
     if [[ -z "$exe" ]]; then
         printf '缺少 game.exe\n'
@@ -112,12 +115,23 @@ init_game_config_state() {
         printf 'game.exe 无效\n'
         return 0
     fi
-    if [[ -z "$runner" ]]; then
-        printf '缺少 runner.name\n'
-        return 0
+
+    # 游戏配置里没有直接给出运行器时，从 runner.name 指向的配置补齐
+    if [[ -z "$runner_exe" && -z "$runner_proton" && -n "$runner" ]]; then
+        local runner_conf="$CONFIG_DIR/runners/$runner.conf"
+        if [[ -f "$runner_conf" ]]; then
+            config_parse_file "$runner_conf" TEMP_CONFIG
+            runner_exe="${TEMP_CONFIG[runner.exe]:-}"
+            runner_proton="${TEMP_CONFIG[runner.protonpath]:-}"
+        fi
     fi
-    if [[ ! -f "$CONFIG_DIR/runners/$runner.conf" ]]; then
-        printf '未知 runner: %s\n' "$runner"
+
+    if [[ -z "$runner_exe" && -z "$runner_proton" ]]; then
+        if [[ -n "$runner" ]]; then
+            printf '未知 runner: %s\n' "$runner"
+        else
+            printf '缺少 runner.name\n'
+        fi
         return 0
     fi
 

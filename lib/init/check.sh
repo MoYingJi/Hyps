@@ -236,6 +236,7 @@ init_check_runner() {
 }
 
 # 用法: init_check_runner_file <runners/*.conf>
+# 与 lib/config.sh 一致：runner.exe 可以省略，此时由 runner.protonpath 推导为 <proton>/proton
 init_check_runner_file() {
     local file="$1"
     local name="${file##*/}"
@@ -245,24 +246,43 @@ init_check_runner_file() {
 
     local exe="${TEMP_CONFIG[runner.exe]:-}"
     local proton="${TEMP_CONFIG[runner.protonpath]:-}"
+    local proton_dir=""
     local -a problems=()
 
-    if [[ -z "$exe" ]]; then
-        problems+=("缺少 runner.exe")
-    elif ! command_exists "$exe"; then
-        problems+=("runner.exe '$exe' 不在 PATH 中")
+    if [[ -n "$proton" ]]; then
+        if [[ -d "$proton" ]]; then
+            proton_dir="$proton"
+        elif ! proton_dir="$(find_proton_by_name "$proton" 2>/dev/null)"; then
+            proton_dir=""
+            problems+=("未找到 Proton '$proton'")
+        fi
     fi
 
-    if [[ -z "$proton" ]]; then
-        problems+=("缺少 runner.protonpath")
-    elif [[ -d "$proton" ]]; then
-        [[ -x "$proton/proton" ]] || problems+=("'$proton' 中缺少可执行的 proton")
-    elif ! find_proton_by_name "$proton" > /dev/null 2>&1; then
-        problems+=("未找到 Proton '$proton'")
+    if [[ -n "$exe" ]]; then
+        if [[ "$exe" == */* ]]; then
+            [[ -x "$exe" ]] || problems+=("runner.exe '$exe' 不可执行")
+        elif ! command_exists "$exe"; then
+            problems+=("runner.exe '$exe' 不在 PATH 中")
+        fi
+    elif [[ -z "$proton" ]]; then
+        problems+=("缺少 runner.exe 和 runner.protonpath")
+    fi
+
+    # 省略 runner.exe 时，配置层会推导为 <proton>/proton，这里校验它确实可执行
+    if [[ -z "$exe" && -n "$proton_dir" && ! -x "$proton_dir/proton" ]]; then
+        problems+=("'$proton_dir' 中缺少可执行的 proton")
     fi
 
     if [[ "${#problems[@]}" -eq 0 ]]; then
-        init_check_add runner ok "$name" "${exe} + ${proton}"
+        local detail
+        if [[ -n "$exe" && -n "$proton" ]]; then
+            detail="${exe} + ${proton}"
+        elif [[ -n "$exe" ]]; then
+            detail="$exe"
+        else
+            detail="$proton（直接使用 proton）"
+        fi
+        init_check_add runner ok "$name" "$detail"
     else
         init_check_add runner warn "$name" "$(_init_join '；' "${problems[@]}")"
     fi

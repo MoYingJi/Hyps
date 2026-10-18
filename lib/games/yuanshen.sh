@@ -56,7 +56,6 @@ gi_fps_unlock_load_config() {
     config_default gi.fps_unlock.val 120
     config_default gi.fps_unlock.interval 5000
     config_default gi.fps_unlock.fifo "$TEMP_DIR/fpsunlock_fifo"
-    config_default gi.fps_unlock.prog "YuanShen.exe"
     config_default gi.fps_unlock.sleep "-"
 
     local sleep
@@ -129,13 +128,22 @@ gi_fps_unlock_post_start() {
 gi_fps_unlock_start() {
     local bin
     bin="$(cache_bin_path unlocker)"
-    local prog fps interval fifo pid
+    local fps interval fifo
 
-    config_read gi.fps_unlock.prog prog
     config_read gi.fps_unlock.val fps
     config_read gi.fps_unlock.interval interval
     config_read gi.fps_unlock.fifo fifo
 
+    local prog
+    if config_has gi.fps_unlock.prog; then
+        config_read gi.fps_unlock.prog prog
+    else
+        local game
+        config_read game.exe game
+        prog="${game##*/}"
+    fi
+
+    local pid
     pid="$(find_pid_by_name -n "$prog")"
 
     log_info gi-fps-unlock "PID: $pid"

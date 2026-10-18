@@ -5,7 +5,7 @@
 // 目前仅终末地有此需求，但理论支持所有检测逻辑相同的游戏
 //
 // 构建:
-//   x86_64-w64-mingw32-gcc -municode -static -O2 -Wall -Wextra -o gryph-surrogate.exe gryph-surrogate.c
+//   x86_64-w64-mingw32-gcc -municode -mwindows -static -O2 -Wall -Wextra -o gryph-surrogate.exe gryph-surrogate.c
 //
 // 用法: 选项写在前面，遇到的第一个非选项参数是游戏路径，之后的参数都会原样传给游戏
 //
@@ -23,7 +23,7 @@
 //     显式指定 launcher 模式，此时必须用 --launcher 给出启动器
 //
 //   gryph-surrogate.exe --mode hardlink|copy|hardlink-or-copy
-//         [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate]
+//         [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate] [--show-info]
 //         <游戏路径> [游戏参数...]
 //     替身模式: 把源文件做成目标文件（硬链接或复制），再将目标文件挂起，作为游戏的父进程
 //     - 不写 --launcher 时，源文件就是游戏 exe 本身
@@ -41,6 +41,7 @@
 //     - 游戏退出后默认删除替身文件，再逐层删除本次运行新建的空目录
 //       遇到非空目录会停止，运行前已存在的目录不会删除
 //     - 加上 --keep-surrogate 时保留替身文件和目录，该选项在 launcher 模式下不可用
+//     - 加上 --show-info 时也通过信息框显示 info 日志，适用于 stderr 不可用的情况
 //
 // 注意：上面三项校验读取的是父进程映像路径指向的磁盘文件本身
 // 普通程序改名为 Games.exe 无法通过信任和指纹检查，替身必须来自真正签名的文件
@@ -65,6 +66,7 @@ typedef struct {
     const WCHAR *launcher;  // launcher 模式下是启动器路径，替身模式下是替身源文件，为 NULL 时使用游戏 exe 本身
     const WCHAR *target;    // 替身目标文件，为 NULL 时使用默认位置
     BOOL keep_surrogate;    // 替身模式下是否保留替身文件和目录，默认删除
+    BOOL show_info;         // 是否通过信息框显示 info 日志
     int game_index;         // 游戏路径在 argv 中的下标
     int game_args_index;    // 第一个游戏参数的下标，即 game_index + 1
 } OPTIONS;
@@ -97,8 +99,11 @@ static WCHAR *resolve_launcher_path(const WCHAR *path);
 static WCHAR *resolve_game_path(const WCHAR *path);
 static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg);
 static WCHAR *build_cmdline(int argc, WCHAR **argv);
+static void log_info(const WCHAR *message);
 static void show_error(const WCHAR *message);
 static void show_win32_error(const WCHAR *what, DWORD code);
+
+static BOOL show_info_dialogs = FALSE;
 
 int wmain(const int argc, WCHAR *argv[]) {
     OPTIONS opts;
@@ -106,6 +111,7 @@ int wmain(const int argc, WCHAR *argv[]) {
     if (parse_rc != 0) {
         return parse_rc;
     }
+    show_info_dialogs = opts.show_info;
 
     WCHAR *resolved_game = resolve_game_path(argv[opts.game_index]);
     if (!resolved_game) {
@@ -176,8 +182,9 @@ static void show_usage() {
         L"gryph-surrogate.exe --launcher <启动器|exe> <游戏路径> [游戏参数...]\n"
         L"gryph-surrogate.exe --mode launcher --launcher <启动器|exe> <游戏路径> [游戏参数...]\n"
         L"gryph-surrogate.exe --mode hardlink|copy|hardlink-or-copy"
-        L" [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate]"
-        L" <游戏路径> [游戏参数...]");
+        L" [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate] [--show-info]"
+        L" <游戏路径> [游戏参数...]\n"
+        L"--show-info: 通过信息框显示 info 日志");
 }
 
 static BOOL is_exe_file(const WCHAR *path) {
@@ -215,6 +222,7 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     const WCHAR *launcher_value = nullptr;
     const WCHAR *target_value = nullptr;
     int keep_surrogate = FALSE;
+    int show_info = FALSE;
 
     // 选项写在前面，遇到第一个非选项参数就当作游戏路径，之后的全部都是游戏参数
     // 未显式指定模式时，--launcher 表示 launcher 模式；裸参数按兼容规则区分旧写法。
@@ -252,6 +260,9 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
         } else if (wcscmp(argv[i], L"--keep-surrogate") == 0) {
             keep_surrogate = TRUE;
             i++;
+        } else if (wcscmp(argv[i], L"--show-info") == 0) {
+            show_info = TRUE;
+            i++;
         } else {
             pos_start = i;
         }
@@ -275,6 +286,7 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     opts->mode = mode;
     opts->target = target_value;
     opts->keep_surrogate = keep_surrogate;
+    opts->show_info = show_info;
 
     if (mode == MODE_LAUNCHER) {
         if (target_value) {
@@ -687,14 +699,18 @@ static WCHAR *surrogate_make_link(const WCHAR *source, const LAUNCH_MODE mode, c
 
     // 检查已有的目标文件
     if (target_attributes != INVALID_FILE_ATTRIBUTES) {
-        BOOL reuse = FALSE;
+        BOOL reuse_hardlink = FALSE;
+        BOOL reuse_copy = FALSE;
         if (mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY) {
-            reuse = is_same_file(source, target);
+            reuse_hardlink = is_same_file(source, target);
         }
-        if (!reuse && (mode == MODE_COPY || mode == MODE_HARDLINK_OR_COPY)) {
-            reuse = copy_matches_source(source, target);
+        if (!reuse_hardlink && (mode == MODE_COPY || mode == MODE_HARDLINK_OR_COPY)) {
+            reuse_copy = copy_matches_source(source, target);
         }
-        if (reuse) {
+        if (reuse_hardlink || reuse_copy) {
+            log_info(is_same_file(source, target)
+                ? L"复用已有硬链接替身"
+                : L"复用已有复制替身");
             return _wcsdup(target);
         }
     }
@@ -706,17 +722,25 @@ static WCHAR *surrogate_make_link(const WCHAR *source, const LAUNCH_MODE mode, c
 
     if (mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY) {
         if (CreateHardLinkW(target, source, nullptr)) {
+            log_info(L"替身创建方式：硬链接");
             return _wcsdup(target);
         }
+        const DWORD hardlink_error = GetLastError();
         if (mode == MODE_HARDLINK) {
             // --mode hardlink 不允许回退，直接报告失败原因
             show_win32_error(L"硬链接创建失败（--mode hardlink 不回退，"
-                             L"常见原因：源与目标不在同一文件系统）", GetLastError());
+                             L"常见原因：源与目标不在同一文件系统）", hardlink_error);
             return nullptr;
         }
+        WCHAR message[128];
+        _snwprintf(message, ARRAYSIZE(message),
+                   L"创建硬链接失败（错误码: %lu），回退为复制", hardlink_error);
+        message[ARRAYSIZE(message) - 1] = L'\0';
+        log_info(message);
     }
 
     if (CopyFileW(source, target, FALSE)) {
+        log_info(L"替身创建方式：复制");
         return _wcsdup(target);
     }
 
@@ -1070,7 +1094,61 @@ static WCHAR *build_cmdline(const int argc, WCHAR **argv) {
     return cmd;
 }
 
+static HANDLE get_stderr_handle() {
+    static HANDLE stderr_handle;
+    static BOOL checked;
+    if (!checked) {
+        stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
+        if (stderr_handle == INVALID_HANDLE_VALUE) {
+            stderr_handle = NULL;
+        }
+        checked = TRUE;
+    }
+    return stderr_handle;
+}
+
+static void log_message(const char *level, const WCHAR *message) {
+    HANDLE stderr_handle = get_stderr_handle();
+    if (!stderr_handle) {
+        return;
+    }
+
+    char output[4096];
+    const size_t level_length = strlen(level);
+    if (level_length >= sizeof(output)) {
+        return;
+    }
+    memcpy(output, level, level_length);
+    const int message_length = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, message, -1,
+        output + level_length, (int)(sizeof(output) - level_length), nullptr, nullptr);
+    if (message_length <= 0) {
+        return;
+    }
+
+    output[level_length + (size_t)message_length - 1] = '\r';
+    output[level_length + (size_t)message_length] = '\n';
+    const SIZE_T output_length = level_length + (size_t)message_length + 1;
+
+    for (SIZE_T offset = 0; offset < output_length;) {
+        const DWORD chunk = output_length - offset;
+        DWORD written = 0;
+        if (!WriteFile(stderr_handle, output + offset, chunk, &written, nullptr) || written == 0) {
+            break;
+        }
+        offset += written;
+    }
+}
+
+static void log_info(const WCHAR *message) {
+    log_message("[INFO] ", message);
+    if (show_info_dialogs) {
+        MessageBoxW(nullptr, message, L"Hyps gryph-surrogate", MB_OK | MB_ICONINFORMATION);
+    }
+}
+
 static void show_error(const WCHAR *message) {
+    log_message("[ERROR] ", message);
     MessageBoxW(nullptr, message, L"Hyps gryph-surrogate", MB_OK | MB_ICONERROR);
 }
 

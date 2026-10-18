@@ -41,7 +41,13 @@
 //     - 游戏退出后默认删除替身文件，再逐层删除本次运行新建的空目录
 //       遇到非空目录会停止，运行前已存在的目录不会删除
 //     - 加上 --keep-surrogate 时保留替身文件和目录，该选项在 launcher 模式下不可用
-//     - 加上 --show-info 时也通过信息框显示 info 日志，适用于 stderr 不可用的情况
+//     - 加上 --show-info 时也通过信息框显示 info 日志，启动时会探测并报告 stderr 状态
+//     - 加上 --launcher-exit-after <毫秒> 时，游戏启动后等待这么多毫秒
+//       游戏仍在运行则结束挂起的父进程并让本工具直接退出，游戏继续运行
+//       父进程可以是替身，也可以是官方启动器；替身模式下替身文件是父进程而不是游戏本体
+//       结束父进程后即可删除替身，清理规则与正常退出相同
+//       游戏在此之前退出时，行为与不加该选项相同
+//       本工具在超时前被强制结束时，挂起的父进程仍会残留
 //
 // 注意：上面三项校验读取的是父进程映像路径指向的磁盘文件本身
 // 普通程序改名为 Games.exe 无法通过信任和指纹检查，替身必须来自真正签名的文件
@@ -52,7 +58,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
-
+#include <errno.h>
 typedef enum {
     MODE_LAUNCHER = 0,       // 挂起官方启动器作为父进程
     MODE_HARDLINK,           // 硬链接替身，失败不回退
@@ -67,6 +73,7 @@ typedef struct {
     const WCHAR *target;    // 替身目标文件，为 NULL 时使用默认位置
     BOOL keep_surrogate;    // 替身模式下是否保留替身文件和目录，默认删除
     BOOL show_info;         // 是否通过信息框显示 info 日志
+    int launcher_exit_after; // 游戏启动后等待的毫秒数，超时仍在运行则结束父进程并退出，0 表示不启用
     int game_index;         // 游戏路径在 argv 中的下标
     int game_args_index;    // 第一个游戏参数的下标，即 game_index + 1
 } OPTIONS;
@@ -78,7 +85,8 @@ static void show_usage();
 static int parse_command_line(int argc, WCHAR *argv[], OPTIONS *opts);
 static WCHAR *surrogate_default_target(const WCHAR *game_exe);
 static WCHAR *surrogate_prepare(const OPTIONS *opts, const WCHAR *game_exe, WCHAR **created_root);
-static int launch_game_chain(WCHAR *surrogate_path, int game_argc, WCHAR **game_argv);
+static int launch_game_chain(WCHAR *surrogate_path, int game_argc, WCHAR **game_argv,
+                             int launcher_exit_after);
 static BOOL open_file_info(const WCHAR *path, HANDLE *handle, BY_HANDLE_FILE_INFORMATION *info);
 static BOOL is_same_file(const WCHAR *left, const WCHAR *right);
 static BOOL copy_matches_source(const WCHAR *source, const WCHAR *link);
@@ -99,7 +107,9 @@ static WCHAR *resolve_launcher_path(const WCHAR *path);
 static WCHAR *resolve_game_path(const WCHAR *path);
 static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg);
 static WCHAR *build_cmdline(int argc, WCHAR **argv);
+static BOOL log_message(const char *level, const WCHAR *message);
 static void log_info(const WCHAR *message);
+static void probe_stderr(void);
 static void show_error(const WCHAR *message);
 static void show_win32_error(const WCHAR *what, DWORD code);
 
@@ -112,6 +122,9 @@ int wmain(const int argc, WCHAR *argv[]) {
         return parse_rc;
     }
     show_info_dialogs = opts.show_info;
+    if (show_info_dialogs) {
+        probe_stderr();
+    }
 
     WCHAR *resolved_game = resolve_game_path(argv[opts.game_index]);
     if (!resolved_game) {
@@ -144,7 +157,8 @@ int wmain(const int argc, WCHAR *argv[]) {
         return 1;
     }
 
-    const int rc = launch_game_chain(surrogate_path, game_argc, game_argv);
+    const int rc = launch_game_chain(surrogate_path, game_argc, game_argv,
+                                     opts.launcher_exit_after);
 
     if (opts.mode != MODE_LAUNCHER && !opts.keep_surrogate) {
         remove_surrogate(surrogate_path, created_root);
@@ -183,8 +197,10 @@ static void show_usage() {
         L"gryph-surrogate.exe --mode launcher --launcher <启动器|exe> <游戏路径> [游戏参数...]\n"
         L"gryph-surrogate.exe --mode hardlink|copy|hardlink-or-copy"
         L" [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate] [--show-info]"
+        L" [--launcher-exit-after <毫秒>]"
         L" <游戏路径> [游戏参数...]\n"
-        L"--show-info: 通过信息框显示 info 日志");
+        L"--show-info: 通过信息框显示 info 日志\n"
+        L"--launcher-exit-after: 游戏启动后 N 毫秒仍在运行则结束父进程并退出（游戏继续运行）");
 }
 
 static BOOL is_exe_file(const WCHAR *path) {
@@ -223,6 +239,7 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     const WCHAR *target_value = nullptr;
     int keep_surrogate = FALSE;
     int show_info = FALSE;
+    int launcher_exit_after = 0;
 
     // 选项写在前面，遇到第一个非选项参数就当作游戏路径，之后的全部都是游戏参数
     // 未显式指定模式时，--launcher 表示 launcher 模式；裸参数按兼容规则区分旧写法。
@@ -263,6 +280,22 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
         } else if (wcscmp(argv[i], L"--show-info") == 0) {
             show_info = TRUE;
             i++;
+        } else if (wcscmp(argv[i], L"--launcher-exit-after") == 0) {
+            if (i + 1 >= argc) {
+                show_usage();
+                return 2;
+            }
+            const WCHAR *value = argv[i + 1];
+            WCHAR *end = nullptr;
+            // errno 检测溢出，wcstol 溢出时返回 LONG_MAX 而不是报错
+            errno = 0;
+            const long ms = wcstol(value, &end, 10);
+            if (value[0] == L'\0' || *end != L'\0' || errno == ERANGE || ms < 1 || ms > INT_MAX) {
+                show_error(L"--launcher-exit-after 只接受正整数毫秒数");
+                return 2;
+            }
+            launcher_exit_after = (int)ms;
+            i += 2;
         } else {
             pos_start = i;
         }
@@ -287,6 +320,7 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     opts->target = target_value;
     opts->keep_surrogate = keep_surrogate;
     opts->show_info = show_info;
+    opts->launcher_exit_after = launcher_exit_after;
 
     if (mode == MODE_LAUNCHER) {
         if (target_value) {
@@ -421,7 +455,8 @@ static WCHAR *surrogate_prepare(const OPTIONS *opts, const WCHAR *game_exe, WCHA
 // 以挂起的 surrogate_path 作为父进程启动游戏 game_argv
 // 游戏退出后，原样返回它的退出码
 // 失败返回 1，成功返回游戏退出码
-static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR **game_argv) {
+static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR **game_argv,
+                             const int launcher_exit_after) {
     PROCESS_INFORMATION launcher;
     PROCESS_INFORMATION game;
     STARTUPINFOW si;
@@ -483,7 +518,23 @@ static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR *
     CloseHandle(game.hThread);
     game.hThread = NULL;
 
-    if (WaitForSingleObject(game.hProcess, INFINITE) != WAIT_OBJECT_0) {
+    // launcher_exit_after 为 0 时无限等待；否则超时仍在运行则结束挂起的父进程，本工具直接退出，游戏继续运行
+    DWORD wait_rc = WAIT_TIMEOUT;
+    if (launcher_exit_after > 0) {
+        wait_rc = WaitForSingleObject(game.hProcess, (DWORD)launcher_exit_after);
+    } else {
+        wait_rc = WaitForSingleObject(game.hProcess, INFINITE);
+    }
+    if (wait_rc == WAIT_TIMEOUT) {
+        TerminateProcess(launcher.hProcess, 0);
+        WaitForSingleObject(launcher.hProcess, 5000);
+        CloseHandle(launcher.hProcess);
+        launcher.hProcess = NULL;
+        log_info(L"已结束启动器，游戏继续运行");
+        rc = 0;
+        goto cleanup;
+    }
+    if (wait_rc != WAIT_OBJECT_0) {
         show_win32_error(L"等待游戏进程失败", GetLastError());
         goto cleanup;
     }
@@ -1107,23 +1158,24 @@ static HANDLE get_stderr_handle() {
     return stderr_handle;
 }
 
-static void log_message(const char *level, const WCHAR *message) {
+static BOOL log_message(const char *level, const WCHAR *message) {
     HANDLE stderr_handle = get_stderr_handle();
     if (!stderr_handle) {
-        return;
+        return FALSE;
     }
 
     char output[4096];
     const size_t level_length = strlen(level);
-    if (level_length >= sizeof(output)) {
-        return;
+    if (level_length + 1 >= sizeof(output)) {
+        return FALSE;
     }
     memcpy(output, level, level_length);
     const int message_length = WideCharToMultiByte(
         CP_UTF8, WC_ERR_INVALID_CHARS, message, -1,
-        output + level_length, (int)(sizeof(output) - level_length), nullptr, nullptr);
+        output + level_length,
+        (int)(sizeof(output) - level_length - 1), nullptr, nullptr);
     if (message_length <= 0) {
-        return;
+        return FALSE;
     }
 
     output[level_length + (size_t)message_length - 1] = '\r';
@@ -1131,13 +1183,21 @@ static void log_message(const char *level, const WCHAR *message) {
     const SIZE_T output_length = level_length + (size_t)message_length + 1;
 
     for (SIZE_T offset = 0; offset < output_length;) {
-        const DWORD chunk = output_length - offset;
+        const SIZE_T remaining = output_length - offset;
+        const DWORD chunk = remaining > MAXDWORD ? MAXDWORD : (DWORD)remaining;
         DWORD written = 0;
         if (!WriteFile(stderr_handle, output + offset, chunk, &written, nullptr) || written == 0) {
-            break;
+            return FALSE;
         }
         offset += written;
     }
+    return TRUE;
+}
+
+static void probe_stderr(void) {
+    const BOOL stderr_available = log_message("[INFO] ", L"stderr 探测成功");
+    const WCHAR *message = stderr_available ? L"stderr 探测成功" : L"stderr 探测失败";
+    MessageBoxW(nullptr, message, L"Hyps gryph-surrogate", MB_OK | MB_ICONINFORMATION);
 }
 
 static void log_info(const WCHAR *message) {

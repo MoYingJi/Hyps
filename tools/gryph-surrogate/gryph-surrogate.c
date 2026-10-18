@@ -23,13 +23,22 @@
 //     显式指定 launcher 模式，此时必须用 --launcher 给出启动器
 //
 //   gryph-surrogate.exe --mode hardlink|copy|hardlink-or-copy
-//         [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate] [--show-info]
-//         <游戏路径> [游戏参数...]
+//         [--launcher <源文件>] [--target <目标文件>]
+//         [--hardlink-target <目标文件>] [--copy-target <目标文件>]
+//         [--keep-surrogate] [--show-info] <游戏路径> [游戏参数...]
 //     替身模式: 把源文件做成目标文件（硬链接或复制），再将目标文件挂起，作为游戏的父进程
 //     - 不写 --launcher 时，源文件就是游戏 exe 本身
 //       这样做可行，是因为游戏目录里的几个 PE 与官方启动器的 Games.exe 使用同一张 HG 代码签名证书
-//     - 不写 --target 时，目标默认放在 <游戏目录>\..\gryph-surrogate\Games.exe
+//     - 目标路径可以统一设置，也可以分别设置
+//       --target 同时作为硬链接目标和复制目标
+//       --hardlink-target 只作为硬链接目标，--copy-target 只作为复制目标
+//       两者同时给出时，单独的选项优先于 --target
+//       只设置其中一个时，另一个保持默认位置
+//       --hardlink-target 只能与 hardlink / hardlink-or-copy 一起使用，
+//       --copy-target 只能与 copy / hardlink-or-copy 一起使用
+//     - 硬链接默认位置为 <游戏目录>\..\gryph-surrogate\Games.exe
 //       该位置和游戏目录在同一个盘上，硬链接更容易成功，而且不会往游戏目录里写文件
+//     - 复制默认位置为 %TEMP%\gryph-surrogate\Games.exe（系统临时目录）
 //     - 目标已存在时，会先校验再决定是否复用
 //       hardlink 检查两者是否为同一份物理文件
 //       copy 检查大小和修改时间是否一致
@@ -59,6 +68,7 @@
 #include <string.h>
 #include <wchar.h>
 #include <errno.h>
+
 typedef enum {
     MODE_LAUNCHER = 0,       // 挂起官方启动器作为父进程
     MODE_HARDLINK,           // 硬链接替身，失败不回退
@@ -69,13 +79,15 @@ typedef enum {
 // 解析后的命令行参数
 typedef struct {
     LAUNCH_MODE mode;
-    const WCHAR *launcher;  // launcher 模式下是启动器路径，替身模式下是替身源文件，为 NULL 时使用游戏 exe 本身
-    const WCHAR *target;    // 替身目标文件，为 NULL 时使用默认位置
-    BOOL keep_surrogate;    // 替身模式下是否保留替身文件和目录，默认删除
-    BOOL show_info;         // 是否通过信息框显示 info 日志
-    int launcher_exit_after; // 游戏启动后等待的毫秒数，超时仍在运行则结束父进程并退出，0 表示不启用
-    int game_index;         // 游戏路径在 argv 中的下标
-    int game_args_index;    // 第一个游戏参数的下标，即 game_index + 1
+    const WCHAR *launcher;        // launcher 模式下是启动器路径，替身模式下是替身源文件，为 NULL 时使用游戏 exe 本身
+    const WCHAR *target;          // 统一的替身目标，硬链接和复制都使用，为 NULL 时不设置
+    const WCHAR *hardlink_target; // 硬链接替身目标，优先于 target，为 NULL 时用 target 或默认位置
+    const WCHAR *copy_target;     // 复制替身目标，优先于 target，为 NULL 时用 target 或默认位置
+    BOOL keep_surrogate;          // 替身模式下是否保留替身文件和目录，默认删除
+    BOOL show_info;               // 是否通过信息框显示 info 日志
+    int launcher_exit_after;      // 游戏启动后等待的毫秒数，超时仍在运行则结束父进程并退出，0 表示不启用
+    int game_index;               // 游戏路径在 argv 中的下标
+    int game_args_index;          // 第一个游戏参数的下标，即 game_index + 1
 } OPTIONS;
 
 static LAUNCH_MODE parse_mode(const WCHAR *value);
@@ -94,7 +106,8 @@ static BOOL delete_if_exists(const WCHAR *path);
 static void remove_created_directories(const WCHAR *file_path, const WCHAR *created_root);
 static void remove_surrogate(const WCHAR *path, const WCHAR *created_root);
 static BOOL ensure_parent_directory(const WCHAR *target, WCHAR **created_root);
-static WCHAR *surrogate_make_link(const WCHAR *source, LAUNCH_MODE mode, const WCHAR *target,
+static WCHAR *surrogate_make_link(const WCHAR *source, LAUNCH_MODE mode,
+                                  const WCHAR *hardlink_target, const WCHAR *copy_target,
                                   WCHAR **created_root);
 static BOOL is_digit(WCHAR value);
 static BOOL is_numeric_version(const WCHAR *version);
@@ -196,8 +209,9 @@ static void show_usage() {
         L"gryph-surrogate.exe --launcher <启动器|exe> <游戏路径> [游戏参数...]\n"
         L"gryph-surrogate.exe --mode launcher --launcher <启动器|exe> <游戏路径> [游戏参数...]\n"
         L"gryph-surrogate.exe --mode hardlink|copy|hardlink-or-copy"
-        L" [--launcher <源文件>] [--target <目标文件>] [--keep-surrogate] [--show-info]"
-        L" [--launcher-exit-after <毫秒>]"
+        L" [--launcher <源文件>] [--target <目标文件>]"
+        L" [--hardlink-target <目标文件>] [--copy-target <目标文件>]"
+        L" [--keep-surrogate] [--show-info] [--launcher-exit-after <毫秒>]"
         L" <游戏路径> [游戏参数...]\n"
         L"--show-info: 通过信息框显示 info 日志\n"
         L"--launcher-exit-after: 游戏启动后 N 毫秒仍在运行则结束父进程并退出（游戏继续运行）");
@@ -237,6 +251,8 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     int legacy_launcher_syntax = FALSE;
     const WCHAR *launcher_value = nullptr;
     const WCHAR *target_value = nullptr;
+    const WCHAR *hardlink_target_value = nullptr;
+    const WCHAR *copy_target_value = nullptr;
     int keep_surrogate = FALSE;
     int show_info = FALSE;
     int launcher_exit_after = 0;
@@ -273,6 +289,20 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
                 return 2;
             }
             target_value = argv[i + 1];
+            i += 2;
+        } else if (wcscmp(argv[i], L"--hardlink-target") == 0) {
+            if (i + 1 >= argc) {
+                show_usage();
+                return 2;
+            }
+            hardlink_target_value = argv[i + 1];
+            i += 2;
+        } else if (wcscmp(argv[i], L"--copy-target") == 0) {
+            if (i + 1 >= argc) {
+                show_usage();
+                return 2;
+            }
+            copy_target_value = argv[i + 1];
             i += 2;
         } else if (wcscmp(argv[i], L"--keep-surrogate") == 0) {
             keep_surrogate = TRUE;
@@ -318,14 +348,16 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
     ZeroMemory(opts, sizeof(*opts));
     opts->mode = mode;
     opts->target = target_value;
+    opts->hardlink_target = hardlink_target_value;
+    opts->copy_target = copy_target_value;
     opts->keep_surrogate = keep_surrogate;
     opts->show_info = show_info;
     opts->launcher_exit_after = launcher_exit_after;
 
     if (mode == MODE_LAUNCHER) {
-        if (target_value) {
-            // launcher 模式不会创建链接，所以不能用 --target
-            show_error(L"--target 仅在替身模式（hardlink / copy / hardlink-or-copy）下可用");
+        if (target_value || hardlink_target_value || copy_target_value) {
+            // launcher 模式不会创建链接，所以不能用目标相关选项
+            show_error(L"--target / --hardlink-target / --copy-target 仅在替身模式（hardlink / copy / hardlink-or-copy）下可用");
             return 2;
         }
         if (keep_surrogate) {
@@ -351,6 +383,14 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
         }
         opts->game_index = pos_start;
     } else {
+        if (hardlink_target_value && mode == MODE_COPY) {
+            show_error(L"--hardlink-target 仅在 hardlink / hardlink-or-copy 模式下可用");
+            return 2;
+        }
+        if (copy_target_value && mode == MODE_HARDLINK) {
+            show_error(L"--copy-target 仅在 copy / hardlink-or-copy 模式下可用");
+            return 2;
+        }
         opts->launcher = launcher_value;
         opts->game_index = pos_start;
     }
@@ -409,6 +449,34 @@ static WCHAR *surrogate_default_target(const WCHAR *game_exe) {
     return target;
 }
 
+// 推导默认复制目标 %TEMP%\gryph-surrogate\Games.exe
+// 复制不要求同盘，放到系统临时目录里，不占用游戏目录所在的盘
+static WCHAR *surrogate_default_copy_target(void) {
+    WCHAR temp_dir[MAX_PATH + 1];
+    const DWORD length = GetTempPathW(MAX_PATH + 1, temp_dir);
+    if (length == 0) {
+        show_win32_error(L"无法获取临时目录", GetLastError());
+        return nullptr;
+    }
+    if (length > MAX_PATH) {
+        show_error(L"临时目录路径过长，请用 --copy-target 显式指定");
+        return nullptr;
+    }
+
+    WCHAR *base = join_path(temp_dir, L"gryph-surrogate");
+    if (!base) {
+        show_error(L"内存不足");
+        return nullptr;
+    }
+    WCHAR *target = join_path(base, L"Games.exe");
+    free(base);
+    if (!target) {
+        show_error(L"内存不足");
+        return nullptr;
+    }
+    return target;
+}
+
 // 确定替身模式的源和目标，准备替身文件
 // 成功时返回替身的可执行路径，由调用方负责释放
 // 本次新建的最上层目录会写入 created_root，失败时这些空目录会被删掉
@@ -428,27 +496,34 @@ static WCHAR *surrogate_prepare(const OPTIONS *opts, const WCHAR *game_exe, WCHA
         }
     }
 
-    WCHAR *target;
-    if (opts->target) {
-        target = _wcsdup(opts->target);
-        if (!target) {
-            show_error(L"内存不足");
+    // 单独的选项优先于 --target，都没有时使用各自的默认位置
+    // 只为当前模式会用到的目标取值，默认位置仅在需要时推导
+    const BOOL use_hardlink = opts->mode == MODE_HARDLINK || opts->mode == MODE_HARDLINK_OR_COPY;
+    const BOOL use_copy = opts->mode == MODE_COPY || opts->mode == MODE_HARDLINK_OR_COPY;
+    const WCHAR *hardlink_target = opts->hardlink_target ? opts->hardlink_target : opts->target;
+    const WCHAR *copy_target = opts->copy_target ? opts->copy_target : opts->target;
+    WCHAR *default_hardlink = nullptr;
+    WCHAR *default_copy = nullptr;
+    if (use_hardlink && !hardlink_target) {
+        default_hardlink = surrogate_default_target(game_exe);
+        if (!default_hardlink) {
             return nullptr;
         }
-    } else {
-        target = surrogate_default_target(game_exe);
-        if (!target) {
+        hardlink_target = default_hardlink;
+    }
+    if (use_copy && !copy_target) {
+        default_copy = surrogate_default_copy_target();
+        if (!default_copy) {
+            free(default_hardlink);
             return nullptr;
         }
+        copy_target = default_copy;
     }
 
-    WCHAR *surrogate = surrogate_make_link(source, opts->mode, target, created_root);
-    if (!surrogate && *created_root) {
-        remove_created_directories(target, *created_root);
-        free(*created_root);
-        *created_root = nullptr;
-    }
-    free(target);
+    WCHAR *surrogate = surrogate_make_link(source, opts->mode, hardlink_target, copy_target,
+                                           created_root);
+    free(default_hardlink);
+    free(default_copy);
     return surrogate;
 }
 
@@ -733,50 +808,88 @@ static BOOL ensure_parent_directory(const WCHAR *target, WCHAR **created_root) {
     return TRUE;
 }
 
-// 创建、校验或复用替身文件，返回替身的可执行路径，由调用方负责释放
-// 目标已存在时先按 mode 校验，校验不通过或目标不存在，则按 mode 重新生成
-static WCHAR *surrogate_make_link(const WCHAR *source, const LAUNCH_MODE mode, const WCHAR *target,
-                                  WCHAR **created_root) {
-    if (!ensure_parent_directory(target, created_root)) {
-        return nullptr;
+// 删除一次失败尝试新建的目录，并清空 created_root
+static void rollback_created_directories(const WCHAR *target, WCHAR **created_root) {
+    if (*created_root) {
+        remove_created_directories(target, *created_root);
+        free(*created_root);
+        *created_root = nullptr;
     }
+}
 
-    const DWORD target_attributes = GetFileAttributesW(target);
-    if (target_attributes != INVALID_FILE_ATTRIBUTES
-        && (target_attributes & FILE_ATTRIBUTE_DIRECTORY)) {
+// 确保 target 的父目录存在，失败时删除本次新建的目录
+static BOOL prepare_target_directory(const WCHAR *target, WCHAR **created_root) {
+    if (ensure_parent_directory(target, created_root)) {
+        return TRUE;
+    }
+    rollback_created_directories(target, created_root);
+    return FALSE;
+}
+
+// 目标是目录时无法作为替身使用，返回 FALSE 表示不可用，错误信息已显示
+static BOOL check_target_not_directory(const WCHAR *target) {
+    const DWORD attributes = GetFileAttributesW(target);
+    if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) {
         show_error(L"替身目标已存在且是目录，无法作为可执行文件使用");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// 目标已存在且校验通过时可以复用
+// hardlink 只接受硬链接，copy 只接受复制品，hardlink-or-copy 两者都接受
+static BOOL surrogate_reusable(const WCHAR *source, const WCHAR *target, const LAUNCH_MODE mode) {
+    if ((mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY) && is_same_file(source, target)) {
+        log_info(L"复用已有硬链接替身");
+        return TRUE;
+    }
+    if ((mode == MODE_COPY || mode == MODE_HARDLINK_OR_COPY) && copy_matches_source(source, target)) {
+        log_info(L"复用已有复制替身");
+        return TRUE;
+    }
+    return FALSE;
+}
+
+// 创建、校验或复用替身文件，返回替身的可执行路径，由调用方负责释放
+// hardlink_target 用于硬链接，copy_target 用于复制，mode 决定会用到哪一个
+// hardlink-or-copy 先尝试硬链接目标，失败后改用复制目标，两个目标互不影响
+// 本次新建的最上层目录写入 created_root，失败时这些目录会被删除
+static WCHAR *surrogate_make_link(const WCHAR *source, const LAUNCH_MODE mode,
+                                  const WCHAR *hardlink_target, const WCHAR *copy_target,
+                                  WCHAR **created_root) {
+    const BOOL use_hardlink = mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY;
+    const BOOL use_copy = mode == MODE_COPY || mode == MODE_HARDLINK_OR_COPY;
+
+    if (use_hardlink && !check_target_not_directory(hardlink_target)) {
+        return nullptr;
+    }
+    if (use_copy && !check_target_not_directory(copy_target)) {
         return nullptr;
     }
 
-    // 检查已有的目标文件
-    if (target_attributes != INVALID_FILE_ATTRIBUTES) {
-        BOOL reuse_hardlink = FALSE;
-        BOOL reuse_copy = FALSE;
-        if (mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY) {
-            reuse_hardlink = is_same_file(source, target);
-        }
-        if (!reuse_hardlink && (mode == MODE_COPY || mode == MODE_HARDLINK_OR_COPY)) {
-            reuse_copy = copy_matches_source(source, target);
-        }
-        if (reuse_hardlink || reuse_copy) {
-            log_info(is_same_file(source, target)
-                ? L"复用已有硬链接替身"
-                : L"复用已有复制替身");
-            return _wcsdup(target);
-        }
+    // 已有的目标先校验，能复用就直接返回
+    if (use_hardlink && surrogate_reusable(source, hardlink_target, mode)) {
+        return _wcsdup(hardlink_target);
+    }
+    if (use_copy && surrogate_reusable(source, copy_target, mode)) {
+        return _wcsdup(copy_target);
     }
 
     // 重新生成
-    if (!delete_if_exists(target)) {
-        return nullptr;
-    }
-
-    if (mode == MODE_HARDLINK || mode == MODE_HARDLINK_OR_COPY) {
-        if (CreateHardLinkW(target, source, nullptr)) {
+    if (use_hardlink) {
+        if (!prepare_target_directory(hardlink_target, created_root)) {
+            return nullptr;
+        }
+        if (!delete_if_exists(hardlink_target)) {
+            rollback_created_directories(hardlink_target, created_root);
+            return nullptr;
+        }
+        if (CreateHardLinkW(hardlink_target, source, nullptr)) {
             log_info(L"替身创建方式：硬链接");
-            return _wcsdup(target);
+            return _wcsdup(hardlink_target);
         }
         const DWORD hardlink_error = GetLastError();
+        rollback_created_directories(hardlink_target, created_root);
         if (mode == MODE_HARDLINK) {
             // --mode hardlink 不允许回退，直接报告失败原因
             show_win32_error(L"硬链接创建失败（--mode hardlink 不回退，"
@@ -790,14 +903,23 @@ static WCHAR *surrogate_make_link(const WCHAR *source, const LAUNCH_MODE mode, c
         log_info(message);
     }
 
-    if (CopyFileW(source, target, FALSE)) {
-        log_info(L"替身创建方式：复制");
-        return _wcsdup(target);
+    if (!prepare_target_directory(copy_target, created_root)) {
+        return nullptr;
     }
-
-    show_win32_error(L"复制替身文件失败", GetLastError());
+    if (!delete_if_exists(copy_target)) {
+        rollback_created_directories(copy_target, created_root);
+        return nullptr;
+    }
+    if (CopyFileW(source, copy_target, FALSE)) {
+        log_info(L"替身创建方式：复制");
+        return _wcsdup(copy_target);
+    }
+    const DWORD copy_error = GetLastError();
+    rollback_created_directories(copy_target, created_root);
+    show_win32_error(L"复制替身文件失败", copy_error);
     return nullptr;
 }
+
 
 // ── 路径解析 ────────────────────────────────────────────────
 

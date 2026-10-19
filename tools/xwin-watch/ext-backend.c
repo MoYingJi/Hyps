@@ -77,31 +77,23 @@ static void ext_bind(struct wl_registry *registry, const uint32_t name, const ui
     (void)version;
     g_ext_list = (struct ext_foreign_toplevel_list_v1 *)wl_registry_bind(
         registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
-    ext_foreign_toplevel_list_v1_add_listener(g_ext_list, &ext_list_listener, NULL);
+    ext_foreign_toplevel_list_v1_add_listener(g_ext_list, &ext_list_listener, nullptr);
 }
 
 static bool ext_check(const char *target_window) {
     bool found = false;
-    ext_toplevel_t *prev = nullptr;
-    ext_toplevel_t *node = g_ext_toplevels;
-    while (node) {
+    for (ext_toplevel_t **link = &g_ext_toplevels; *link;) {
+        ext_toplevel_t *node = *link;
         if (node->dead) {
-            ext_toplevel_t *dead = node;
-            if (prev) {
-                prev->next = node->next;
-            } else {
-                g_ext_toplevels = node->next;
-            }
-            node = node->next;
-            free(dead->title);
-            free(dead);
+            *link = node->next;
+            free(node->title);
+            free(node);
             continue;
         }
         if (!found && node->title && strcmp(node->title, target_window) == 0) {
             found = true;
         }
-        prev = node;
-        node = node->next;
+        link = &node->next;
     }
     return found;
 }
@@ -132,8 +124,7 @@ static wayland_extension_t g_ext_extension = {
     .close = ext_close,
 };
 
-static void ext_register() __attribute__((constructor));
-static void ext_register() {
+[[gnu::constructor]] static void ext_register() {
     g_ext_extension.interface_name = ext_foreign_toplevel_list_v1_interface.name;
     wayland_register_extension(&g_ext_extension);
 }

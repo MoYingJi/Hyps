@@ -159,31 +159,23 @@ static void plasma_bind(struct wl_registry *registry, uint32_t name, uint32_t ve
     uint32_t bind_version = version < PLASMA_MAX_VERSION ? version : PLASMA_MAX_VERSION;
     g_plasma_wm = (struct org_kde_plasma_window_management *)wl_registry_bind(
         registry, name, &org_kde_plasma_window_management_interface, bind_version);
-    org_kde_plasma_window_management_add_listener(g_plasma_wm, &plasma_wm_listener, NULL);
+    org_kde_plasma_window_management_add_listener(g_plasma_wm, &plasma_wm_listener, nullptr);
 }
 
 static bool plasma_check(const char *target_window) {
     bool found = false;
-    plasma_toplevel_t *prev = nullptr;
-    plasma_toplevel_t *node = g_plasma_toplevels;
-    while (node) {
+    for (plasma_toplevel_t **link = &g_plasma_toplevels; *link;) {
+        plasma_toplevel_t *node = *link;
         if (node->dead) {
-            plasma_toplevel_t *dead = node;
-            if (prev) {
-                prev->next = node->next;
-            } else {
-                g_plasma_toplevels = node->next;
-            }
-            node = node->next;
-            free(dead->title);
-            free(dead);
+            *link = node->next;
+            free(node->title);
+            free(node);
             continue;
         }
         if (!found && node->title && strcmp(node->title, target_window) == 0) {
             found = true;
         }
-        prev = node;
-        node = node->next;
+        link = &node->next;
     }
     return found;
 }
@@ -214,8 +206,7 @@ static wayland_extension_t g_plasma_extension = {
     .close = plasma_close,
 };
 
-static void plasma_register() __attribute__((constructor));
-static void plasma_register() {
+[[gnu::constructor]] static void plasma_register() {
     g_plasma_extension.interface_name = org_kde_plasma_window_management_interface.name;
     wayland_register_extension(&g_plasma_extension);
 }

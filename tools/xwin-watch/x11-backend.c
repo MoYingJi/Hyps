@@ -49,7 +49,7 @@ static int x11_error_handler(Display *display, XErrorEvent *event) {
 
 // 读取窗口的 WM_NAME，按 UTF-8 转换后取第一项与目标做逐字节比较
 static bool window_title_equals(Display *display, Window window, const char *target_window) {
-    XTextProperty prop = {0};
+    XTextProperty prop = {};
     char **list = nullptr;
     int count = 0;
     bool equal = false;
@@ -88,7 +88,7 @@ static bool x11_backend_check(const char *target_window) {
     unsigned long count = 0;
     unsigned long bytes_after = 0;
     unsigned char *data = nullptr;
-    XErrorHandler previous_handler = XSetErrorHandler(x11_error_handler);
+    const XErrorHandler previous_handler = XSetErrorHandler(x11_error_handler);
     const int status = XGetWindowProperty(g_x11_display, DefaultRootWindow(g_x11_display),
                                           client_list, 0, 1024, False, XA_WINDOW,
                                           &actual_type, &actual_format,
@@ -96,7 +96,7 @@ static bool x11_backend_check(const char *target_window) {
 
     bool found = false;
     if (status == Success && !g_x11_request_failed && data && count > 0 && actual_format == 32) {
-        const Window *windows = (const Window *)data;
+        auto const windows = (const Window *)data;
         for (unsigned long i = 0; i < count && !found; i++) {
             found = window_title_equals(g_x11_display, windows[i], target_window);
         }

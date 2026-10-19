@@ -149,7 +149,10 @@ static int wait_poll_timeout_ms() {
         return -1;
     }
     const int remaining = g_config.appear_timeout - (int)(time(nullptr) - g_wait_start);
-    return remaining <= 0 ? 0 : remaining * 1000;
+    if (remaining <= 0) {
+        return 0;
+    }
+    return remaining > INT_MAX / 1000 ? INT_MAX : remaining * 1000;
 }
 
 // 尝试初始化一个后端，成功则加入列表；只打印当前实际应用的那个 (第一个成功初始化的后端)
@@ -218,8 +221,9 @@ static bool parse_arguments(const int argc, char *argv[]) {
                 errno = 0;
                 const long timeout = strtol(optarg, &endptr, 10);
                 if (endptr == optarg || *endptr != '\0' || errno == ERANGE ||
-                    timeout < INT_MIN || timeout > INT_MAX) {
-                    fprintf(stderr, "错误: 无效的窗口出现超时时间: %s\n", optarg);
+                    timeout < INT_MIN || timeout > INT_MAX / 1000) {
+                    fprintf(stderr, "错误: 无效的窗口出现超时时间（最大 %d 秒）: %s\n",
+                            INT_MAX / 1000, optarg);
                     return false;
                 }
                 g_config.appear_timeout = (int)timeout;
@@ -251,7 +255,8 @@ static void print_usage(const char *program_name) {
     fprintf(stderr, "    %s [选项]\n", program_name);
     fprintf(stderr, "\n选项: \n");
     fprintf(stderr, "    -w <窗口名称>       监控的窗口名称，必填\n");
-    fprintf(stderr, "    -a <窗口出现超时>   窗口出现的超时时间（秒），超时后输出 failed 事件并退出，默认为 0，表示无限制\n");
+    fprintf(stderr, "    -a <窗口出现超时>   窗口出现的超时时间（秒），超时后输出 failed 事件并退出，默认为 0（无限制），正数最大为 %d 秒\n",
+            INT_MAX / 1000);
     fprintf(stderr, "    -c                  窗口出现后继续监控，窗口关闭时输出 closed 事件；不指定则窗口出现后立即退出\n");
     fprintf(stderr, "\n事件通过 stdout 逐行输出: exists / closed / failed，其余日志输出到 stderr\n");
 }

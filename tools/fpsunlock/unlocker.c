@@ -64,8 +64,8 @@ static bool write_process_memory(pid_t pid, uintptr_t addr, const void* buf, siz
 static bool parse_integer(const char *text, long long minimum, long long maximum, bool allow_trailing_whitespace, long long *value);
 static bool parse_memory_mapping(char *line, memory_mapping_t *mapping);
 static void* find_pattern_in_process(pid_t pid, uintptr_t start, size_t len, const int16_t* pattern, size_t plen);
-static int verify_process(pid_t pid);
-static int ends_with(const char *str, const char *suffix);
+static bool verify_process(pid_t pid);
+static bool ends_with(const char *str, const char *suffix);
 static uintptr_t find_fps_var_address(pid_t pid);
 
 int main(const int argc, char **argv) {
@@ -367,22 +367,22 @@ static void* find_pattern_in_process(const pid_t pid, const uintptr_t start, con
     return nullptr;
 }
 
-static int ends_with(const char *str, const char *suffix) {
-    if (!str || !suffix) return 0;
+static bool ends_with(const char *str, const char *suffix) {
+    if (!str || !suffix) return false;
     const size_t len_str = strlen(str);
     const size_t len_suffix = strlen(suffix);
-    if (len_suffix > len_str) return 0;
+    if (len_suffix > len_str) return false;
     return !strncmp(str + len_str - len_suffix, suffix, len_suffix);
 }
 
-static int verify_process(const pid_t pid) {
+static bool verify_process(const pid_t pid) {
     char path[64];
-    char cmdline[1024] = {0};
+    char cmdline[1024] = {};
 
-    if (pid < 1) return 0;
+    if (pid < 1) return false;
     snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
     FILE* fp = fopen(path, "r");
-    if (!fp) return 0;
+    if (!fp) return false;
 
     fread(cmdline, 1, sizeof(cmdline) - 1, fp);
     fclose(fp);

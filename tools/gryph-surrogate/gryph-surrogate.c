@@ -122,7 +122,7 @@ static WCHAR *append_quoted_arg(WCHAR *dst, const WCHAR *arg);
 static WCHAR *build_cmdline(int argc, WCHAR **argv);
 static BOOL log_message(const char *level, const WCHAR *message);
 static void log_info(const WCHAR *message);
-static void probe_stderr(void);
+static void probe_stderr();
 static void show_error(const WCHAR *message);
 static void show_win32_error(const WCHAR *what, DWORD code);
 
@@ -345,7 +345,6 @@ static int parse_command_line(const int argc, WCHAR *argv[], OPTIONS *opts) {
         }
     }
 
-    ZeroMemory(opts, sizeof(*opts));
     opts->mode = mode;
     opts->target = target_value;
     opts->hardlink_target = hardlink_target_value;
@@ -451,7 +450,7 @@ static WCHAR *surrogate_default_target(const WCHAR *game_exe) {
 
 // 推导默认复制目标 %TEMP%\gryph-surrogate\Games.exe
 // 复制不要求同盘，放到系统临时目录里，不占用游戏目录所在的盘
-static WCHAR *surrogate_default_copy_target(void) {
+static WCHAR *surrogate_default_copy_target() {
     WCHAR temp_dir[MAX_PATH + 1];
     const DWORD length = GetTempPathW(MAX_PATH + 1, temp_dir);
     if (length == 0) {
@@ -556,12 +555,12 @@ static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR *
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     if (!CreateProcessW(nullptr, lcmd, nullptr, nullptr, FALSE, CREATE_SUSPENDED,
-                        NULL, nullptr, &si, &launcher)) {
+                        nullptr, nullptr, &si, &launcher)) {
         show_win32_error(L"无法创建挂起的父进程", GetLastError());
         goto cleanup;
     }
     CloseHandle(launcher.hThread);
-    launcher.hThread = NULL;
+    launcher.hThread = nullptr;
 
     InitializeProcThreadAttributeList(nullptr, 1, 0, &attrs_size);
     attrs = HeapAlloc(GetProcessHeap(), 0, attrs_size);
@@ -577,7 +576,7 @@ static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR *
 
     if (!UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
                                    &launcher.hProcess, sizeof(launcher.hProcess),
-                                   NULL, nullptr)) {
+                                   nullptr, nullptr)) {
         show_win32_error(L"无法设置游戏父进程", GetLastError());
         goto cleanup;
     }
@@ -586,12 +585,12 @@ static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR *
     siex.StartupInfo.cb = sizeof(siex);
     siex.lpAttributeList = attrs;
     if (!CreateProcessW(nullptr, gcmd, nullptr, nullptr, FALSE, EXTENDED_STARTUPINFO_PRESENT,
-                        NULL, nullptr, &siex.StartupInfo, &game)) {
+                        nullptr, nullptr, &siex.StartupInfo, &game)) {
         show_win32_error(L"无法启动游戏", GetLastError());
         goto cleanup;
     }
     CloseHandle(game.hThread);
-    game.hThread = NULL;
+    game.hThread = nullptr;
 
     // launcher_exit_after 为 0 时无限等待；否则超时仍在运行则结束挂起的父进程，本工具直接退出，游戏继续运行
     DWORD wait_rc = WAIT_TIMEOUT;
@@ -604,7 +603,7 @@ static int launch_game_chain(WCHAR *surrogate_path, const int game_argc, WCHAR *
         TerminateProcess(launcher.hProcess, 0);
         WaitForSingleObject(launcher.hProcess, 5000);
         CloseHandle(launcher.hProcess);
-        launcher.hProcess = NULL;
+        launcher.hProcess = nullptr;
         log_info(L"已结束启动器，游戏继续运行");
         rc = 0;
         goto cleanup;
@@ -1273,7 +1272,7 @@ static HANDLE get_stderr_handle() {
     if (!checked) {
         stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
         if (stderr_handle == INVALID_HANDLE_VALUE) {
-            stderr_handle = NULL;
+            stderr_handle = nullptr;
         }
         checked = TRUE;
     }
@@ -1316,7 +1315,7 @@ static BOOL log_message(const char *level, const WCHAR *message) {
     return TRUE;
 }
 
-static void probe_stderr(void) {
+static void probe_stderr() {
     const BOOL stderr_available = log_message("[INFO] ", L"stderr 探测成功");
     const WCHAR *message = stderr_available ? L"stderr 探测成功" : L"stderr 探测失败";
     MessageBoxW(nullptr, message, L"Hyps gryph-surrogate", MB_OK | MB_ICONINFORMATION);

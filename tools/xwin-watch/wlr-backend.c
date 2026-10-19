@@ -99,31 +99,23 @@ static void wlr_bind(struct wl_registry *registry, const uint32_t name, const ui
     (void)version;
     g_wlr_manager = (struct zwlr_foreign_toplevel_manager_v1 *)wl_registry_bind(
         registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 1);
-    zwlr_foreign_toplevel_manager_v1_add_listener(g_wlr_manager, &wlr_manager_listener, NULL);
+    zwlr_foreign_toplevel_manager_v1_add_listener(g_wlr_manager, &wlr_manager_listener, nullptr);
 }
 
 static bool wlr_check(const char *target_window) {
     bool found = false;
-    wlr_toplevel_t *prev = nullptr;
-    wlr_toplevel_t *node = g_wlr_toplevels;
-    while (node) {
+    for (wlr_toplevel_t **link = &g_wlr_toplevels; *link;) {
+        wlr_toplevel_t *node = *link;
         if (node->dead) {
-            wlr_toplevel_t *dead = node;
-            if (prev) {
-                prev->next = node->next;
-            } else {
-                g_wlr_toplevels = node->next;
-            }
-            node = node->next;
-            free(dead->title);
-            free(dead);
+            *link = node->next;
+            free(node->title);
+            free(node);
             continue;
         }
         if (!found && node->title && strcmp(node->title, target_window) == 0) {
             found = true;
         }
-        prev = node;
-        node = node->next;
+        link = &node->next;
     }
     return found;
 }
@@ -154,8 +146,7 @@ static wayland_extension_t g_wlr_extension = {
     .close = wlr_close,
 };
 
-static void wlr_register() __attribute__((constructor));
-static void wlr_register() {
+[[gnu::constructor]] static void wlr_register() {
     g_wlr_extension.interface_name = zwlr_foreign_toplevel_manager_v1_interface.name;
     wayland_register_extension(&g_wlr_extension);
 }

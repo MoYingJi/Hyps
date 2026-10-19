@@ -61,7 +61,7 @@ static bool wayland_init() {
     }
 
     g_registry = wl_display_get_registry(g_display);
-    wl_registry_add_listener(g_registry, &registry_listener, NULL);
+    wl_registry_add_listener(g_registry, &registry_listener, nullptr);
     wl_display_roundtrip(g_display);
 
     bool any = false;

@@ -85,7 +85,8 @@ gi_fps_unlock_all_source() {
 gi_fps_unlock_verify_output() {
     local bin="$1"
     [ -f "$bin" ] || return 1
-    [ -x "$bin" ] || return 1
+    [[ "$(stat -c %u "$bin")" -eq 0 ]] || return 1
+    [[ "$(stat -c %a "$bin")" -eq 755 ]] || return 1
     [[ "$(getcap "$bin")" =~ cap_sys_ptrace=ep ]] || return 1
 }
 gi_fps_unlock_compile() {
@@ -94,8 +95,9 @@ gi_fps_unlock_compile() {
     run_and_log DEBUG gi-fps-unlock "编译命令" \
         "$cc" ${HYPS_CFLAGS[@]+"${HYPS_CFLAGS[@]}"} -std=gnu23 "$GI_FPS_UNLOCK_TOOL/unlocker.c" -o "$output" \
         || return 1
-    ensure_executable "$output" gi-fps-unlock
-    sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$output"
+    [[ "$(stat -c %u "$output")" -eq 0 ]] || sudo_request "设置二进制文件所有者" chown root:root "$output"
+    [[ "$(stat -c %a "$output")" -eq 755 ]] || sudo_request "设置二进制文件权限" chmod 755 "$output"
+    [[ "$(getcap "$output")" =~ cap_sys_ptrace=ep ]] || sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$output"
 }
 
 gi_fps_unlock_prepare() {

@@ -248,7 +248,8 @@ env_transform_colon_separated_array_to_string() {
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=':' result="${array[*]}"
+        local IFS=':'
+        result="${array[*]}"
     elif [[ -n "$value" ]]; then
         result="$value"
     else
@@ -263,7 +264,8 @@ env_transform_comma_separated_array_to_string() {
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=',' result="${array[*]}"
+        local IFS=','
+        result="${array[*]}"
     elif [[ -n "$value" ]]; then
         result="$value"
     else
@@ -278,7 +280,8 @@ env_transform_semicolon_separated_array_to_string() {
     if is_array "$value"; then
         local array=()
         parse_array "$value" array
-        IFS=';' result="${array[*]}"
+        local IFS=';'
+        result="${array[*]}"
     elif [[ -n "$value" ]]; then
         result="$value"
     else

@@ -147,6 +147,7 @@ register_hook() {
 # 参数: $1 = phase, $2 = on_failure (可选, "continue" 表示失败时继续执行)
 # 返回: 0 成功, 1 失败
 _lifecycle_run_sorted_hooks() {
+    local IFS=$' \t\n'
     local phase="$1"
     local on_failure="${2:-}"
     local raw="${HOOKS_BY_PHASE[$phase]:-}"

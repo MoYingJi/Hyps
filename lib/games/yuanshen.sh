@@ -95,9 +95,20 @@ gi_fps_unlock_compile() {
     run_and_log DEBUG gi-fps-unlock "编译命令" \
         "$cc" ${HYPS_CFLAGS[@]+"${HYPS_CFLAGS[@]}"} -std=gnu23 "$GI_FPS_UNLOCK_TOOL/unlocker.c" -o "$output" \
         || return 1
-    [[ "$(stat -c %u "$output")" -eq 0 ]] || sudo_request "设置二进制文件所有者" chown root:root "$output"
-    [[ "$(stat -c %a "$output")" -eq 755 ]] || sudo_request "设置二进制文件权限" chmod 755 "$output"
-    [[ "$(getcap "$output")" =~ cap_sys_ptrace=ep ]] || sudo_request "赋予读写进程内存权限" setcap cap_sys_ptrace+ep "$output"
+    gi_fps_unlock_verify_output "$output" && return 0
+    gi_fps_unlock_grant_cap "$output"
+}
+# 路径经 argv 传入 root 子 shell，不拼接进脚本；检查必须与 chown 同在 root 下执行，避免符号链接跟随
+gi_fps_unlock_grant_cap() {
+    local bin="$1"
+    # shellcheck disable=SC2016 # 单引号有意保留 $1，由子 shell 展开
+    local script='
+        [ -f "$1" ] && [ ! -L "$1" ] || exit 1
+        chown root:root "$1"
+        chmod 755 "$1"
+        setcap cap_sys_ptrace+ep "$1"
+    '
+    sudo_request "设置 fps 解锁器的所有者、权限和能力" sh -c "$script" sh "$bin"
 }
 
 gi_fps_unlock_prepare() {

@@ -373,11 +373,6 @@ init_check_features() {
         init_check_add features info "Intel RAPL" "未检测到 /sys/class/powercap/intel-rapl:0"
     fi
 
-    if [[ -w /etc/hosts ]]; then
-        init_check_add features ok "hosts 可写" "/etc/hosts"
-    else
-        init_check_add features info "hosts 可写" "当前不可写：hosts_disconnect 会用 sudo 临时提权"
-    fi
 }
 
 init_check_config() {

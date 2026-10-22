@@ -163,7 +163,7 @@ overlay.lower = "/path/to/game"
 
  - 删掉本项目的文件夹
  - 如果还设置了单独的配置文件夹，也别忘了
-    - 项目根目录的 `config.conf` 设置了 `path.config = "./config"`。配置文件夹可以被设置到别的地方，或者删掉使用默认值 `$XDG_CONFIG_HOM/hypsc` (`~/.config/hypsc`)
+    - 项目根目录的 `config.conf` 设置了 `path.config = "./config"`。配置文件夹可以被设置到别的地方，或者删掉使用默认值 `$XDG_CONFIG_HOME/hypsc` (`~/.config/hypsc`)
  - `/tmp/hypsc` (临时文件)
  - `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`)
     - 着色器缓存 (`cache.shader.enabled` 和 `cache.dx.enabled`)

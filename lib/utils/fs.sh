@@ -24,6 +24,26 @@ path_dirname() {
     output="$dir"
 }
 
+# 临时文件后缀；上次运行被打断时可能遗留 "$dst$FILE_ATOMIC_TMP_SUFFIX"
+FILE_ATOMIC_TMP_SUFFIX=".hyps-tmp"
+
+# 先复制到同目录的临时文件，再 mv 覆盖，替换是原子的；失败时不留下半个文件
+file_replace_atomic() {
+    local src="$1"
+    local dst="$2"
+    local tmp="$dst$FILE_ATOMIC_TMP_SUFFIX"
+
+    if [ -e "$tmp" ]; then
+        log_warn "发现上次遗留的临时文件，已删除: '$tmp'"
+        rm -f "$tmp" || return 1
+    fi
+
+    if ! cp "$src" "$tmp" || ! mv -f "$tmp" "$dst"; then
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
 try_link_dir() {
     local src="$1"
     local dst="$2"

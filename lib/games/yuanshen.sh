@@ -228,6 +228,38 @@ gi_patch_d3d12_load_config() {
 
 register_hook load_config gi_patch_d3d12_load_config
 
+gi_patch_d3d12_fingerprint() {
+    printf '%s\n' "$GI_PATCH_D3D12_IMPL"
+    md5sum "$PROJECT_ROOT/tools/genshin-d3d12/$GI_PATCH_D3D12_PATCHER" || return 1
+    md5sum "$GI_PATCH_D3D12_OFFICIAL" || return 1
+}
+
+gi_patch_d3d12_verify_output() {
+    [ -f "$1" ]
+}
+
+# 由 check_cache_and_compile 调用：从官方副本生成补丁副本
+gi_patch_d3d12_compile() {
+    local output="$1"
+
+    cp "$GI_PATCH_D3D12_OFFICIAL" "$output" || die 1 gi-patch-d3d12 "无法创建补丁副本: $output"
+    pushd "$PROJECT_ROOT/tools/genshin-d3d12" >/dev/null || die 1 gi-patch-d3d12 "无法进入工具目录"
+    if [ "$GI_PATCH_D3D12_IMPL" = "bytes" ]; then
+        command_exists python3 || die 1 gi-patch-d3d12 "bytes 实现需要 python3"
+        python3 "$GI_PATCH_D3D12_PATCHER" "$output" --mode d3d12 || die 1 gi-patch-d3d12 "使用 bytes 实现更新缓存失败"
+    elif command_exists uv; then
+        # 只使用系统解释器：uv 默认可能选中 free-threaded 版 Python，而 UnityPy 的依赖 astc-encoder-py 在其上无法安装
+        uv run --no-managed-python "$GI_PATCH_D3D12_PATCHER" "$output" --mode d3d12 || die 1 gi-patch-d3d12 "使用 uv 更新缓存失败"
+    elif command_exists python3 && python3 -c "import UnityPy" 2>/dev/null; then
+        log_debug gi-patch-d3d12 "未找到 uv，使用已安装 UnityPy 的系统 Python"
+        python3 "$GI_PATCH_D3D12_PATCHER" "$output" --mode d3d12 || die 1 gi-patch-d3d12 "使用系统 Python 更新缓存失败"
+    else
+        die 1 gi-patch-d3d12 "更新缓存需要 uv，或已安装 UnityPy 的 python3，请先安装 uv"
+    fi
+    popd >/dev/null || die 1 gi-patch-d3d12 "无法返回原目录"
+}
+
+# shellcheck disable=SC2153 # STATE_DIR / CACHE_DIR 由 config.sh 赋值
 gi_patch_d3d12_prepare() {
     GI_PATCH_D3D12_MODE="" # overlay | in-place
     GI_PATCH_D3D12_TARGET_GGM="" # 本次运行中已替换的 globalgamemanagers，为空表示未替换
@@ -259,54 +291,38 @@ gi_patch_d3d12_prepare() {
     local pkg_version_file="$game_dir/pkg_version"
     [ -f "$pkg_version_file" ] || die 1 gi-patch-d3d12 "未找到 pkg_version 文件"
 
-    #shellcheck disable=SC2153
+    local state_dir="$STATE_DIR/gi-patch-d3d12"
     local cache_dir="$CACHE_DIR/gi-patch-d3d12"
-    mkdir -p "$cache_dir" || die 1 gi-patch-d3d12 "无法创建缓存目录 $cache_dir"
+    mkdir -p "$state_dir" "$cache_dir" || die 1 gi-patch-d3d12 "无法创建状态或缓存目录"
 
-    local cached_ggm_official="$cache_dir/globalgamemanagers_official"
-    local cached_ggm_temp="$cache_dir/globalgamemanagers_temp"
-    local cached_ggm_patched="$cache_dir/globalgamemanagers_patched"
-    local cached_patcher_key="$cache_dir/patcher_key"
-    local applied_marker="$cache_dir/applied"
-    local patcher_file="$PROJECT_ROOT/tools/genshin-d3d12/$GI_PATCH_D3D12_PATCHER"
+    GI_PATCH_D3D12_OFFICIAL="$state_dir/globalgamemanagers_official"
+    GI_PATCH_D3D12_MARKER="$state_dir/applied"
+    local patched_cache="$cache_dir/globalgamemanagers_patched"
+
+    # 旧版本把标记和官方副本放在缓存目录，清缓存后会丢失，这里一次性迁移到状态目录
+    if [ -f "$cache_dir/applied" ] && [ ! -f "$GI_PATCH_D3D12_MARKER" ]; then
+        mv "$cache_dir/applied" "$GI_PATCH_D3D12_MARKER" || die 1 gi-patch-d3d12 "无法迁移补丁状态记录"
+        if [ -f "$cache_dir/globalgamemanagers_official" ]; then
+            mv -f "$cache_dir/globalgamemanagers_official" "$GI_PATCH_D3D12_OFFICIAL" || die 1 gi-patch-d3d12 "无法迁移官方 globalgamemanagers 副本"
+        fi
+    fi
 
     # 上次异常退出可能遗留了补丁，必须先恢复，否则下面的校验会因 md5 不符而拒绝启动
-    gi_patch_d3d12_recover "$applied_marker" "$cached_ggm_official"
+    gi_patch_d3d12_recover "$GI_PATCH_D3D12_MARKER" "$GI_PATCH_D3D12_OFFICIAL"
 
     verify_file_with_pkg_version "$pkg_version_file" "$ggm_remote_path" "$ggm_path" \
         || die 1 gi-patch-d3d12 "globalgamemanagers 文件校验失败，拒绝执行"
 
-    local patcher_key cached_key=""
-    patcher_key="$(md5sum "$patcher_file")" || die 1 gi-patch-d3d12 "无法读取补丁脚本: $patcher_file"
-    patcher_key="${patcher_key%% *}"
-    [ -f "$cached_patcher_key" ] && cached_key="$(cat "$cached_patcher_key")"
-
-    if [ ! -f "$cached_ggm_official" ] || [ ! -f "$cached_ggm_patched" ] \
-        || [ "$cached_key" != "$patcher_key" ] || ! cmp -s "$ggm_path" "$cached_ggm_official"; then
-        log_info gi-patch-d3d12 "缓存已失效（游戏文件或补丁脚本已变化），将更新缓存"
-        # 先删除旧缓存，避免失败后误用与当前版本不一致的文件
-        rm -f "$cached_ggm_patched" "$cached_ggm_temp" "$cached_patcher_key"
-        cp "$ggm_path" "$cached_ggm_official" || die 1 gi-patch-d3d12 "无法更新缓存的 globalgamemanagers_official 文件"
-        pushd "$PROJECT_ROOT/tools/genshin-d3d12" >/dev/null || die 1 gi-patch-d3d12 "无法进入工具目录"
-        cp "$cached_ggm_official" "$cached_ggm_temp" || die 1 gi-patch-d3d12 "无法创建临时缓存文件"
-        if [ "$GI_PATCH_D3D12_IMPL" = "bytes" ]; then
-            command_exists python3 || die 1 gi-patch-d3d12 "bytes 实现需要 python3"
-            python3 "$GI_PATCH_D3D12_PATCHER" "$cached_ggm_temp" --mode d3d12 || die 1 gi-patch-d3d12 "使用 bytes 实现更新缓存失败"
-        elif command_exists uv; then
-            # 只使用系统解释器：uv 默认可能选中 free-threaded 版 Python，而 UnityPy 的依赖 astc-encoder-py 在其上无法安装
-            uv run --no-managed-python "$GI_PATCH_D3D12_PATCHER" "$cached_ggm_temp" --mode d3d12 || die 1 gi-patch-d3d12 "使用 uv 更新缓存失败"
-        elif command_exists python3 && python3 -c "import UnityPy" 2>/dev/null; then
-            log_debug gi-patch-d3d12 "未找到 uv，使用已安装 UnityPy 的系统 Python"
-            python3 "$GI_PATCH_D3D12_PATCHER" "$cached_ggm_temp" --mode d3d12 || die 1 gi-patch-d3d12 "使用系统 Python 更新缓存失败"
-        else
-            die 1 gi-patch-d3d12 "更新缓存需要 uv，或已安装 UnityPy 的 python3，请先安装 uv"
-        fi
-        mv "$cached_ggm_temp" "$cached_ggm_patched" || die 1 gi-patch-d3d12 "无法更新缓存的 globalgamemanagers_patched 文件"
-        printf '%s\n' "$patcher_key" > "$cached_patcher_key" || die 1 gi-patch-d3d12 "无法写入补丁脚本版本记录"
-        popd >/dev/null || die 1 gi-patch-d3d12 "无法返回原目录"
+    # 校验通过后，官方副本与当前文件不一致时（如游戏更新）才刷新
+    if [ ! -f "$GI_PATCH_D3D12_OFFICIAL" ] || ! cmp -s "$ggm_path" "$GI_PATCH_D3D12_OFFICIAL"; then
+        log_info gi-patch-d3d12 "官方副本已过期，正在更新"
+        file_replace_atomic "$ggm_path" "$GI_PATCH_D3D12_OFFICIAL" || die 1 gi-patch-d3d12 "无法更新官方 globalgamemanagers 副本"
     fi
 
-    [ -f "$cached_ggm_patched" ] || die 1 gi-patch-d3d12 "缓存的 globalgamemanagers_patched 文件不存在"
+    check_cache_and_compile "gi-patch-d3d12" "$patched_cache" \
+        gi_patch_d3d12_fingerprint \
+        gi_patch_d3d12_verify_output \
+        gi_patch_d3d12_compile
 
     local target_ggm target_dir
     if [ "$GI_PATCH_D3D12_MODE" = "overlay" ]; then
@@ -327,23 +343,28 @@ gi_patch_d3d12_prepare() {
     GI_PATCH_D3D12_TARGET_GGM="$target_ggm"
     register_hook cleanup gi_patch_d3d12_cleanup
 
-    local patched_md5
-    patched_md5="$(md5sum "$cached_ggm_patched")" || die 1 gi-patch-d3d12 "无法计算缓存文件 md5"
-    printf '%s\t%s\t%s\n' "$GI_PATCH_D3D12_MODE" "$target_ggm" "${patched_md5%% *}" > "$applied_marker" \
-        || die 1 gi-patch-d3d12 "无法写入补丁状态记录: $applied_marker"
+    local patched_md5 official_md5
+    patched_md5="$(md5sum "$patched_cache")" || die 1 gi-patch-d3d12 "无法计算补丁副本 md5"
+    patched_md5="${patched_md5%% *}"
+    official_md5="$(md5sum "$GI_PATCH_D3D12_OFFICIAL")" || die 1 gi-patch-d3d12 "无法计算官方副本 md5"
+    official_md5="${official_md5%% *}"
 
-    cp "$cached_ggm_patched" "$target_ggm" || die 1 gi-patch-d3d12 "无法将缓存的 globalgamemanagers_patched 文件复制到目标位置"
+    printf '%s\t%s\t%s\t%s\n' "$GI_PATCH_D3D12_MODE" "$target_ggm" "$patched_md5" "$official_md5" > "$GI_PATCH_D3D12_MARKER.tmp" \
+        || die 1 gi-patch-d3d12 "无法写入补丁状态记录: $GI_PATCH_D3D12_MARKER"
+    mv -f "$GI_PATCH_D3D12_MARKER.tmp" "$GI_PATCH_D3D12_MARKER" || die 1 gi-patch-d3d12 "无法写入补丁状态记录: $GI_PATCH_D3D12_MARKER"
+
+    file_replace_atomic "$patched_cache" "$target_ggm" || die 1 gi-patch-d3d12 "无法将补丁副本写入目标位置: $target_ggm"
 }
 
 # 恢复上次异常退出遗留的补丁状态。只处理标记文件记录的路径，且 in-place 仅在文件仍是我们写入的补丁版本时才还原。
 gi_patch_d3d12_recover() {
     local marker="$1"
-    local cached_ggm_official="$2"
+    local official="$2"
 
     [ -f "$marker" ] || return 0
 
-    local prev_mode prev_target prev_md5
-    IFS=$'\t' read -r prev_mode prev_target prev_md5 < "$marker" || true
+    local prev_mode prev_target prev_md5 prev_official_md5
+    IFS=$'\t' read -r prev_mode prev_target prev_md5 prev_official_md5 < "$marker" || true
 
     case "$prev_mode" in
         overlay)
@@ -351,17 +372,20 @@ gi_patch_d3d12_recover() {
             rm -f "$prev_target" || die 1 gi-patch-d3d12 "无法删除上次遗留的 overlay 文件: $prev_target"
             ;;
         in-place)
+            rm -f "$prev_target$FILE_ATOMIC_TMP_SUFFIX"
             local current_md5=""
             if [ -f "$prev_target" ]; then
                 current_md5="$(md5sum "$prev_target")"
                 current_md5="${current_md5%% *}"
             fi
-            if [ "$current_md5" = "$prev_md5" ]; then
+            if [ -n "$current_md5" ] && [ "$current_md5" = "$prev_md5" ]; then
                 log_warn gi-patch-d3d12 "检测到上次异常退出遗留的补丁，正在还原: $prev_target"
-                [ -f "$cached_ggm_official" ] || die 1 gi-patch-d3d12 "缓存的官方 globalgamemanagers 文件不存在，无法还原: $cached_ggm_official"
-                cp "$cached_ggm_official" "$prev_target" || die 1 gi-patch-d3d12 "无法还原上次遗留的补丁: $prev_target"
+                [ -f "$official" ] || die 1 gi-patch-d3d12 "官方 globalgamemanagers 副本不存在，无法还原: $official"
+                file_replace_atomic "$official" "$prev_target" || die 1 gi-patch-d3d12 "无法还原上次遗留的补丁: $prev_target"
+            elif [ -n "$current_md5" ] && [ "$current_md5" = "$prev_official_md5" ]; then
+                log_debug gi-patch-d3d12 "游戏文件已是原版，只清理状态记录"
             else
-                log_warn gi-patch-d3d12 "上次记录的补丁文件已变化，跳过还原: $prev_target"
+                log_warn gi-patch-d3d12 "游戏文件与补丁记录不符（可能已更新或被外部修改），跳过还原: $prev_target"
             fi
             ;;
         *)
@@ -375,21 +399,18 @@ gi_patch_d3d12_recover() {
 gi_patch_d3d12_cleanup() {
     [ -n "$GI_PATCH_D3D12_TARGET_GGM" ] || return 0
 
-    local marker="$CACHE_DIR/gi-patch-d3d12/applied"
-    local cached_ggm_official="$CACHE_DIR/gi-patch-d3d12/globalgamemanagers_official"
-
     if [ "$GI_PATCH_D3D12_MODE" = "overlay" ]; then
         rm -f "$GI_PATCH_D3D12_TARGET_GGM" || { log_error gi-patch-d3d12 "无法删除 overlay 文件，下次启动时将自动清理: $GI_PATCH_D3D12_TARGET_GGM"; return 0; }
     elif [ "$GI_PATCH_D3D12_MODE" = "in-place" ]; then
-        if [ ! -f "$cached_ggm_official" ]; then
-            log_error gi-patch-d3d12 "缓存的官方 globalgamemanagers 文件不存在，无法还原: $GI_PATCH_D3D12_TARGET_GGM"
+        if [ ! -f "$GI_PATCH_D3D12_OFFICIAL" ]; then
+            log_error gi-patch-d3d12 "官方 globalgamemanagers 副本不存在，无法还原: $GI_PATCH_D3D12_TARGET_GGM"
             return 0
         fi
-        cp "$cached_ggm_official" "$GI_PATCH_D3D12_TARGET_GGM" || { log_error gi-patch-d3d12 "无法还原 globalgamemanagers，下次启动时将自动还原: $GI_PATCH_D3D12_TARGET_GGM"; return 0; }
+        file_replace_atomic "$GI_PATCH_D3D12_OFFICIAL" "$GI_PATCH_D3D12_TARGET_GGM" || { log_error gi-patch-d3d12 "无法还原 globalgamemanagers，下次启动时将自动还原: $GI_PATCH_D3D12_TARGET_GGM"; return 0; }
     else
         log_error gi-patch-d3d12 "未知的 GI_PATCH_D3D12_MODE 模式: $GI_PATCH_D3D12_MODE"
         return 0
     fi
 
-    rm -f "$marker"
+    rm -f "$GI_PATCH_D3D12_MARKER"
 }

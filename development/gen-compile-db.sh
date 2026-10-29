@@ -6,6 +6,7 @@
 HYPS_CC="${HYPS_CC:=gcc}"
 HYPS_WIN_CC="${HYPS_WIN_CC:=x86_64-w64-mingw32-gcc}"
 
+# shellcheck disable=SC2034 # 通过 toolspec_resolve 的 nameref 读取
 DEFAULT_FLAGS=(-Wall -Wextra)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,64 +34,35 @@ output() {
     jq -s '.' "$TEMP" > "$OUTPUT"
 }
 
-# gryph-surrogate
+#shellcheck source=../lib/utils/toolspec.sh
+source "$ROOT/lib/utils/toolspec.sh"
 
-GRYPH_SURROGATE_TOOL="$ROOT/tools/gryph-surrogate"
-GRYPH_SURROGATE_SOURCE="$GRYPH_SURROGATE_TOOL/gryph-surrogate.c"
-GRYPH_SURROGATE_FLAGS=("${DEFAULT_FLAGS[@]}" -std=gnu23 -municode -mwindows -static)
+for spec in "$ROOT"/tools/*/toolspec.sh; do
+    dir="$(dirname "$spec")"
+    toolspec_load "$dir"
 
-record_compile \
-    "$GRYPH_SURROGATE_TOOL" \
-    "$GRYPH_SURROGATE_SOURCE" \
-    "$HYPS_WIN_CC" "${GRYPH_SURROGATE_FLAGS[@]}" "$GRYPH_SURROGATE_SOURCE"
+    if [[ "$TOOLSPEC_TOOLCHAIN" == mingw ]]; then
+        cc="$HYPS_WIN_CC"
+    else
+        cc="$HYPS_CC"
+    fi
 
-# fpsunlock
+    backends=()
+    for backend in "${TOOLSPEC_BACKENDS[@]}"; do
+        if toolspec_backend_available "$backend"; then
+            backends+=("$backend")
+        else
+            echo "警告：未检测到 $TOOLSPEC_NAME 的 $backend 后端依赖 (pkg-config 模块 $(toolspec_backend_pkg "$backend"))，将不编译该后端" >&2
+        fi
+    done
 
-FPSUNLOCK_TOOL="$ROOT/tools/fpsunlock"
-FPSUNLOCK_SOURCE="$FPSUNLOCK_TOOL/unlocker.c"
-FPSUNLOCK_FLAGS=("${DEFAULT_FLAGS[@]}" -std=gnu23)
-
-record_compile \
-    "$FPSUNLOCK_TOOL" \
-    "$FPSUNLOCK_SOURCE" \
-    "$HYPS_CC" "${FPSUNLOCK_FLAGS[@]}" "$FPSUNLOCK_SOURCE"
-
-# xwin-watch
-
-XWIN_WATCH_TOOL="$ROOT/tools/xwin-watch"
-XWIN_WATCH_SOURCES=("$XWIN_WATCH_TOOL/xwin-watch.c")
-XWIN_WATCH_FLAGS=("${DEFAULT_FLAGS[@]}" -std=gnu23)
-
-XWIN_WATCH_FLAGS+=("-I$XWIN_WATCH_TOOL")
-
-if pkg-config --exists x11; then
-    XWIN_WATCH_SOURCES+=("$XWIN_WATCH_TOOL/x11-backend.c")
-    XWIN_WATCH_FLAGS+=(-DHAVE_X11 -lX11)
-else
-    echo "警告：未检测到 X11 开发依赖 (pkg-config 模块 x11), xwin-watch 将不编译 X11 后端" >&2
-fi
-
-if pkg-config --exists wayland-client; then
-    XWIN_WATCH_SOURCES+=("$XWIN_WATCH_TOOL/wayland.c")
-    XWIN_WATCH_FLAGS+=(-DHAVE_WAYLAND -lwayland-client)
-
-    XWIN_WATCH_SOURCES+=("$XWIN_WATCH_TOOL/wlr-backend.c" "$XWIN_WATCH_TOOL/generated/wlr-foreign-toplevel-management-unstable-v1.c")
-    XWIN_WATCH_FLAGS+=(-DHAVE_WLR)
-
-    XWIN_WATCH_SOURCES+=("$XWIN_WATCH_TOOL/ext-backend.c" "$XWIN_WATCH_TOOL/generated/ext-foreign-toplevel-list-v1.c")
-    XWIN_WATCH_FLAGS+=(-DHAVE_EXT)
-
-    XWIN_WATCH_SOURCES+=("$XWIN_WATCH_TOOL/plasma-backend.c" "$XWIN_WATCH_TOOL/generated/plasma-window-management.c")
-    XWIN_WATCH_FLAGS+=(-DHAVE_PLASMA)
-else
-    echo "警告：未检测到 Wayland 开发依赖 (pkg-config 模块 wayland-client), xwin-watch 将不编译 Wayland 后端" >&2
-fi
-
-for src in "${XWIN_WATCH_SOURCES[@]}"; do
-    record_compile \
-        "$XWIN_WATCH_TOOL" \
-        "$src" \
-        "$HYPS_CC" "${XWIN_WATCH_FLAGS[@]}" "$src"
+    toolspec_resolve "$cc" DEFAULT_FLAGS "${backends[@]}" || exit 1
+    for src in "${TOOLSPEC_RESULT_SOURCES[@]}"; do
+        record_compile \
+            "$dir" \
+            "$src" \
+            "$cc" "${TOOLSPEC_RESULT_CFLAGS[@]}" "${TOOLSPEC_RESULT_LIBS[@]}" "$src"
+    done
 done
 
 # 生成 compile_commands.json 文件

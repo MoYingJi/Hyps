@@ -66,12 +66,11 @@ feat_xwin_watch_kwin_permission_desktop() {
 # 后端开关解析: 输出 x11/wayland 是否启用 (true/false)
 feat_xwin_watch_backend_enabled() {
     local backend="$1"
-    local module="$backend"
-    [[ "$backend" == wayland ]] && module="wayland-client"
     local cfg
     config_read "features.xwin_watch.$backend" cfg auto
     if [[ "$cfg" == auto ]]; then
-        if pkg-config --exists "$module"; then
+        toolspec_load "$XWIN_WATCH_TOOL"
+        if toolspec_backend_available "$backend"; then
             echo true
         else
             echo false
@@ -83,32 +82,45 @@ feat_xwin_watch_backend_enabled() {
     fi
 }
 
+# 输出已启用的后端, 每行一个
+feat_xwin_watch_enabled_backends() {
+    toolspec_load "$XWIN_WATCH_TOOL"
+    local backend
+    for backend in "${TOOLSPEC_BACKENDS[@]}"; do
+        isy "$(feat_xwin_watch_backend_enabled "$backend")" && echo "$backend"
+    done
+}
+
+# 没有任何可用后端时逐个列出原因后退出
+feat_xwin_watch_require_backend() {
+    local -a backends=()
+    mapfile -t backends < <(feat_xwin_watch_enabled_backends)
+    [[ "${#backends[@]}" -gt 0 ]] && return 0
+
+    toolspec_load "$XWIN_WATCH_TOOL"
+    local backend cfg hint="请把 features.xwin_watch.<后端> 设为 true 后重试"
+    local msg="xwin-watch 没有可用的后端:"
+    for backend in "${TOOLSPEC_BACKENDS[@]}"; do
+        config_read "features.xwin_watch.$backend" cfg auto
+        if [[ "$cfg" == auto ]]; then
+            msg+=$'\n'"  $backend: 配置为 auto, 未找到依赖 $(toolspec_backend_pkg "$backend")"
+            hint="请安装上述依赖, 或把 features.xwin_watch.<后端> 设为 true 后重试"
+        else
+            msg+=$'\n'"  $backend: 已在配置中禁用 (features.xwin_watch.$backend=$cfg)"
+        fi
+    done
+    die 1 xwin-watch "$msg"$'\n'"$hint"
+}
+
 feat_xwin_watch_all_source() {
     local output="$1"
-    local tool="$XWIN_WATCH_TOOL"
-    cat "$tool/xwin-watch.c"
-    cat "$tool/backends.h"
-    echo -n "x11=" && feat_xwin_watch_backend_enabled x11
-    echo -n "wayland=" && feat_xwin_watch_backend_enabled wayland
-    if isy "$(feat_xwin_watch_backend_enabled x11)"; then
-        cat "$tool/x11-backend.c"
-    fi
-    if isy "$(feat_xwin_watch_backend_enabled wayland)"; then
-        cat "$tool/wayland.c"
-        cat "$tool/wayland.h"
-        cat "$tool/wlr-backend.c"
-        cat "$tool/ext-backend.c"
-        cat "$tool/plasma-backend.c"
-        cat "$tool/generated/wlr-foreign-toplevel-management-unstable-v1.c"
-        cat "$tool/generated/ext-foreign-toplevel-list-v1.c"
-        cat "$tool/generated/plasma-window-management.c"
-    fi
+    local -a backends=()
+    mapfile -t backends < <(feat_xwin_watch_enabled_backends)
+
+    toolspec_runtime_fingerprint "$XWIN_WATCH_TOOL" "${backends[@]}"
     command_exists kwin_wayland && feat_xwin_watch_kwin_permission_desktop "$output" || echo "kwin not found"
-    #shellcheck disable=SC2153
-    echo "${HYPS_CC:-}"
-    echo "${HYPS_CFLAGS[@]:-}"
-    echo "-std=gnu23"
 }
+
 feat_xwin_watch_verify_output() {
     local output="$1"
     [ -f "$output" ] || return 1
@@ -121,80 +133,30 @@ feat_xwin_watch_verify_output() {
 }
 feat_xwin_watch_compile() {
     local output="$1"
-    local tool="$XWIN_WATCH_TOOL"
 
-    local x11 wayland
-    x11="$(feat_xwin_watch_backend_enabled x11)"
-    wayland="$(feat_xwin_watch_backend_enabled wayland)"
+    feat_xwin_watch_require_backend
+    local -a backends=()
+    mapfile -t backends < <(feat_xwin_watch_enabled_backends)
+    log_debug xwin-watch "启用后端: ${backends[*]}"
 
-    if ! isy "$x11" && ! isy "$wayland"; then
-        die 1 xwin-watch "x11 和 wayland 后端均被禁用，至少需要启用一个"
+    if isy "$(feat_xwin_watch_backend_enabled wayland)" && command_exists kwin_wayland; then
+        local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+        local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
+        mkdir -p "$desktop_dir"
+        feat_xwin_watch_kwin_permission_desktop "$output" > "$desktop_file"
+        command_exists kbuildsycoca6 && kbuildsycoca6 >/dev/null 2>&1 || true
     fi
 
-    if isy "$x11"; then
-        log_debug xwin-watch "启用 X11 后端"
-    else
-        log_debug xwin-watch "禁用 X11 后端"
-    fi
-    if isy "$wayland"; then
-        log_debug xwin-watch "启用 Wayland 后端"
-    else
-        log_debug xwin-watch "禁用 Wayland 后端"
-    fi
-
-    local cc="${HYPS_CC:-gcc}"
-    local -a sources=()
-    local -a cflags=()
-    local -a libs=()
-
-    cflags+=("${HYPS_CFLAGS[@]}")
-    cflags+=("-std=gnu23")
-
-    sources+=("$tool/xwin-watch.c")
-    cflags+=("-I$tool")
-
-    if isy "$x11"; then
-        sources+=("$tool/x11-backend.c")
-        cflags+=("-DHAVE_X11")
-        libs+=("-lX11")
-    fi
-
-    if isy "$wayland"; then
-        sources+=("$tool/wayland.c")
-        cflags+=("-DHAVE_WAYLAND")
-        libs+=("-lwayland-client")
-
-        # Wayland 扩展各自独立编译 (wlr / ext / plasma)
-        sources+=("$tool/wlr-backend.c")
-        cflags+=("-DHAVE_WLR")
-        sources+=("$tool/generated/wlr-foreign-toplevel-management-unstable-v1.c")
-
-        sources+=("$tool/ext-backend.c")
-        cflags+=("-DHAVE_EXT")
-        sources+=("$tool/generated/ext-foreign-toplevel-list-v1.c")
-
-        sources+=("$tool/plasma-backend.c")
-        cflags+=("-DHAVE_PLASMA")
-        sources+=("$tool/generated/plasma-window-management.c")
-
-        if command_exists kwin_wayland; then
-            local desktop_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-            local desktop_file="$desktop_dir/hyps-xwin-watch.desktop"
-            mkdir -p "$desktop_dir"
-            feat_xwin_watch_kwin_permission_desktop "$output" > "$desktop_file"
-            command_exists kbuildsycoca6 && kbuildsycoca6 >/dev/null 2>&1 || true
-        fi
-    fi
-
-    run_and_log DEBUG xwin-watch "编译命令" \
-        "$cc" "${sources[@]}" "${cflags[@]}" "${libs[@]}" -o "$output" \
-        || return 1
+    toolspec_runtime_build "$XWIN_WATCH_TOOL" "$output" "${backends[@]}" || return 1
     ensure_executable "$output" "xwin-watch"
 }
+
 
 feat_xwin_watch_prepare() {
     local bin
     bin="$(cache_bin_path xwin-watch)"
+
+    feat_xwin_watch_require_backend
 
     check_cache_and_compile "xwin-watch" \
         "$bin" \

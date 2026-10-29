@@ -46,8 +46,6 @@ shader_cache_invalidate() {
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）
 
 GRYPH_SURROGATE_TOOL="$PROJECT_ROOT/tools/gryph-surrogate"
-GRYPH_SURROGATE_DEFAULT_CC="x86_64-w64-mingw32-gcc"
-GRYPH_SURROGATE_FLAGS=(-std=gnu23 -municode -mwindows -static)
 
 gryph_surrogate_exe_path() {
     cache_bin_path gryph-surrogate.exe
@@ -208,10 +206,7 @@ feat_endfield_surrogate_load_config() {
 }
 
 gryph_surrogate_all_source() {
-    cat "$GRYPH_SURROGATE_TOOL/gryph-surrogate.c"
-    echo
-    local -a flags=("${GRYPH_SURROGATE_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}")
-    printf '%s %s\n' "${HYPS_WIN_CC:-$GRYPH_SURROGATE_DEFAULT_CC}" "$(quote_args "${flags[@]}")"
+    toolspec_runtime_fingerprint "$GRYPH_SURROGATE_TOOL"
 }
 
 gryph_surrogate_verify_output() {
@@ -219,20 +214,7 @@ gryph_surrogate_verify_output() {
 }
 
 gryph_surrogate_compile() {
-    local output="$1"
-    local cc="${HYPS_WIN_CC:-$GRYPH_SURROGATE_DEFAULT_CC}"
-    local -a flags=("${GRYPH_SURROGATE_FLAGS[@]}" "${HYPS_MINGW_CFLAGS[@]}")
-
-    if ! command -v "$cc" > /dev/null 2>&1; then
-        log_error gryph-surrogate "未找到 Windows 交叉编译器 '$cc'，请检查 compile.mingw.CC 配置或安装 mingw-w64"
-        return 1
-    fi
-
-    mkdir -p "$(dirname "$output")" || return 1
-    run_and_log DEBUG gryph-surrogate "编译命令" \
-        "$cc" "${flags[@]}" \
-        -o "$output" "$GRYPH_SURROGATE_TOOL/gryph-surrogate.c" \
-        || return 1
+    toolspec_runtime_build "$GRYPH_SURROGATE_TOOL" "$1"
 }
 
 feat_endfield_surrogate_prepare() {

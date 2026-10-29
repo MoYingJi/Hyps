@@ -74,13 +74,7 @@ gi_fps_unlock_load_config() {
 register_hook load_config gi_fps_unlock_load_config 50 before:feat_xwin_watch_load_config
 
 gi_fps_unlock_all_source() {
-    local line
-    while IFS= read -r line; do
-        printf '%s\n' "$line"
-    done < "$GI_FPS_UNLOCK_TOOL/unlocker.c"
-    [[ -n "$line" ]] && printf '%s' "$line"
-    echo "${HYPS_CFLAGS[@]:-}"
-    echo "-std=gnu23"
+    toolspec_runtime_fingerprint "$GI_FPS_UNLOCK_TOOL"
 }
 gi_fps_unlock_verify_output() {
     local bin="$1"
@@ -91,10 +85,7 @@ gi_fps_unlock_verify_output() {
 }
 gi_fps_unlock_compile() {
     local output="$1"
-    local cc="${HYPS_CC:-gcc}"
-    run_and_log DEBUG gi-fps-unlock "编译命令" \
-        "$cc" ${HYPS_CFLAGS[@]+"${HYPS_CFLAGS[@]}"} -std=gnu23 "$GI_FPS_UNLOCK_TOOL/unlocker.c" -o "$output" \
-        || return 1
+    toolspec_runtime_build "$GI_FPS_UNLOCK_TOOL" "$output" || return 1
     gi_fps_unlock_verify_output "$output" && return 0
     gi_fps_unlock_grant_cap "$output"
 }

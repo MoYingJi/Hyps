@@ -163,12 +163,14 @@ overlay.lower = "/path/to/game"
  - 删掉本项目的文件夹
  - 如果还设置了单独的配置文件夹，也别忘了
     - 项目根目录的 `config.conf` 设置了 `path.config = "./config"`。配置文件夹可以被设置到别的地方，或者删掉使用默认值 `$XDG_CONFIG_HOME/hypsc` (`~/.config/hypsc`)
- - `/tmp/hypsc` (临时文件)
+ - `/tmp/hypsc` (`path.temp` 临时文件)
+ - `$XDG_RUNTIME_DIR/hypsc` (`path.runtime`)
  - `$XDG_CACHE_HOME/hypsc` (`~/.cache/hypsc`)
     - 着色器缓存 (`cache.shader.enabled` 和 `cache.dx.enabled`)
     - 源码变更检测 (一些需要编译的小工具，校验和在 `checksums/`)
     - 需要编译的小工具的产物 (`bin/`)，删除后下次启动会重新编译 (fpsunlock 还需要 sudo 设置权限)
- - `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc`)
+ - `$XDG_DATA_HOME/hypsc` (`~/.local/share/hypsc` `path.data`)
     - OverlayFS
     - Wine Prefix / Proton Compat Data
     - 游玩时间记录
+ - `$XDG_STATE_HOME/hypsc` (`~/.local/state/hypsc` `path.state`)

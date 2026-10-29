@@ -20,7 +20,15 @@ load_common_config() {
 
     config_read_realpath_prefer_env path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
     config_read_realpath_prefer_env path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
+    config_read_realpath_prefer_env path.state STATE_DIR "${XDG_STATE_HOME:-$HOME/.local/state}/hypsc"
     config_read_realpath_prefer_env path.temp TEMP_DIR "/tmp/hypsc"
+
+    # XDG_RUNTIME_DIR 未设置时回退到 path.temp
+    local runtime_default="$TEMP_DIR"
+    if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+        runtime_default="$XDG_RUNTIME_DIR/hypsc"
+    fi
+    config_read_realpath_prefer_env path.runtime RUNTIME_DIR "$runtime_default"
 
     config_parse_file "$CONFIG_DIR/games/_common.conf"
 }

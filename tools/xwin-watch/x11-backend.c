@@ -120,7 +120,7 @@ static const char *x11_backend_name() {
     return "X11 (_NET_CLIENT_LIST)";
 }
 
-window_backend_t x11_backend = {
+const window_backend_t x11_backend = {
     .name = x11_backend_name,
     .init = x11_backend_init,
     .fd = x11_backend_fd,

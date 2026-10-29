@@ -6,7 +6,7 @@
 #include "backends.h"
 #include "wayland.h"
 
-#define WAYLAND_MAX_EXTENSIONS 8
+static constexpr int WAYLAND_MAX_EXTENSIONS = 8;
 
 static struct wl_display *g_display = nullptr;
 static struct wl_registry *g_registry = nullptr;
@@ -132,7 +132,7 @@ static const char *wayland_backend_name() {
     return name;
 }
 
-window_backend_t wayland_backend = {
+const window_backend_t wayland_backend = {
     .name = wayland_backend_name,
     .init = wayland_init,
     .fd = wayland_fd,

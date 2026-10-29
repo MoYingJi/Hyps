@@ -12,11 +12,11 @@ typedef struct window_backend {
 } window_backend_t;
 
 #ifdef HAVE_X11
-extern window_backend_t x11_backend;
+extern const window_backend_t x11_backend;
 #endif
 
 #ifdef HAVE_WAYLAND
-extern window_backend_t wayland_backend;
+extern const window_backend_t wayland_backend;
 #endif
 
 #endif

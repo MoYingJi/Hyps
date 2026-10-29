@@ -20,7 +20,7 @@
 
 #include "backends.h"
 
-#define MAX_BACKENDS 2
+static constexpr int MAX_BACKENDS = 2;
 
 typedef struct {
     const char *target_window;
@@ -38,7 +38,7 @@ static bool check_window_exists(const char *target_window);
 static void close_displays();
 static void handle_signal_and_exit(int signum);
 static void signal_handler(int signum);
-static void add_backend(window_backend_t *backend);
+static void add_backend(const window_backend_t *backend);
 static int wait_poll_timeout_ms();
 
 // 全局变量
@@ -46,7 +46,7 @@ static volatile sig_atomic_t g_signal_received = 0;
 static bool g_window_found = false;
 static time_t g_wait_start = 0; // 开始等待窗口出现的时间戳 (秒)
 
-static window_backend_t *g_backends[MAX_BACKENDS];
+static const window_backend_t *g_backends[MAX_BACKENDS];
 static int g_backend_count = 0;
 
 // 状态机: 处理一次检查结果，返回 -1 表示继续，>=0 表示退出码
@@ -156,7 +156,7 @@ static int wait_poll_timeout_ms() {
 }
 
 // 尝试初始化一个后端，成功则加入列表；只打印当前实际应用的那个 (第一个成功初始化的后端)
-static void add_backend(window_backend_t *backend) {
+static void add_backend(const window_backend_t *backend) {
     if (g_backend_count >= MAX_BACKENDS || !backend->init()) {
         return;
     }

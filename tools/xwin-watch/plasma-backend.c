@@ -6,7 +6,7 @@
 #include "generated/plasma-window-management.h"
 #include "wayland.h"
 
-#define PLASMA_MAX_VERSION 18
+static constexpr uint32_t PLASMA_MAX_VERSION = 18;
 
 typedef struct plasma_toplevel {
     struct plasma_toplevel *next;

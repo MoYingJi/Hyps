@@ -184,7 +184,7 @@ init_check_commands() {
     elif command_exists pkexec; then
         init_check_add commands ok "提权工具" "pkexec（无终端时不可用）"
     else
-        init_check_add commands warn "提权工具" "未安装 sudo / pkexec：帧率解锁、RAPL、hosts 等功能不可用"
+        init_check_add commands warn "提权工具" "未安装 sudo / pkexec：帧率解锁、RAPL 等功能不可用"
     fi
 
     init_check_command commands warn "gcc" gcc "未安装：fpsunlock / xwin-watch / 替身父进程无法编译"

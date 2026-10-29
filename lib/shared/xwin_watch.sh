@@ -49,9 +49,10 @@ feat_xwin_watch_load_config() {
 
 register_hook load_config feat_xwin_watch_load_config
 
-# KWin 只对声明了 org_kde_plasma_window_management 接口的客户端开放该协议。
-# 权限通过 .desktop 文件授予：Exec 必须精确匹配客户端可执行文件的规范路径，
-# 且声明 X-KDE-Wayland-Interfaces。这里按 XWIN_WATCH_BIN 的实际路径生成并安装。
+# KWin 只对声明了 org_kde_plasma_window_management 接口的客户端开放该协议
+# 权限通过 .desktop 文件授予
+# Exec 必须精确匹配客户端可执行文件的规范路径 且声明 X-KDE-Wayland-Interfaces
+# 这里按 XWIN_WATCH_BIN 的实际路径生成并安装
 feat_xwin_watch_kwin_permission_desktop() {
     local bin="$1"
     echo "[Desktop Entry]"

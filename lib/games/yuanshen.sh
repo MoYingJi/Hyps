@@ -168,6 +168,11 @@ gi_reg_hdr_load_config() {
 register_hook load_config gi_reg_hdr_load_config
 
 try_edit_prefix_reg() {
+    if isy "$HYPS_GI_REG_HDR_FORCE_WINE_REG"; then
+        log_debug gi-reg-hdr "强制使用 wine reg 设置注册表"
+        return 1
+    fi
+
     local prefix file key game_prefix
 
     config_read game.prefix game_prefix
@@ -201,11 +206,7 @@ gi_reg_hdr_prepare() {
         local reg_path reg_key
         config_read gi.reg_hdr.path reg_path
         config_read gi.reg_hdr.key reg_key
-        WINE_SIDE_PREPARE_BATCH="$(cat << EOF
-$WINE_SIDE_PREPARE_BATCH
-reg add "$reg_path" /v "$reg_key" /t REG_DWORD /d 1 /f
-EOF
-        )"
+        launch_plan_prepare_snippet_append "reg add \"$reg_path\" /v \"$reg_key\" /t REG_DWORD /d 1 /f"
     fi
 }
 

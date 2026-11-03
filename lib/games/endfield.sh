@@ -46,6 +46,7 @@ shader_cache_invalidate() {
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）
 
 GRYPH_SURROGATE_TOOL="$PROJECT_ROOT/tools/gryph-surrogate"
+declare -a GRYPH_SURROGATE_ARGS=()  # load_config 写入，endfield_surrogate_handler 读取
 
 gryph_surrogate_exe_path() {
     cache_bin_path gryph-surrogate.exe
@@ -201,8 +202,21 @@ feat_endfield_surrogate_load_config() {
     fi
 
     surrogate_args+=(--mode "$surrogate_mode")
-    WINE_SIDE_OUTER_WRAPPER+=("${surrogate_args[@]}")
+
+    GRYPH_SURROGATE_ARGS=("${surrogate_args[@]}")
+    launch_plan_register_game_handler gryph-surrogate endfield_surrogate_handler
     register_hook prepare feat_endfield_surrogate_prepare
+}
+
+endfield_surrogate_handler() {
+    local -n _out="$1"
+    local -a game_args=()
+    local game_exe
+
+    launch_plan_args_get game_args
+    config_read game.exe game_exe
+
+    _out=("${GRYPH_SURROGATE_ARGS[@]}" "$(wine_unix_path_to_windows "$game_exe")" "${game_args[@]}")
 }
 
 gryph_surrogate_all_source() {

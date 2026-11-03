@@ -301,7 +301,6 @@ env_transform_protonpath() {
     fi
 }
 
-GAME_LD_PRELOAD=()
 env_parse_ld_preload() {
     local ld_preload_array
 
@@ -330,12 +329,8 @@ env_add_ld_preload() {
     if [[ -z "$lib" ]]; then
         die 1 environment "env_add_ld_preload: 参数不能为空"
     fi
-    GAME_LD_PRELOAD+=("$lib")
+    launch_plan_ld_preload_append "$lib"
     log_debug environment "添加 LD_PRELOAD 库: '$lib'"
-}
-env_get_ld_preload() {
-    local IFS=':'
-    echo "${GAME_LD_PRELOAD[*]}"
 }
 
 env_parse_compile_settings() {

@@ -6,8 +6,6 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../config/environment.sh
 source "$SCRIPT_DIR/config/environment.sh"
 
-RUNNER_WRAPPER=()
-
 wrapper_load_config() {
     local gamescope_args=()
     config_has gamescope.args && config_read_array gamescope.args gamescope_args
@@ -27,7 +25,7 @@ wrapper_load_config() {
         config_require_realpath_which_exe mangohud.exe "mangohud"
         local mangohud_exe
         config_read mangohud.exe mangohud_exe
-        RUNNER_WRAPPER=("$mangohud_exe" "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$mangohud_exe"
     fi
 
     # OBS Game Capture (wrapper)
@@ -38,7 +36,7 @@ wrapper_load_config() {
         config_require_realpath_which_exe obs_vkcapture.wrapper.exe "obs-gamecapture"
         local obs_exe
         config_read obs_vkcapture.wrapper.exe obs_exe
-        RUNNER_WRAPPER=("$obs_exe" "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$obs_exe"
     fi
 
     # Gamescope
@@ -46,7 +44,7 @@ wrapper_load_config() {
         config_require_realpath_which_exe gamescope.exe "gamescope"
         local gamescope_exe
         config_read gamescope.exe gamescope_exe
-        RUNNER_WRAPPER=("$gamescope_exe" "${gamescope_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$gamescope_exe" "${gamescope_args[@]}" --
     fi
 
     # Taskset
@@ -79,7 +77,7 @@ wrapper_load_config() {
 
         local taskset_exe
         config_read taskset.exe taskset_exe
-        RUNNER_WRAPPER=("$taskset_exe" "${taskset_args[@]}" "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$taskset_exe" "${taskset_args[@]}"
     fi
 
     # GameMode (wrapper)
@@ -87,7 +85,7 @@ wrapper_load_config() {
         config_require_realpath_which_exe gamemode.wrapper.exe "gamemoderun"
         local gamemode_exe
         config_read gamemode.wrapper.exe gamemode_exe
-        RUNNER_WRAPPER=("$gamemode_exe" "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$gamemode_exe"
     fi
 
     # GameMode (LD_PRELOAD)
@@ -109,7 +107,7 @@ wrapper_load_config() {
         config_read inhibit.exe inhibit_exe
         inhibit_args+=("--what=$inhibit_what")
         inhibit_args+=("--why=$inhibit_why")
-        RUNNER_WRAPPER=("$inhibit_exe" "${inhibit_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$inhibit_exe" "${inhibit_args[@]}" --
     fi
 
     # systemd-run
@@ -131,11 +129,13 @@ wrapper_load_config() {
         systemd_run_args+=("${systemd_run_args_config[@]}")
 
         config_read systemd_run.exe systemd_run_exe
-        RUNNER_WRAPPER=("$systemd_run_exe" "${systemd_run_args[@]}" -- "${RUNNER_WRAPPER[@]}")
+        launch_plan_runner_wrapper_prepend "$systemd_run_exe" "${systemd_run_args[@]}" --
     fi
 
     # 日志
-    log_debug wrapper "游戏启动器包装器: $(quote_args "${RUNNER_WRAPPER[@]}")"
+    local -a runner_wrapper=()
+    launch_plan_runner_wrapper_get runner_wrapper
+    log_debug wrapper "游戏启动器包装器: $(quote_args "${runner_wrapper[@]}")"
 }
 
 register_hook load_config wrapper_load_config

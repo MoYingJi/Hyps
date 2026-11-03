@@ -14,6 +14,7 @@ PROJECT_ROOT="${SCRIPT_DIR%/*}"
 
 cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
 
+#shellcheck disable=SC2034
 SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 
 
@@ -51,16 +52,18 @@ hyps_main() {
 
     mkdir -p "$TEMP_DIR" || die 1 lifecycle "无法创建临时目录: '$TEMP_DIR'"
     run_hooks prepare || exit $?
-    build_game_command
+
+    launch_plan_select_mode
+    launch_plan_build_command
     run_hooks pre_start || exit $?
-    start_game_process
+    launch_plan_run
     run_hooks post_start continue
-    wait "$GAME_PID"
+    wait "$(launch_plan_get_pid)"
 }
 
 cleanup() {
     log_info lifecycle "终止"
-    kill "$GAME_PID" 2>/dev/null
+    launch_plan_kill
     run_hooks cleanup continue
 
     isy "$DEBUG_SKIP_REMOVE_TEMP" || rm -rf "$TEMP_DIR"
@@ -70,40 +73,11 @@ load_config() {
     load_common_config
     load_game_config "$GAME_NAME"
 
-    #shellcheck disable=SC2034
-    GAME_ARGS=()
-    config_has game.args && config_read_array game.args GAME_ARGS
-}
+    local -a game_args=()
+    config_has game.args && config_read_array game.args game_args
+    launch_plan_args_set "${game_args[@]}"
 
-build_game_command() {
-    GAME_COMMAND=("${RUNNER_WRAPPER[@]}")
-
-    local runner_exe
-    config_read runner.exe runner_exe
-    GAME_COMMAND+=("$runner_exe")
-
-    local -a runner_args=()
-    config_has runner.args && config_read_array runner.args runner_args
-    GAME_COMMAND+=("${runner_args[@]}")
-    # Wine-side preparation populates this explicit target slot.
-    GAME_COMMAND+=("${COMMAND_RUNNER_TARGET[@]}")
-}
-
-start_game_process() {
-    local -a cmd=("${GAME_COMMAND[@]}")
     local game_cwd
     config_read game.cwd game_cwd
-
-    log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
-    log_debug lifecycle "工作目录: $game_cwd"
-    pushd "$game_cwd" > /dev/null || die 1 lifecycle "无法切换到游戏工作目录: '$game_cwd'"
-    LD_PRELOAD="$(env_get_ld_preload)" "${cmd[@]}" &
-    GAME_PID="$!"
-    log_debug lifecycle "游戏进程 PID: $GAME_PID"
-    popd > /dev/null || die 1 lifecycle "无法切换回项目根目录"
-
-    local now_ns dur_ns
-    now_ns="$(date +%s%N)"
-    dur_ns="$((now_ns - SCRIPT_START_NANOSECONDS))"
-    log_debug lifecycle "本次脚本用时: $(printf "%'d" "$dur_ns") 纳秒"
+    launch_plan_set_cwd "$game_cwd"
 }

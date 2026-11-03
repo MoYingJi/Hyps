@@ -121,46 +121,40 @@ config_parse_file() {
 _strip_trailing_comment() {
     local -n str_ref="$1"
     local str="$str_ref"
-    local in_single=0
-    local in_double=0
-    local escape=0
-    local i
-    local char
-    local comment_pos=-1
 
-    for ((i=0; i<${#str}; i++)); do
-        char="${str:i:1}"
+    # 无 # 则不可能有注释，直接返回
+    [[ $str == *'#'* ]] || return 0
 
-        # 处理转义字符（仅对双引号内有效）
-        if [[ $escape -eq 1 ]]; then
-            escape=0
-            continue
-        fi
+    # 只跳到引号、反斜杠与 # 处，其余字符不影响引号状态
+    local rest="$str" plain c pos=0 comment_pos=-1
+    local in_single=0 in_double=0
 
-        if [[ $char == "\\" ]] && [[ $in_double -eq 1 ]]; then
-            escape=1
-            continue
-        fi
+    while [[ -n $rest ]]; do
+        plain="${rest%%[\'\"\\#]*}"
+        pos=$((pos + ${#plain}))
+        rest="${rest:${#plain}}"
+        [[ -n $rest ]] || break
 
-        # 切换引号状态
-        if [[ $char == "'" ]] && [[ $in_double -eq 0 ]]; then
+        c="${rest:0:1}"
+        rest="${rest:1}"
+        pos=$((pos + 1))
+
+        # 双引号内的反斜杠转义下一个字符
+        if (( in_double )) && [[ $c == "\\" ]]; then
+            [[ -n $rest ]] || break
+            rest="${rest:1}"
+            pos=$((pos + 1))
+        elif [[ $c == "'" ]] && (( ! in_double )); then
             in_single=$((1 - in_single))
-            continue
-        fi
-        if [[ $char == '"' ]] && [[ $in_single -eq 0 ]]; then
+        elif [[ $c == '"' ]] && (( ! in_single )); then
             in_double=$((1 - in_double))
-            continue
-        fi
-
-        # 在引号外遇到 # 即标记注释位置
-        if [[ $in_single -eq 0 && $in_double -eq 0 && $char == '#' ]]; then
-            comment_pos=$i
+        elif [[ $c == '#' ]] && (( ! in_single && ! in_double )); then
+            comment_pos=$((pos - 1))
             break
         fi
     done
 
-    if [[ $comment_pos -ne -1 ]]; then
-        # 截取注释前部分，并去除尾随空白
+    if (( comment_pos != -1 )); then
         str="${str:0:comment_pos}"
         str="${str%"${str##*[![:space:]]}"}"
     fi

@@ -24,6 +24,22 @@ path_dirname() {
     output="$dir"
 }
 
+# load_config 等阶段只登记目录，由 prepare 阶段的 flush_pending_mkdirs 统一创建
+declare -a PENDING_MKDIRS=()
+
+defer_mkdir() {
+    PENDING_MKDIRS+=("$1")
+}
+
+flush_pending_mkdirs() {
+    local dir
+    for dir in "${PENDING_MKDIRS[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            mkdir -p "$dir" || die 1 utils "无法创建目录: '$dir'"
+        fi
+    done
+}
+
 # 临时文件后缀；上次运行被打断时可能遗留 "$dst$FILE_ATOMIC_TMP_SUFFIX"
 FILE_ATOMIC_TMP_SUFFIX=".hyps-tmp"
 

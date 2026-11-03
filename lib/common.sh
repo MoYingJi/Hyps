@@ -35,6 +35,8 @@ for feature_script in "$SCRIPT_DIR"/features/*.sh; do
 done
 
 hyps_main() {
+    register_hook prepare flush_pending_mkdirs 0
+
     local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"
     if [ -f "$game_impl" ]; then
         log_debug lifecycle "加载游戏实现: $game_impl"

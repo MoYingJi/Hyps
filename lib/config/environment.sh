@@ -155,19 +155,6 @@ _export_env_var() {
     fi
 }
 
-declare -a ENV_MKDIRS=()
-
-env_mkdirs() {
-    local dir
-    for dir in "${ENV_MKDIRS[@]}"; do
-        if [[ ! -d "$dir" ]]; then
-            mkdir -p "$dir" || die 1 environment "无法创建目录: '$dir'"
-        fi
-    done
-}
-
-register_hook prepare env_mkdirs
-
 
 env_transform_noop() {
     return 0
@@ -223,8 +210,8 @@ env_transform_path_mkdir() {
         die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
     else
         result="$(realpath -m "$dir_path")"
-        ENV_MKDIRS+=("$result")
-        log_debug environment "目录待创建: '$final_value'"
+        defer_mkdir "$result"
+        log_debug environment "目录待创建: '$result'"
         return 0
     fi
 }

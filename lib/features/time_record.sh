@@ -9,7 +9,7 @@ feat_time_record_load_config() {
     config_default features.time_record.enabled true
     config_is_true features.time_record.enabled || return 0
 
-    config_require_realpath_mkdir features.time_record.dir "$DATA_DIR/time"
+    config_realpath features.time_record.dir "$DATA_DIR/time"
     config_default features.time_record.min_sec 60
 
     if ! config_has features.time_record.today.reset; then

@@ -118,8 +118,7 @@ endfield_surrogate_add_target() {
         config_read "$dir_key" target_path
         [[ -n $target_path ]] || die 1 config "配置项 '$dir_key' 不能为空"
         target_path="$(realpath -m -- "$target_path")"
-        mkdir -p -- "$target_path" \
-            || die 1 config "配置项 '$dir_key' 所指目录无法创建：'$target_path'"
+        defer_mkdir "$target_path"
         _target_args+=("$flag" "$(wine_unix_path_to_windows "$target_path")\Games.exe")
     elif $has_file; then
         # 完整文件路径，文件名由用户决定

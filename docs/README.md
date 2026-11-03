@@ -41,7 +41,7 @@
 - [x] 【原神】使用 FPS Unlocker 解锁帧率
 - [x] 【原神】强制 D3D12 图形 API（需要额外依赖）
 - [x] 【崩坏：星穹铁道】注册表解锁帧率（需要 python3）
-- [x] 【明日方舟：终末地】通过官方启动器直接启动游戏（需要 mingw-w64 和官方启动器）
+- [x] 【明日方舟：终末地】通过官方启动器直接启动游戏（需要 mingw-w64）
 
 目前 **不支持** 的功能：
 
@@ -157,6 +157,20 @@ overlay.lower = "/path/to/game"
 部分游戏支持自动识别游戏目录；对此类游戏，可以不设置 `overlay.lower`，改为设置 `overlay.lower_auto = true`。若游戏不支持自动识别，则必须手动设置 `overlay.lower`
 
 启用后需要安装 `fuse-overlayfs`
+
+### 着色器缓存
+
+设置 `cache.shader.enabled = true` 即可。会增加游戏流畅度。若驱动更新 / 游戏更新，而游戏未重新预编译着色器，可以使用 `_Hyps shader-cache invalidate <GAME_NAME>` 删除着色器使其预重新编译
+
+### 时间记录
+
+默认开启时间记录
+
+```bash
+_Hyps time list  # 列出所有游戏的 启动次数、总游戏时长、最后一次启动时间
+_Hyps time today # 列出所有游戏的 最后一次启动时间 和 今天游戏日常范围内的启动状态
+_Hyps time report <GAME_NAME> # 查看该游戏的详细报告
+```
 
 ## 删除
 

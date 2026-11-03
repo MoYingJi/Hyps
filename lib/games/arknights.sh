@@ -13,3 +13,8 @@ overlay_auto_lower() {
 feat_time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
 }
+
+userdata_link() {
+    local userprofile="$2"
+    try_link_dir "$SCREENSHOTS/Arknights" "$userprofile/Pictures/Arknights_Screenshots"
+}

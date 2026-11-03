@@ -76,7 +76,7 @@ init_find_launcher_script() {
     for sh in "${SCRIPTS_DIR:-$PROJECT_ROOT/scripts}"/*.sh; do
         [[ -f "$sh" ]] || continue
         [[ "${sh##*/}" == _* ]] && continue
-        name="$(sed -n 's/^GAME_NAME="\([^"]*\)"$/\1/p' "$sh" | head -n 1)"
+        game_script_name "$sh" name || continue
         if [[ "$name" == "$want" ]]; then
             printf '%s\n' "$sh"
             return 0

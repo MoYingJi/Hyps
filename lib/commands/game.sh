@@ -20,12 +20,7 @@ command_game_list() {
 
             basename_style="green,bold"
 
-            name="$(
-                #shellcheck disable=SC1090
-                source "$sh"
-                #shellcheck disable=SC2153
-                echo "$GAME_NAME"
-            )"
+            game_script_name "$sh" name || name=""
 
             if [ -z "$name" ]; then
                 name="无效"

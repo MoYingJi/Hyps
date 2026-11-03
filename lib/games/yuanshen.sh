@@ -17,7 +17,7 @@ overlay_auto_lower() {
 
 # 日常重置时间
 
-feat_time_record_today_reset() {
+time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
 }
 

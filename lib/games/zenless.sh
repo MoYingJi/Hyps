@@ -10,7 +10,7 @@ overlay_auto_lower() {
     printf '%s\n' "$game_dir"
 }
 
-feat_time_record_today_reset() {
+time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
 }
 

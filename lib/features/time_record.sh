@@ -14,8 +14,8 @@ feat_time_record_load_config() {
 
     if ! config_has features.time_record.today.reset; then
         local reset_time
-        if [ "$(type -t feat_time_record_today_reset)" = "function" ]; then
-            reset_time="$(feat_time_record_today_reset)"
+        if [ "$(type -t time_record_today_reset)" = "function" ]; then
+            reset_time="$(time_record_today_reset)"
         else
             reset_time="$TIME_RECORD_TODAY_RESET_DEFAULT"
         fi

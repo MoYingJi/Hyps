@@ -56,12 +56,14 @@ feat_overlay_load_config() {
     config_read overlay.mount mount
     config_read overlay.lower lower
 
-    config_read game.exe OVERLAY_ORIGINAL_GAME
-    config_set game.exe "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME")"
+    local original_exe
+    config_read game.exe original_exe
+    launch_plan_set_game_exe "$mount/$(realpath --relative-to="$lower" "$original_exe")"
 
-    config_read game.cwd OVERLAY_ORIGINAL_GAME_CWD
-    if [[ "$OVERLAY_ORIGINAL_GAME_CWD" == "$lower"* ]]; then
-        config_set game.cwd "$mount/$(realpath --relative-to="$lower" "$OVERLAY_ORIGINAL_GAME_CWD")"
+    local original_cwd
+    config_read game.cwd original_cwd
+    if [[ "$original_cwd" == "$lower"* ]]; then
+        launch_plan_set_cwd "$mount/$(realpath --relative-to="$lower" "$original_cwd")"
     fi
 
     register_hook prepare feat_overlay_mount

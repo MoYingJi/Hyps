@@ -269,14 +269,13 @@ gi_patch_d3d12_prepare() {
 
     if config_is_true overlay.enabled; then
         GI_PATCH_D3D12_MODE="overlay"
-        game="$OVERLAY_ORIGINAL_GAME"
         config_read overlay.upper overlay_upper
     else
         log_warn gi-patch-d3d12 "当前未开启 overlay，使用 in-place 模式！"
         GI_PATCH_D3D12_MODE="in-place"
-        config_read game.exe game
     fi
 
+    config_read game.exe game
     path_dirname "$game" game_dir
 
     for data_dir in "YuanShen_Data" "GenshinImpact_Data"; do

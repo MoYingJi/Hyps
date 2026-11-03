@@ -77,7 +77,9 @@ load_config() {
     config_has game.args && config_read_array game.args game_args
     launch_plan_args_set "${game_args[@]}"
 
-    local game_cwd
+    local game_exe game_cwd
+    config_read game.exe game_exe
+    launch_plan_set_game_exe "$game_exe"
     config_read game.cwd game_cwd
     launch_plan_set_cwd "$game_cwd"
 }

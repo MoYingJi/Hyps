@@ -212,10 +212,8 @@ endfield_surrogate_handler() {
     local -n _out="$1"
     local -a game_args=()
     local game_exe
-
     launch_plan_args_get game_args
-    config_read game.exe game_exe
-
+    game_exe="$(launch_plan_get_game_exe)"
     _out=("${GRYPH_SURROGATE_ARGS[@]}" "$(wine_unix_path_to_windows "$game_exe")" "${game_args[@]}")
 }
 

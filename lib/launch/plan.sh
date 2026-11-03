@@ -19,7 +19,8 @@ declare -a LP_COMMAND=()           # 最终组装好的启动命令
 declare LP_GAME_HANDLER="launch_plan_default_game_handler"  # 游戏 handler 函数名，契约见 game_handler.sh
 
 declare    LP_PID=""              # 启动的游戏进程 PID
-declare    LP_GAME_CWD=""         # 游戏工作目录
+declare    LP_GAME_EXE=""         # 实际运行的游戏 exe (overlay 开启时为挂载点路径)
+declare    LP_GAME_CWD=""         # 实际运行的游戏工作目录
 
 declare    LP_PREPARE_SNIPPET=""     # 准备片段: 脚本模式下写入整份 .bat，直接模式下单独运行一次
 declare    LP_BEFORE_SNIPPET=""      # 游戏启动前的 .bat 片段: 存在即采用脚本模式
@@ -118,6 +119,12 @@ launch_plan_after_snippet_empty() {
 
 launch_plan_get_pid() {
     printf '%s' "$LP_PID"
+}
+launch_plan_set_game_exe() {
+    LP_GAME_EXE="$1"
+}
+launch_plan_get_game_exe() {
+    printf '%s' "$LP_GAME_EXE"
 }
 launch_plan_set_cwd() {
     LP_GAME_CWD="$1"

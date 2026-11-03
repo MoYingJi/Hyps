@@ -26,7 +26,7 @@ feat_userdata_link_prepare() {
         local overlay_upper overlay_lower
         config_read overlay.upper overlay_upper
         config_read overlay.lower overlay_lower
-        game_exe="$overlay_upper/$(realpath --relative-to="$overlay_lower" "$OVERLAY_ORIGINAL_GAME")"
+        game_exe="$overlay_upper/$(realpath --relative-to="$overlay_lower" "$game_exe")"
     fi
 
     local screenshots_dir

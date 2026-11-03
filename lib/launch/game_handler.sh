@@ -17,13 +17,10 @@ source "$SCRIPT_DIR/libs.sh"
 launch_plan_default_game_handler() {
     #shellcheck disable=SC2178
     local -n _out="$1"
-    local game_exe
     local -a game_args=()
-
-    config_read game.exe game_exe
     launch_plan_args_get game_args
 
-    _out=("$game_exe" "${game_args[@]}")
+    _out=("$(launch_plan_get_game_exe)" "${game_args[@]}")
 }
 
 # 经临时数组 _argv 接收 handler 输出，不能把 _out 的名字直接传给 handler (会形成 nameref 自引用)

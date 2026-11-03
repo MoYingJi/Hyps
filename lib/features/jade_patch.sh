@@ -25,7 +25,7 @@ jade_patch_handler() {
     fi
 
     local game_exe
-    config_read game.exe game_exe
+    game_exe="$(launch_plan_get_game_exe)"
 
     local -a game_args=()
     launch_plan_args_get game_args

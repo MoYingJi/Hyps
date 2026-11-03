@@ -47,7 +47,7 @@ feat_fs_detect_pre_start() {
     config_is_true features.fs_detect.enabled true || return 0 # 总开关
 
     local game_exe game_blkfs
-    config_read game.exe game_exe
+    game_exe="$(launch_plan_get_game_exe)"
     game_blkfs="$(feat_fs_detect_get_blkfs "$game_exe")" \
         || log_debug "无法获取游戏本体所在的文件系统: '$game_exe'"
 

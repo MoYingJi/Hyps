@@ -7,23 +7,31 @@ source "$SCRIPT_DIR/libs.sh"
 source "$SCRIPT_DIR/config/environment.sh"
 
 feat_program_cache_load_config() {
-    # GLShaderCache
     if config_is_true cache.shader.enabled; then
-        config_default cache.shader.path "$CACHE_DIR/GLShaderCache/$GAME_NAME"
+        config_default cache.shader.path "$CACHE_DIR/shader/$GAME_NAME"
+
+        config_default cache.shader.nv_enabled true
+        config_default cache.shader.nv_skip_cleanup true
+        config_default cache.shader.nv_max_size "10G"
+        config_default cache.shader.mesa_max_size "10G"
+
+        local shader_path
+        config_read cache.shader.path shader_path
+
+        for subdir in nvidia mesa dxvk vkd3d; do
+            defer_mkdir "$shader_path/$subdir"
+        done
+
+        export __GL_SHADER_DISK_CACHE_PATH="$shader_path/nvidia"
+        export MESA_SHADER_CACHE_DIR="$shader_path/mesa"
+        export DXVK_STATE_CACHE_PATH="$shader_path/dxvk"
+        export VKD3D_SHADER_CACHE_PATH="$shader_path/vkd3d"
 
         ENV_EXPORTS+=(
-            "cache.shader.enabled|__GL_SHADER_DISK_CACHE_SKIP_CLEANUP|bool_to_01"
-            "cache.shader.path|__GL_SHADER_DISK_CACHE_PATH|path_mkdir"
-        )
-    fi
-
-    # DXCache
-    if config_is_true cache.dx.enabled; then
-        config_default cache.dx.path "$CACHE_DIR/DXCache/$GAME_NAME"
-
-        ENV_EXPORTS+=(
-            "cache.dx.path|DXVK_STATE_CACHE_PATH|path_mkdir"
-            "cache.dx.path|VKD3D_SHADER_CACHE_PATH|path_mkdir"
+            "cache.shader.nv_enabled|__GL_SHADER_DISK_CACHE|bool_to_01"
+            "cache.shader.nv_skip_cleanup|__GL_SHADER_DISK_CACHE_SKIP_CLEANUP|bool_to_01"
+            "cache.shader.nv_max_size|__GL_SHADER_DISK_CACHE_SIZE|size_string_to_bytes_uint"
+            "cache.shader.mesa_max_size|MESA_SHADER_CACHE_MAX_SIZE|string"
         )
     fi
 }
@@ -61,6 +69,5 @@ feat_program_cache_invalidate() {
     # 应用默认路径，与游戏启动时的行为保持一致
     feat_program_cache_load_config
 
-    program_cache_clear_dir cache.shader.path GLShaderCache
-    program_cache_clear_dir cache.dx.path DXCache
+    program_cache_clear_dir cache.shader.path "着色器"
 }

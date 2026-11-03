@@ -186,6 +186,14 @@ env_transform_uint() {
     fi
 }
 
+env_transform_size_string_to_bytes_uint() {
+    local value="$1"
+    local -n result="$2"
+    local conf_key="${3:-}"
+    [ -z "$value" ] && die 1 environment "配置项 '$conf_key' 的值为空"
+    result="$(size_string_to_bytes_uint "$value")" || die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是有效的大小字符串"
+}
+
 env_transform_path_dir() {
     local dir_path="$1"
     local -n result="$2"

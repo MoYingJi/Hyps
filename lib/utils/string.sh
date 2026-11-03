@@ -77,3 +77,47 @@ quote_args_bat() {
     done
     echo
 }
+
+size_string_to_bytes_uint() {
+    local input="${1//[[:space:]]/}"
+    local num unit
+
+    if [[ $input =~ ^([0-9]*\.?[0-9]+)([a-zA-Z]*)$ ]]; then
+        num="${BASH_REMATCH[1]}"
+        unit="${BASH_REMATCH[2]}"
+    else
+        return 1
+    fi
+
+    local multiplier
+    case "${unit,,}" in
+        "" | b)          multiplier=1 ;;
+        k | kb | kib)    multiplier=$(( 1 << 10 )) ;;
+        m | mb | mib)    multiplier=$(( 1 << 20 )) ;;
+        g | gb | gib)    multiplier=$(( 1 << 30 )) ;;
+        t | tb | tib)    multiplier=$(( 1 << 40 )) ;;
+        p | pb | pib)    multiplier=$(( 1 << 50 )) ;;
+        e | eb | eib)    multiplier=$(( 1 << 60 )) ;;
+        *) return 1 ;;
+    esac
+
+    local int_part frac_part=""
+    if [[ $num == *.* ]]; then
+        int_part="${num%.*}"
+        frac_part="${num#*.}"
+    else
+        int_part="$num"
+    fi
+    int_part="${int_part:-0}"
+
+    local result=$(( 10#$int_part * multiplier ))
+
+    if [[ -n $frac_part ]]; then
+        local flen=${#frac_part}
+        local fnum=$(( 10#$frac_part ))
+        local denom=$(( 10 ** flen ))
+        result=$(( result + fnum * multiplier / denom ))
+    fi
+
+    echo "$result"
+}

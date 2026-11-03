@@ -120,6 +120,22 @@ config_require_realpath_mkdir() {
     config_set "$key" "$value" "$target_map_name"
 }
 
+# 获取 $1 的绝对路径，如果不是目录则延迟创建，并将其存储回配置中
+config_require_realpath_mkdir_defer() {
+    local key="$1"
+    local default="${2:-}"
+    local target_map_name="${3:-CONFIG}"
+
+    local value
+    config_read "$key" value "$default" "$target_map_name"
+    [[ -n "$value" ]] || die 1 config "配置项 '$key' 未设置"
+    value="$(realpath -m "$value")"
+    [[ -e "$value" ]] && [[ ! -d "$value" ]] && die 1 config "配置项 '$key' 指向的路径不是目录：'$value'"
+    [[ -d "$value" ]] || return 0
+    defer_mkdir "$value"
+    config_set "$key" "$value" "$target_map_name"
+}
+
 # 获取 $1 的绝对路径，如果不是可执行文件则报错，并将其存储回配置中
 config_require_realpath_which_exe() {
     local key="$1"

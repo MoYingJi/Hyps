@@ -7,21 +7,21 @@ __UTILS_FS_SH_LOADED=1
 source "$SCRIPT_DIR/core/log.sh"
 
 path_dirname() {
-    local path="$1"
+    local _path="$1"
     local -n output="$2"
 
-    while [[ "$path" == */ && "$path" != "/" ]]; do
-        path="${path%/}"
+    while [[ "$_path" == */ && "$_path" != "/" ]]; do
+        _path="${_path%/}"
     done
 
-    local dir="${path%/*}"
-    [[ "$dir" == "$path" ]] && dir="."
-    [[ -z "$dir" ]] && dir="/"
-    while [[ "$dir" == */ && "$dir" != "/" ]]; do
-        dir="${dir%/}"
+    local _dir="${_path%/*}"
+    [[ "$_dir" == "$_path" ]] && _dir="."
+    [[ -z "$_dir" ]] && _dir="/"
+    while [[ "$_dir" == */ && "$_dir" != "/" ]]; do
+        _dir="${_dir%/}"
     done
-    #shellcheck disable=SC2034 # Writes through the nameref to the caller's variable.
-    output="$dir"
+    # shellcheck disable=SC2034 # Writes through the nameref to the caller's variable.
+    output="$_dir"
 }
 
 # load_config 等阶段只登记目录，由 prepare 阶段的 flush_pending_mkdirs 统一创建

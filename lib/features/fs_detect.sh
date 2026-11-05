@@ -7,7 +7,7 @@ feat_fs_detect_get_blkfs() {
     local path="$1"
     [ -n "$path" ] || return 1
     while [ ! -e "$path" ] && [ "$path" != "/" ]; do
-        path_dirname path path
+        path_dirname "$path" path
     done
 
     local source_dev
@@ -49,23 +49,25 @@ feat_fs_detect_pre_start() {
     local game_exe game_blkfs
     game_exe="$(launch_plan_get_game_exe)"
     game_blkfs="$(feat_fs_detect_get_blkfs "$game_exe")" \
-        || log_debug "无法获取游戏本体所在的文件系统: '$game_exe'"
+        || log_debug fs-detect "无法获取游戏本体所在的文件系统: '$game_exe'"
 
     case "$game_blkfs" in
         ntfs)  feat_fs_detect_warn_game_in "NTFS"         "ntfs"  ;;
         exfat) feat_fs_detect_warn_game_in "exFAT"        "exfat" ;;
         vfat)  feat_fs_detect_warn_game_in "FAT 文件系统" "vfat"  ;;
+        *)     log_debug fs-detect "游戏本体所在的文件系统: $game_blkfs" ;;
     esac
 
     local prefix_dir prefix_blkfs
     config_read game.prefix prefix_dir
     prefix_blkfs="$(feat_fs_detect_get_blkfs "$prefix_dir")" \
-        || log_debug "无法获取 Wine Prefix 所在的文件系统: '$prefix_dir'"
+        || log_debug fs-detect "无法获取 Wine Prefix 所在的文件系统: '$prefix_dir'"
 
     case "$prefix_blkfs" in
         ntfs)  feat_fs_detect_error_prefix_in "NTFS"         "ntfs"  ;;
         exfat) feat_fs_detect_error_prefix_in "exFAT"        "exfat" ;;
         vfat)  feat_fs_detect_error_prefix_in "FAT 文件系统" "vfat"  ;;
+        *)     log_debug fs-detect "Wine Prefix 所在的文件系统: $prefix_blkfs" ;;
     esac
 
     return 0

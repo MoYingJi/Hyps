@@ -41,15 +41,28 @@ sudo_request() {
     local why="$1"
     shift
 
+    local quoted_args
+    quoted_args="$(quote_args "$@")"
+
     {
         echo "[Hyps] [sudo 请求] $why"
-        echo -n "[Hyps] $ "
-        quote_args "$@"
+        echo "[Hyps] # $quoted_args"
     } >&2
+
+    if [ ! -t 0 ] || isy "$HYPS_FORCE_SUDO_NOTIFY" = "1"; then
+        if command_exists notify-send; then
+            notify-send \
+                --app-name "Hyps" \
+                "sudo 请求" \
+                $"$why\n请注意查看终端或提权弹窗\n\n# $quoted_args"
+        else
+            log_warn utils "无法发送 sudo 请求通知给用户"
+        fi
+    fi
 
     if command_exists sudo && [ -t 0 ]; then
         # 有 sudo 命令，有终端
-        sudo "$@"
+        sudo -- "$@"
         return "$?"
     elif command -v pkexec >/dev/null 2>&1 && { [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; }; then
         # 有 pkexec 命令，有显示环境

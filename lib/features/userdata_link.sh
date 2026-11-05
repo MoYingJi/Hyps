@@ -18,7 +18,10 @@ feat_userdata_link_prepare() {
 
     config_read game.prefix prefix
 
-    wine_resolve_user_dirs userdata-link "$prefix" drive_c userprofile
+    if ! wine_resolve_user_dirs userdata-link "$prefix" drive_c userprofile; then
+        log_error userdata-link "解析用户目录失败，跳过 userdata_link 功能"
+        return 0
+    fi
 
     config_read game.exe game_exe
     if config_is_true overlay.enabled; then

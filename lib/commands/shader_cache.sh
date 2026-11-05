@@ -31,15 +31,10 @@ command_shader_cache_invalidate() {
         log_warn shader-cache "未定义 shader_cache_invalidate 函数，跳过游戏特定的着色器缓存清除"
     fi
 
-    local prefix drive_c userprofile game_exe
+    local prefix
     config_read game.prefix prefix
 
     ensure_no_wineserver "$prefix" error "清除着色器缓存前需要先关闭游戏"
-
-    if [ "$has_game_fn" -eq 1 ]; then
-        wine_resolve_user_dirs shader-cache "$prefix" drive_c userprofile
-        config_read game.exe game_exe
-    fi
 
     local answer
     read -r -p "将清除 $GAME_NAME 的着色器缓存，是否继续？[y/N] " answer || answer=""
@@ -51,7 +46,14 @@ command_shader_cache_invalidate() {
     feat_program_cache_invalidate
 
     if [ "$has_game_fn" -eq 1 ]; then
-        shader_cache_invalidate "$drive_c" "$userprofile" "$game_exe"
+        local drive_c userprofile game_exe
+        config_read game.exe game_exe
+
+        if wine_resolve_user_dirs shader-cache "$prefix" drive_c userprofile; then
+            shader_cache_invalidate "$drive_c" "$userprofile" "$game_exe"
+        else
+            log_error shader-cache "解析用户目录失败，跳过游戏特定的着色器缓存清除"
+        fi
     fi
 
     log_info shader-cache "着色器缓存清除完成"

@@ -77,7 +77,8 @@ wine_resolve_user_dirs() {
     elif [ -d "$prefix/pfx/drive_c" ]; then
         drive_c_ref="$prefix/pfx/drive_c"
     else
-        die 1 "$module" "未找到 prefix 中的 drive_c 目录"
+        log_warn "$module" "未找到 prefix 中的 drive_c 目录"
+        return 1
     fi
 
     if [ -d "$drive_c_ref/users/steamuser" ]; then
@@ -86,7 +87,8 @@ wine_resolve_user_dirs() {
         # shellcheck disable=SC2034 # 通过 nameref 写入调用方变量
         userprofile_ref="$drive_c_ref/users/$USER"
     else
-        die 1 "$module" "未找到 prefix 中的用户目录"
+        log_warn "$module" "未找到 prefix 中的用户目录"
+        return 1
     fi
 }
 

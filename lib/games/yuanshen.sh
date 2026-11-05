@@ -150,8 +150,14 @@ gi_fps_unlock_start() {
     local pid
     pid="$(find_pid_by_name -n "$prog")"
 
+    local args=(--interval "$interval" --fifo "$fifo")
+
+    if [[ "$LOG_LEVEL" == DEBUG ]]; then
+        args+=(--verbose)
+    fi
+
     log_info gi-fps-unlock "PID: $pid"
-    "$bin" "$pid" "$fps" "$interval" "$fifo" &
+    "$bin" "${args[@]}" "$pid" "$fps" &
 }
 
 # 注册表 HDR

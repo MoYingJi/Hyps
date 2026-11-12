@@ -1,0 +1,216 @@
+#!/hint/bash
+
+[[ -n "${__INTEGRATIONS_HYP_SH_LOADED:-}" ]] && return 0
+__INTEGRATIONS_HYP_SH_LOADED=1
+
+#shellcheck source=../libs.sh
+source "$SCRIPT_DIR/libs.sh"
+
+ini_get() {
+    local file="$1"; shift
+    local sep=$'\x1f' keys
+    printf -v keys "%s$sep" "$@"          # 每个 key 后带一个分隔符
+
+    awk -v keys="$keys" -v sep="$sep" '
+        BEGIN {
+            t = split(keys, T, sep)
+            n = 0
+            for (i = 1; i <= t; i++)           # 过滤尾部空串
+                if (T[i] != "") { K[++n] = T[i]; want[T[i]] = n }
+        }
+        /^[ \t]*[;#]/ { next }
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            eq = index(line, "=");  if (!eq) next
+            k = substr(line, 1, eq - 1)
+            v = substr(line, eq + 1)
+            gsub(/^[ \t]+|[ \t]+$/, "", k)
+            gsub(/^[ \t]+|[ \t]+$/, "", v)
+            if (k in want) val[want[k]] = v    # 同名后写覆盖前写，保持原语义
+        }
+        END { for (i = 1; i <= n; i++) print (i in val ? val[i] : "") }
+    ' "$file"
+}
+
+integration_hyp_read_server_from_game_config() {
+    local config_file="$1" # /path/to/config.ini
+    local -n _server="$2"
+    if [ -n "$3" ]; then local -n _game_version="$3"; else local _game_version=""; fi
+
+    local channel sub_channel cps game_version
+    { read -r channel; read -r sub_channel; read -r cps; read -r game_version; } \
+        < <(ini_get "$config_file" "channel" "sub_channel" "cps" "game_version")
+
+    _game_version="$game_version"
+
+    case "${channel}:${sub_channel}:${cps}" in
+        "1:1:hyp_mihoyo")    _server="cn" ;;
+        "14:0:hyp_mihoyo")   _server="bilibili" ;;
+        "1:0:hyp_hoyoverse") _server="global" ;;
+        *) return 1 ;;
+    esac
+}
+
+integration_hyp_get_game_version_local() {
+    local game_exe="$1"
+    local -n _local_version="$2"
+    local -n _local_variant="$3"
+    local game_dir server version
+
+    path_dirname "$game_exe" game_dir
+    integration_hyp_read_server_from_game_config "$game_dir/config.ini" server version || return 1
+    _local_version="$version"
+    _local_variant="$server"
+}
+
+integration_hyp_variant_human_readable() {
+    local variant="$1"
+    case "$variant" in
+        "cn")       printf '%s\n' "国服" ;;
+        "global")   printf '%s\n' "国际服" ;;
+        "bilibili") printf '%s\n' "Bilibili" ;;
+        *)          printf '%s\n' "未知" ;;
+    esac
+}
+
+_integration_hyp_get_api_domain() {
+    local -n _domain="$1"
+    local server="$2"
+
+    case "$server" in
+        "cn")       _domain="hyp-api.mihoyo.com" ;;
+        "bilibili") _domain="hyp-api.mihoyo.com" ;;
+        "global")   _domain="sg-hyp-api.hoyoverse.com" ;;
+        *) return 1 ;;
+    esac
+}
+
+_integration_hyp_get_launcher_id() {
+    local -n _launcher_id="$1"
+    local server="$2"
+    local game="${3:-}"
+
+    case "$server" in
+        "cn")       _launcher_id="jGHBHlcOq1" ;;
+        "global")   _launcher_id="VYTpXlbWo8" ;;
+        "bilibili")
+            case "$game" in
+                "genshin")  _launcher_id="umfgRO5gh5" ;;
+                "starrail") _launcher_id="6P5gHMNyK3" ;;
+                "zenless")  _launcher_id="xV0f4r1GT0" ;;
+                *) return 1 ;;
+            esac ;;
+        *) return 1 ;;
+    esac
+}
+
+declare -gA _HYP_BRANCH_VERSION      # game_biz -> main.tag
+declare -gA _HYP_BRANCH_PREDOWNLOAD  # game_biz -> pre_download.tag (无预下载时为空)
+declare -gA _HYP_BRANCH_LOADED       # 缓存键 -> 1
+# -g: 本文件常在函数作用域内被 source，普通 declare 会使数组成为该函数的局部变量，
+# 其它上下文 (如命令替换子 shell) 看不到缓存，且赋值会静默降级为索引数组
+
+# bilibili 每个游戏有独立 launcher_id，缓存键按 launcher_id 而非 variant
+_integration_hyp_branches_cache_key() {
+    local -n _cache_key="$1"
+    local variant="$2"
+    local game="${3:-}"
+
+    if [ "$variant" = "bilibili" ]; then
+        _integration_hyp_get_launcher_id _cache_key "$variant" "$game" || return 1
+    else
+        _cache_key="$variant"
+        return 0
+    fi
+}
+
+# 请求 getGameBranches 并解析所有游戏的版本与预下载信息
+_integration_hyp_load_branches() {
+    local game="$1"
+    local variant="${2:-cn}"
+    local cache_key
+    _integration_hyp_branches_cache_key cache_key "$variant" "$game" || return 1
+    [[ -n "${_HYP_BRANCH_LOADED[$cache_key]:-}" ]] && return 0
+
+    local domain launcher_id raw
+    _integration_hyp_get_api_domain domain "$variant" || return 1
+    _integration_hyp_get_launcher_id launcher_id "$variant" "$game" || return 1
+
+    raw="$(curl -fsS "https://$domain/hyp/hyp-connect/api/getGameBranches?launcher_id=$launcher_id" \
+        | jq -r '
+            if .retcode != 0 then
+                "API error [\(.retcode)]: \(.message // "unknown")" | halt_error(1)
+            else
+                .data.game_branches[]
+                | [.game.biz, (.main.tag // ""), (.pre_download.tag // "")]
+                | join("\u001f")
+            end
+        ' 2>&1)" || {
+        # 本函数可能在 command substitution 中被调用，用 log_error + return 1 报错
+        log_error hyp "无法获取游戏分支信息 (variant=$variant): $raw"
+        return 1
+    }
+
+    # \x1f 分隔: bash read 会折叠连续的空白 IFS 字符，空字段 (如无预下载的 pre_download.tag) 会被吞掉
+    local sep=$'\x1f'
+    local biz tag pre
+    while IFS="$sep" read -r biz tag pre; do
+        # 后写覆盖前写，与原语义一致 (如 global 响应中重复的 bh3 条目)
+        [ -n "$biz" ] || continue
+        _HYP_BRANCH_VERSION["$biz"]="$tag"
+        _HYP_BRANCH_PREDOWNLOAD["$biz"]="$pre"
+    done <<< "$raw"
+
+    _HYP_BRANCH_LOADED["$cache_key"]=1
+    log_debug hyp "已加载游戏分支信息 (variant=$variant, launcher_id=$launcher_id): ${#_HYP_BRANCH_VERSION[@]} 个游戏"
+}
+
+# 解析 hyp 游戏的 game_biz 标识；biz 后缀按服务器区分
+_integration_hyp_game_biz() {
+    local -n _game_biz="$1"
+    local game="$2"
+    local variant="${3:-cn}"
+
+    case "$game" in
+        "genshin")  _game_biz="hk4e" ;;
+        "starrail") _game_biz="hkrpg" ;;
+        "zenless")  _game_biz="nap" ;;
+        "honkai3")  _game_biz="bh3" ;;
+        *) return 1 ;;
+    esac
+
+    case "$variant" in
+        "cn" | "bilibili") _game_biz+="_cn" ;;
+        "global")          _game_biz+="_global" ;;
+        *) return 1 ;;
+    esac
+}
+
+# 返回远程版本；无版本时输出空行并返回 1
+integration_hyp_get_game_version_remote() {
+    local game="$1"
+    local variant="${2:-cn}"
+    local game_biz
+
+    _integration_hyp_game_biz game_biz "$game" "$variant" || return 1
+    _integration_hyp_load_branches "$game" "$variant" || return 1
+
+    local version="${_HYP_BRANCH_VERSION[$game_biz]:-}"
+    [ -n "$version" ] || {
+        log_error hyp "API 未返回 $game ($game_biz, variant=$variant) 的版本"
+        return 1
+    }
+    printf "%s\n" "$version"
+}
+
+# 返回预下载版本；无预下载时输出空行
+integration_hyp_get_game_predownload_remote() {
+    local game="$1"
+    local variant="${2:-cn}"
+    local game_biz
+
+    _integration_hyp_game_biz game_biz "$game" "$variant" || return 1
+    _integration_hyp_load_branches "$game" "$variant" || return 1
+    printf "%s\n" "${_HYP_BRANCH_PREDOWNLOAD[$game_biz]:-}"
+}

@@ -46,7 +46,9 @@ shader_cache_invalidate() {
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）
 
 GRYPH_SURROGATE_TOOL="$PROJECT_ROOT/tools/gryph-surrogate"
-declare -a GRYPH_SURROGATE_ARGS=()  # load_config 写入，endfield_surrogate_handler 读取
+declare -ga GRYPH_SURROGATE_ARGS=()  # load_config 写入，endfield_surrogate_handler 读取
+# -g: 本文件在 hyps_main 等函数作用域内被 source，普通 declare 会把数组限制在该作用域，
+# 命令替换等其它上下文将看不到
 
 gryph_surrogate_exe_path() {
     cache_bin_path gryph-surrogate.exe

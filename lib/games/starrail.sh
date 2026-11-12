@@ -3,6 +3,9 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck source=../integrations/hyp.sh
+source "$SCRIPT_DIR/integrations/hyp.sh"
+
 # Overlay
 
 overlay_auto_lower() {
@@ -25,6 +28,24 @@ userdata_link() {
     local game_dir
     path_dirname "$game_exe" game_dir
     try_link_dir "$SCREENSHOTS/StarRail" "$game_dir/StarRail_Data/ScreenShots"
+}
+
+# 游戏版本
+
+game_version_local() {
+    integration_hyp_get_game_version_local "$@"
+}
+
+game_version_variant_human_readable() {
+    integration_hyp_variant_human_readable "$1"
+}
+
+game_version_remote() {
+    integration_hyp_get_game_version_remote "starrail" "${1:-cn}"
+}
+
+game_version_predownload_remote() {
+    integration_hyp_get_game_predownload_remote "starrail" "${1:-cn}"
 }
 
 # 注册表解锁帧率

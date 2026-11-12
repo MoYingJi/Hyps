@@ -1,5 +1,8 @@
 #!/hint/bash
 
+#shellcheck source=../core/console.sh
+source "$SCRIPT_DIR/core/console.sh"
+
 [[ -n "${__UTILS_TIME_SH_LOADED:-}" ]] && return 0
 __UTILS_TIME_SH_LOADED=1
 
@@ -50,7 +53,10 @@ format_dur() {
     hours=$((dur_sec / 3600))
     minutes=$(((dur_sec % 3600) / 60))
     secs=$((dur_sec % 60))
-    printf "%s%d%s 时 %s%02d%s 分 %s%02d%s 秒" "$(style bright_blue)" "$hours" "$(style bright_black)" "$(style bright_blue)" "$minutes" "$(style bright_black)" "$(style bright_blue)" "$secs" "$(style bright_black)"
+    printf "%s%d%s 时 %s%02d%s 分 %s%02d%s 秒" \
+        "${_CONSOLE_STYLES[bright_blue]}" "$hours" "${_CONSOLE_STYLES[bright_black]}" \
+        "${_CONSOLE_STYLES[bright_blue]}" "$minutes" "${_CONSOLE_STYLES[bright_black]}" \
+        "${_CONSOLE_STYLES[bright_blue]}" "$secs" "${_CONSOLE_STYLES[bright_black]}"
 }
 
 format_time() {

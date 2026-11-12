@@ -172,6 +172,13 @@ _Hyps time today # 列出所有游戏的 最后一次启动时间 和 今天游�
 _Hyps time report <GAME_NAME> # 查看该游戏的详细报告
 ```
 
+### 游戏版本
+
+```bash
+_Hyps game outdated           # 列出已配置且支持版本检查的游戏及版本状态（含预下载状态）
+_Hyps game outdated [GAME_ID] # 详细检查指定游戏的版本、安装路径和预下载状态
+```
+
 ## 删除
 
  - 删掉本项目的文件夹

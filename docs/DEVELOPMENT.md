@@ -24,13 +24,19 @@
 
 ## 游戏实现
 
-游戏实现放在 `lib/games/<GAME_NAME>.sh` 下
+游戏实现放在 `lib/games/<GAME_NAME>.sh` 下，文件名必须与 `GAME_NAME` 一致
 
-游戏实现可以描述游戏本身，实现哪些函数都可选的
+**实现方式**：游戏文件只写游戏特有的逻辑，并通过**可选函数**与通用模块对接。这些函数用 `type -t` 检测，不存在时不会报错
+
+游戏实现可以描述游戏本身，下面的函数都是可选实现
  - `overlay_auto_lower`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏在 overlay 中推荐的 lower 目录 (通常是游戏文件夹本身)
  - `time_record_today_reset`: 不接受参数。在 stdout 输出游戏的日常刷新时间 (如 `04:00 Asia/Shanghai`)
  - `userdata_link`: 将游戏本体、prefix 内的用户数据 (如截图) 链接到一起。接受三个参数，第一个是 prefix 的 drive_c 路径，第二个是 prefix 内用户的 USERPROFILE 路径，第三个是 `game.exe`。还有一个环境变量 `SCREENSHOTS` 为统一截图目录，常将已有截图复制到 `$SCREENSHOTS/<游戏目录>`，然后将游戏原截图目录软链接至此处。路径均为 Linux 侧的路径。提供 `try_link_dir` 工具函数方便完成复制后创建链接这一重复操作
  - `shader_cache_invalidate` 接受和 `userdata_link` 相同的参数。删除游戏的着色器缓存 (无需处理程序已负责的 `__GL_SHADER_DISK_CACHE_PATH`、`DXVK_STATE_CACHE_PATH`、`VKD3D_SHADER_CACHE_PATH` 等，只负责游戏产出的**游戏特定**的着色器部分)
+ - `game_version_local`: 接受游戏可执行文件路径和两个 nameref 变量名，将本地版本和变体标识写入变量。本地版本只包含游戏本体已安装的版本，预下载不会安装到游戏本体，不应包含在内。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准
+ - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身
+ - `game_version_remote`: 接受变体标识，在 stdout 输出远程版本
+ - `game_version_predownload_remote`: 接受变体标识，在 stdout 输出预下载的远程版本，无预下载时输出空行。为可选实现，未实现的游戏在版本检查中不显示预下载状态
 
 游戏实现中也可以直接注册生命周期钩子
 

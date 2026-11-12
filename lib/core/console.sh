@@ -58,44 +58,8 @@ use_color() {
     return 0
 }
 
-style() {
-    use_color || return 0
-    local name="$1"
-    if [[ -n "${_CONSOLE_STYLES[$name]:-}" ]]; then
-        printf "%s" "${_CONSOLE_STYLES[$name]}"
-    elif [[ "$name" == $'\033['* ]]; then
-        printf "%s" "$name"
-    else
-        printf "\033[%sm" "$name"
-    fi
-}
-style_reset() {
-    use_color || return 0
-    printf $'\033[0m'
-}
-style_256_fg() {
-    use_color || return 0
-    local color="$1"
-    printf "\033[38;5;%sm" "$color"
-}
-style_256_bg() {
-    use_color || return 0
-    local color="$1"
-    printf "\033[48;5;%sm" "$color"
-}
-style_rgb_fg() {
-    use_color || return 0
-    local r="$1" g="$2" b="$3"
-    printf "\033[38;2;%s;%s;%sm" "$r" "$g" "$b"
-}
-style_rgb_bg() {
-    use_color || return 0
-    local r="$1" g="$2" b="$3"
-    printf "\033[48;2;%s;%s;%sm" "$r" "$g" "$b"
-}
-
 style_quote() {
-    use_color || { echo "$2"; return 0; }
+    use_color || { printf '%s' "$2"; return 0; }
 
     local styles=()
     IFS=',' read -ra styles <<< "$1"
@@ -103,8 +67,13 @@ style_quote() {
 
     local style_sequence=""
     for style_name in "${styles[@]}"; do
-        style_sequence+=$(style "$style_name")
+        style_sequence+="${_CONSOLE_STYLES[$style_name]:-}"
     done
 
-    printf "%s%s%s" "$style_sequence" "$text" "$(style reset)"
+    printf "%s%s%s" "$style_sequence" "$text" "${_CONSOLE_STYLES[reset]}"
+}
+
+# 表格表头统一样式
+style_table_header() {
+    style_quote bright_white,bold "$1"
 }

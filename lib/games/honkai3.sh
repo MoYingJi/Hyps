@@ -3,6 +3,9 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck source=../integrations/hyp.sh
+source "$SCRIPT_DIR/integrations/hyp.sh"
+
 overlay_auto_lower() {
     local game_exe="$1"
     local game_dir
@@ -18,4 +21,22 @@ userdata_link() {
     local userprofile="$2"
     # 我已经不玩崩崩崩了，这个路径是我在米游社找的
     try_link_dir "$SCREENSHOTS/Honkai3" "$userprofile/Pictures/bh3rd"
+}
+
+# 游戏版本
+
+game_version_local() {
+    integration_hyp_get_game_version_local "$@"
+}
+
+game_version_variant_human_readable() {
+    integration_hyp_variant_human_readable "$1"
+}
+
+game_version_remote() {
+    integration_hyp_get_game_version_remote "honkai3" "${1:-cn}"
+}
+
+game_version_predownload_remote() {
+    integration_hyp_get_game_predownload_remote "honkai3" "${1:-cn}"
 }

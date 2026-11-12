@@ -3,13 +3,19 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+help_proton_list() {
+    echo "  proton list  列出可用的 Proton"
+}
+
 command_proton_list() {
-    [ "$#" -eq 0 ] || die 1 "proton list 命令不接受任何参数"
+    [ "$#" -eq 0 ] || die 1 "用法: proton list"
 
     local path proton name
 
     {
-        printf "%s\t%s\n" "Proton 名称" "路径"
+        printf "%s\t%s\n" \
+            "$(style_table_header "Proton 名称")" \
+            "$(style_table_header "路径")"
         for path in "${_PROTON_PATHS[@]}"; do
             for proton in "$path"/*; do
                 if ! [ -d "$proton" ]; then

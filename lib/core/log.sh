@@ -112,6 +112,7 @@ log_error() {
 }
 
 # 致命错误：记录错误并退出
+# 不能在 command substitution 等子 shell 中调用（exit 只会退出子 shell），此类函数用 log_error + return 1 报错
 # 用法: die [exit_code] [message]
 die() {
     local exit_code="${1:-1}"

@@ -6,8 +6,12 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../features/time_record.sh
 source "$SCRIPT_DIR/features/time_record.sh"
 
+help_time_today() {
+    echo "  time today  列出所有游戏的最后一次启动时间与今日日常启动状态"
+}
+
 command_time_today() {
-    [ "$#" -eq 0 ] || die 1 "time today 命令不接受任何参数"
+    [ "$#" -eq 0 ] || die 1 "用法: time today"
 
     local common_set_reset_time=0
 
@@ -30,7 +34,10 @@ command_time_today() {
     local game game_name last_start last_start_time reset_time day_start today_status
 
     {
-        printf "%s\t%s\t%s\n" "游戏名" "最后一次启动时间" "今天"
+        printf "%s\t%s\t%s\n" \
+            "$(style_table_header "游戏名")" \
+            "$(style_table_header "最后一次启动时间")" \
+            "$(style_table_header "今天")"
         for game in "$dir"/*; do
             if [ ! -d "$game" ]; then
                 log_warn "跳过非目录文件: $game"
@@ -74,8 +81,12 @@ command_time_today() {
     } | column -t -s $'\t'
 }
 
+help_time_list() {
+    echo "  time list  列出所有游戏的启动次数、总游戏时长、最后一次启动时间"
+}
+
 command_time_list() {
-    [ "$#" -eq 0 ] || die 1 "time list 命令不接受任何参数"
+    [ "$#" -eq 0 ] || die 1 "用法: time list"
 
     load_common_config
     feat_time_record_load_config
@@ -84,7 +95,11 @@ command_time_list() {
     config_read features.time_record.dir dir
 
     {
-        printf "%s\t%s\t  %s\t  %s\n" "游戏名" "启动次数" "总游戏时长" "最后一次启动时间"
+        printf "%s\t%s\t  %s\t  %s\n" \
+            "$(style_table_header "游戏名")" \
+            "$(style_table_header "启动次数")" \
+            "$(style_table_header "总游戏时长")" \
+            "$(style_table_header "最后一次启动时间")"
 
         for game in "$dir"/*; do
             game_name="${game##*/}"
@@ -106,8 +121,12 @@ command_time_list() {
     } | column -t -s $'\t' -o '' -R 2,3
 }
 
+help_time_report() {
+    echo "  time report <游戏名>  查看指定游戏的游玩时间报告"
+}
+
 command_time_report() {
-    [ "$#" -eq 1 ] || die 1 "time report 命令接受 1 个 game_name 参数"
+    [ "$#" -eq 1 ] || die 1 "用法: time report <游戏名>"
 
     local game_name="$1"
 

@@ -11,33 +11,19 @@ feat_userdata_link_prepare() {
         return 0
     fi
 
-    local prefix
-    local drive_c
-    local userprofile
-    local game_exe
-
-    config_read game.prefix prefix
-
-    if ! wine_resolve_user_dirs userdata-link "$prefix" drive_c userprofile; then
+    if ! game_fs_resolve_user_dirs userdata-link; then
         log_error userdata-link "解析用户目录失败，跳过 userdata_link 功能"
         return 0
-    fi
-
-    config_read game.exe game_exe
-    if config_is_true overlay.enabled; then
-        # overlayfs 开启时游戏截图会被保存到 upper 中，这里直接编辑 upper
-        local overlay_upper overlay_lower
-        config_read overlay.upper overlay_upper
-        config_read overlay.lower overlay_lower
-        game_exe="$overlay_upper/$(realpath --relative-to="$overlay_lower" "$game_exe")"
     fi
 
     local screenshots_dir
     config_require_realpath_mkdir features.userdata_link.screenshots "$(xdg-user-dir PICTURES)/HypsScreenshots"
     config_read features.userdata_link.screenshots screenshots_dir
 
-    SCREENSHOTS="$screenshots_dir" \
-        userdata_link "$drive_c" "$userprofile" "$game_exe"
+    # 在 prepare 阶段执行，overlay 已挂载
+    if ! SCREENSHOTS="$screenshots_dir" userdata_link; then
+        log_warn userdata-link "userdata_link 执行失败，跳过"
+    fi
 }
 
 register_hook prepare feat_userdata_link_prepare

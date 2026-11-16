@@ -348,9 +348,9 @@ init_check_features() {
     if command_exists fuse-overlayfs && [[ -r /dev/fuse && -w /dev/fuse ]]; then
         init_check_add features ok "overlay" "fuse-overlayfs + /dev/fuse 可用"
     elif ! command_exists fuse-overlayfs; then
-        init_check_add features warn "overlay" "未安装 fuse-overlayfs（启用 overlay.enabled 时需要）"
+        init_check_add features warn "overlay" "未安装 fuse-overlayfs（启用 overlay 时需要）"
     else
-        init_check_add features warn "overlay" "/dev/fuse 不可用（启用 overlay.enabled 时需要）"
+        init_check_add features warn "overlay" "/dev/fuse 不可用（启用 overlay 时需要）"
     fi
 
     init_check_command features info "fusermount3" fusermount3 "未安装（overlay 卸载用，可回退 mount）"

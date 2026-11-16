@@ -3,7 +3,7 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -15,6 +15,7 @@ time_record_today_reset() {
 }
 
 userdata_link() {
-    local userprofile="$2"
-    try_link_dir "$SCREENSHOTS/Arknights" "$userprofile/Pictures/Arknights_Screenshots"
+    local target
+    target="$(game_fs_write_path userprofile "Pictures/Arknights_Screenshots")" || return 1
+    try_link_dir "$SCREENSHOTS/Arknights" "$target"
 }

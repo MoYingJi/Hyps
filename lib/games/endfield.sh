@@ -5,7 +5,7 @@ source "$SCRIPT_DIR/libs.sh"
 
 # Overlay
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -21,20 +21,20 @@ time_record_today_reset() {
 # 用户数据链接
 
 userdata_link() {
-    local userprofile="$2"
-    try_link_dir "$SCREENSHOTS/Endfield" "$userprofile/Pictures/ENDFIELD"
+    local target
+    target="$(game_fs_write_path userprofile "Pictures/ENDFIELD")" || return 1
+    try_link_dir "$SCREENSHOTS/Endfield" "$target"
 }
 
 # 着色器缓存
 
 shader_cache_invalidate() {
-    local userprofile="$2"
-    local dir file
+    local dir file cache
 
     # 国服目录为 Hypergryph，国际服目录为 Gryphline（后者未经本机验证），两者都尝试清除
     for dir in "Hypergryph" "Gryphline"; do
         for file in vulkan_pso_cache.bin dx11_pso_cache.bin; do
-            local cache="$userprofile/AppData/LocalLow/$dir/Endfield/$file"
+            cache="$(game_fs_write_path userprofile "AppData/LocalLow/$dir/Endfield/$file")" || continue
             if [ -e "$cache" ]; then
                 log_info shader-cache "清除游戏着色器缓存: $cache"
                 rm -f -- "$cache"
@@ -135,7 +135,11 @@ feat_endfield_surrogate_load_config() {
     local surrogate_mode
     local surrogate_src=""
     local launcher_path
+    local overlay_enabled=0
+    local skip_hardlink_target=0
     local -a surrogate_args=("$(gryph_surrogate_exe_path)")
+
+    config_is_true overlay.enabled && overlay_enabled=1
 
     if ! config_has endfield.surrogate.mode; then
         for key in launcher keep exit_after show_info dir target hardlink_dir hardlink_target copy_dir copy_target; do
@@ -165,6 +169,22 @@ feat_endfield_surrogate_load_config() {
             surrogate_args+=(--launcher "$(wine_unix_path_to_windows "$launcher_path")")
             ;;
         hardlink | copy | hardlink-or-copy)
+            if [ "$overlay_enabled" -eq 1 ]; then
+                case "$surrogate_mode" in
+                    hardlink-or-copy)
+                        if config_has endfield.surrogate.hardlink_dir || config_has endfield.surrogate.hardlink_target; then
+                            log_warn endfield-surrogate "overlay 下 hardlink-or-copy 按 copy 执行，忽略 hardlink 目标配置"
+                        fi
+                        log_info endfield-surrogate "overlay 下 hardlink-or-copy 按 copy 执行，避免游戏 exe copy-up"
+                        surrogate_mode="copy"
+                        skip_hardlink_target=1
+                        ;;
+                    hardlink)
+                        log_warn endfield-surrogate "overlay 下 hardlink 会触发游戏 exe copy-up，且要求 upper 与目标同文件系统，失败时由 surrogate 报错"
+                        ;;
+                esac
+            fi
+
             if config_has endfield.surrogate.launcher; then
                 # 可选: 显式指定替身源文件 (默认游戏 exe 自身) 对应 CLI 的 --launcher
                 config_read endfield.surrogate.launcher surrogate_src
@@ -173,7 +193,9 @@ feat_endfield_surrogate_load_config() {
             fi
 
             endfield_surrogate_add_target surrogate_args "" --target "$surrogate_mode"
-            endfield_surrogate_add_target surrogate_args hardlink_ --hardlink-target "$surrogate_mode"
+            if [ "$skip_hardlink_target" -eq 0 ]; then
+                endfield_surrogate_add_target surrogate_args hardlink_ --hardlink-target "$surrogate_mode"
+            fi
             endfield_surrogate_add_target surrogate_args copy_ --copy-target "$surrogate_mode"
 
             if [[ $surrogate_mode != hardlink ]] \

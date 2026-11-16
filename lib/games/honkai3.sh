@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -18,9 +18,10 @@ time_record_today_reset() {
 }
 
 userdata_link() {
-    local userprofile="$2"
     # 我已经不玩崩崩崩了，这个路径是我在米游社找的
-    try_link_dir "$SCREENSHOTS/Honkai3" "$userprofile/Pictures/bh3rd"
+    local target
+    target="$(game_fs_write_path userprofile "Pictures/bh3rd")" || return 1
+    try_link_dir "$SCREENSHOTS/Honkai3" "$target"
 }
 
 # 游戏版本

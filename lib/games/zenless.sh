@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -18,10 +18,9 @@ time_record_today_reset() {
 }
 
 userdata_link() {
-    local game_exe="$3"
-    local game_dir
-    path_dirname "$game_exe" game_dir
-    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$game_dir/ScreenShot"
+    local target
+    target="$(game_fs_write_path runtime "ScreenShot")" || return 1
+    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$target"
 }
 
 # 游戏版本

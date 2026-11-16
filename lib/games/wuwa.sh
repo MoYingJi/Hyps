@@ -3,7 +3,7 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     case "$game_exe" in
@@ -21,23 +21,23 @@ time_record_today_reset() {
 }
 
 userdata_link() {
-    local game_exe="$3"
-
-    local game_dir
-    game_dir="$(overlay_auto_lower "$game_exe")" || return 1
-
-    try_link_dir "$SCREENSHOTS/WutheringWaves" "$game_dir/Client/Saved/ScreenShot"
+    local target
+    target="$(game_fs_write_path runtime "Client/Saved/ScreenShot")" || return 1
+    try_link_dir "$SCREENSHOTS/WutheringWaves" "$target"
 }
 
 shader_cache_invalidate() {
-    local game_exe="$3"
+    local view path
+    local found=0
 
-    local game_dir
-    game_dir="$(overlay_auto_lower "$game_exe")" || return 1
+    # 离线执行，同时清 lower/upper
+    while IFS=$'\t' read -r view path; do
+        found=1
+        if [ -e "$path" ]; then
+            log_info shader-cache "清除游戏着色器缓存 ($view): $path"
+            rm -rf -- "$path" || log_warn shader-cache "清除失败 ($view): $path"
+        fi
+    done < <(game_fs_write_paths all "Client/Saved/PSO")
 
-    local cache="$game_dir/Client/Saved/PSO"
-    if [ -e "$cache" ]; then
-        log_info shader-cache "清除游戏着色器缓存: $cache"
-        rm -rf -- "$cache"
-    fi
+    [ "$found" -eq 1 ] || log_warn shader-cache "无法解析游戏着色器缓存路径"
 }

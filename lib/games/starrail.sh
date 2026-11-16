@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/integrations/hyp.sh"
 
 # Overlay
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -24,10 +24,9 @@ time_record_today_reset() {
 # 用户数据链接
 
 userdata_link() {
-    local game_exe="$3"
-    local game_dir
-    path_dirname "$game_exe" game_dir
-    try_link_dir "$SCREENSHOTS/StarRail" "$game_dir/StarRail_Data/ScreenShots"
+    local target
+    target="$(game_fs_write_path runtime "StarRail_Data/ScreenShots")" || return 1
+    try_link_dir "$SCREENSHOTS/StarRail" "$target"
 }
 
 # 游戏版本

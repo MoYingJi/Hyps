@@ -14,6 +14,7 @@ command_shader_cache_invalidate() {
     [ "$#" -eq 1 ] || die 1 "用法: shader-cache invalidate <游戏名>"
 
     GAME_NAME="$1"
+    [[ "$GAME_NAME" =~ ^[[:alnum:]_-]+$ ]] || die 1 "无效的游戏名: $GAME_NAME"
 
     local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"
     if [ -f "$game_impl" ]; then
@@ -24,6 +25,11 @@ command_shader_cache_invalidate() {
     load_common_config
     load_game_config "$GAME_NAME"
 
+    # 本命令是离线操作：只解析路径，不挂载 overlay
+    game_fs_init || die 1 shader-cache "初始化游戏环境失败"
+    game_fs_set_phase offline || die 1 shader-cache "设置离线阶段失败"
+    game_fs_require_offline || die 1 shader-cache "overlay 挂载期间不能清除着色器缓存"
+
     local has_game_fn=0
     if [ "$(type -t shader_cache_invalidate)" = "function" ]; then
         has_game_fn=1
@@ -31,8 +37,7 @@ command_shader_cache_invalidate() {
         log_warn shader-cache "未定义 shader_cache_invalidate 函数，跳过游戏特定的着色器缓存清除"
     fi
 
-    local prefix
-    config_read game.prefix prefix
+    local prefix="${GAME_FS[prefix]}"
 
     ensure_no_wineserver "$prefix" error "清除着色器缓存前需要先关闭游戏"
 
@@ -43,14 +48,14 @@ command_shader_cache_invalidate() {
         return 0
     fi
 
+    # 确认期间可能有人挂载 overlay
+    game_fs_require_offline || die 1 shader-cache "overlay 挂载期间不能清除着色器缓存"
+
     feat_program_cache_invalidate
 
     if [ "$has_game_fn" -eq 1 ]; then
-        local drive_c userprofile game_exe
-        config_read game.exe game_exe
-
-        if wine_resolve_user_dirs shader-cache "$prefix" drive_c userprofile; then
-            shader_cache_invalidate "$drive_c" "$userprofile" "$game_exe"
+        if game_fs_resolve_user_dirs shader-cache; then
+            shader_cache_invalidate
         else
             log_error shader-cache "解析用户目录失败，跳过游戏特定的着色器缓存清除"
         fi

@@ -59,4 +59,4 @@ feat_pfx_link_prepare() {
     set +e
 }
 
-register_hook prepare feat_pfx_link_prepare
+register_hook prepare feat_pfx_link_prepare 10

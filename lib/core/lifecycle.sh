@@ -19,6 +19,8 @@ source "$SCRIPT_DIR/core/log.sh"
 #   - 可配置钩子失败行为: run_hooks <phase> [continue]
 #     当传入 "continue" 参数时，某个钩子失败后仍会继续执行后续钩子
 #
+# 阶段职责见 docs/DEVELOPMENT.md
+#
 # 用法:
 #   source core/lifecycle.sh
 #   register_hook prepare my_prepare_func 50 "depends_on:other_func before:later_func"
@@ -38,10 +40,12 @@ declare -A HOOK_BEFORE
 # 合法的阶段名称
 readonly LIFECYCLE_PHASES=(
     "load_config"
+    "prepare_offline"
     "prepare"
     "pre_start"
     "post_start"
     "cleanup"
+    "cleanup_offline"
 )
 
 # 内部：检查阶段名是否合法

@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/integrations/hyp.sh"
 
 # Overlay
 
-overlay_auto_lower() {
+game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
@@ -27,10 +27,9 @@ time_record_today_reset() {
 # 用户数据链接
 
 userdata_link() {
-    local game_exe="$3"
-    local game_dir
-    path_dirname "$game_exe" game_dir
-    try_link_dir "$SCREENSHOTS/YuanShen" "$game_dir/ScreenShot"
+    local target
+    target="$(game_fs_write_path runtime "ScreenShot")" || return 1
+    try_link_dir "$SCREENSHOTS/YuanShen" "$target"
 }
 
 # 游戏版本
@@ -54,12 +53,11 @@ game_version_predownload_remote() {
 # 着色器缓存
 
 shader_cache_invalidate() {
-    local userprofile="$2"
-    local dir
+    local dir cache
 
     # 国服目录为 原神，国际服目录为 Genshin Impact（后者未经本机验证），两者都尝试清除
     for dir in "原神" "Genshin Impact"; do
-        local cache="$userprofile/AppData/LocalLow/miHoYo/$dir/d3d12PSOcache"
+        cache="$(game_fs_write_path userprofile "AppData/LocalLow/miHoYo/$dir/d3d12PSOcache")" || continue
         if [ -e "$cache" ]; then
             log_info shader-cache "清除游戏着色器缓存: $cache"
             rm -rf -- "$cache"
@@ -251,7 +249,7 @@ gi_patch_d3d12_load_config() {
         *) die 1 gi-patch-d3d12 "未知的 gi.patch_d3d12.impl: $GI_PATCH_D3D12_IMPL（可选 unitypy 或 bytes）" ;;
     esac
 
-    register_hook prepare gi_patch_d3d12_prepare
+    register_hook prepare_offline gi_patch_d3d12_prepare
 }
 
 register_hook load_config gi_patch_d3d12_load_config
@@ -292,11 +290,10 @@ gi_patch_d3d12_prepare() {
     GI_PATCH_D3D12_MODE="" # overlay | in-place
     GI_PATCH_D3D12_TARGET_GGM="" # 本次运行中已替换的 globalgamemanagers，为空表示未替换
 
-    local game game_dir data_dir ggm_path ggm_remote_path overlay_upper
+    local game game_dir data_dir ggm_path ggm_remote_path
 
-    if config_is_true overlay.enabled; then
+    if [ "${GAME_FS[overlay_enabled]}" = "1" ]; then
         GI_PATCH_D3D12_MODE="overlay"
-        config_read overlay.upper overlay_upper
     else
         log_warn gi-patch-d3d12 "当前未开启 overlay，使用 in-place 模式！"
         GI_PATCH_D3D12_MODE="in-place"
@@ -353,10 +350,14 @@ gi_patch_d3d12_prepare() {
 
     local target_ggm target_dir
     if [ "$GI_PATCH_D3D12_MODE" = "overlay" ]; then
-        local ggm_rel_path overlay_lower
-        config_read overlay.lower overlay_lower
-        ggm_rel_path="$(realpath --relative-to="$overlay_lower" "$ggm_path")"
-        target_ggm="$overlay_upper/$ggm_rel_path"
+        local ggm_rel_path
+        ggm_rel_path="$(realpath -m --relative-to="${GAME_FS[overlay_lower]}" -- "$ggm_path")"
+        case "$ggm_rel_path" in
+            /* | ../* | ..) die 1 gi-patch-d3d12 "globalgamemanagers 不在 overlay lower 内: $ggm_path" ;;
+        esac
+        # prepare_offline 阶段，挂载前写 upper
+        target_ggm="$(game_fs_write_path writable "$ggm_rel_path")" \
+            || die 1 gi-patch-d3d12 "无法解析 overlay 目标路径: $ggm_rel_path"
         [ -f "$target_ggm" ] && die 1 gi-patch-d3d12 "目标 globalgamemanagers 文件已存在: $target_ggm"
         path_dirname "$target_ggm" target_dir
         mkdir -p "$target_dir" || die 1 gi-patch-d3d12 "无法创建 overlay 目标目录: $target_dir"
@@ -368,7 +369,7 @@ gi_patch_d3d12_prepare() {
 
     # 先登记 cleanup 并写入标记，再替换文件：替换中途失败也能被还原
     GI_PATCH_D3D12_TARGET_GGM="$target_ggm"
-    register_hook cleanup gi_patch_d3d12_cleanup
+    register_hook cleanup_offline gi_patch_d3d12_cleanup
 
     local patched_md5 official_md5
     patched_md5="$(md5sum "$patched_cache")" || die 1 gi-patch-d3d12 "无法计算补丁副本 md5"

@@ -43,6 +43,8 @@
 - [x] 【崩坏：星穹铁道】注册表解锁帧率（需要 python3）
 - [x] 【明日方舟：终末地】通过官方启动器直接启动游戏（需要 mingw-w64）
 
+终末地的父进程检查与替身配置见 [docs/endfield-surrogate.md](endfield-surrogate.md)
+
 目前 **不支持** 的功能：
 
 - 自动下载、安装或更新：游戏、启动器、Wine/Proton、DXVK/VKD3D 等
@@ -136,14 +138,14 @@
 
 Overlay 使用 FUSE OverlayFS 为游戏目录提供一个可写视图：游戏安装目录作为只读的 `lower` 层，游戏运行时对目录的修改写入 `upper` 层，不会直接改动安装目录。`upper` 会保留在多次运行之间，因此这不是每次启动都会重置的临时环境
 
-在对应游戏的配置文件中添加以下配置，并将 `overlay.lower` 改成游戏安装目录（该目录需要包含配置中的 `game.exe`）：
+在对应游戏的配置文件中启用即可：
 
 ```ini
 overlay.enabled = true
-overlay.lower = "/path/to/game"
+#overlay.lower = "/path/to/game"  # 可选，默认就是游戏安装目录，自定义时必须包含 game.exe
 ```
 
-挂载需要四个目录：`lower` 是原始游戏目录，`upper` 保存运行时产生的修改，`work` 是 OverlayFS 使用的工作目录，`mount` 是提供给游戏使用的合并视图。通常只需设置 `overlay.enabled` 和 `overlay.lower`；其余目录会默认创建在 `overlay.dir/<游戏名>/` 下：
+挂载需要四个目录：`lower` 是原始游戏目录，`upper` 保存运行时产生的修改，`work` 是 OverlayFS 使用的工作目录，`mount` 是提供给游戏使用的合并视图。通常只需设置 `overlay.enabled`；`overlay.lower` 默认使用游戏安装目录，其余目录会默认创建在 `overlay.dir/<游戏名>/` 下：
 
 ```text
 ~/.local/share/hypsc/overlays/<游戏名>/
@@ -154,13 +156,17 @@ overlay.lower = "/path/to/game"
 
 `overlay.dir` 默认是 `$XDG_DATA_HOME/hypsc/overlays`；未设置 `XDG_DATA_HOME` 时即 `~/.local/share/hypsc/overlays`。如需自定义位置，可设置 `overlay.dir`，也可以分别用 `overlay.mount`、`overlay.upper` 和 `overlay.work` 指定目录。自定义的 `upper` 和 `work` 应放在同一文件系统中
 
-部分游戏支持自动识别游戏目录；对此类游戏，可以不设置 `overlay.lower`，改为设置 `overlay.lower_auto = true`。若游戏不支持自动识别，则必须手动设置 `overlay.lower`
+`overlay.lower` 未设置时默认使用游戏安装目录。只有需要把 lower 指向安装目录之外的路径时才需要显式设置；自定义 lower 必须包含配置中的 `game.exe`。旧的 `overlay.lower_auto` 不再需要
 
-启用后需要安装 `fuse-overlayfs`
+overlay 需要知道游戏安装根。内置游戏会自动识别；其他游戏可以设置 `game.install_dir`
+
+启用 overlay 需要安装 `fuse-overlayfs`，并确保 `/dev/fuse` 可用
+
+如果上次异常退出留下了仍在挂载的 `overlay.mount`，启动会拒绝复用并提示先手动卸载，避免在挂载期间直接写 upper
 
 ### 着色器缓存
 
-设置 `cache.shader.enabled = true` 即可。会增加游戏流畅度。若驱动更新 / 游戏更新，而游戏未重新预编译着色器，可以使用 `_Hyps shader-cache invalidate <GAME_NAME>` 删除着色器使其预重新编译
+设置 `cache.shader.enabled = true` 即可。会增加游戏流畅度。若驱动更新 / 游戏更新，而游戏未重新预编译着色器，可以使用 `_Hyps shader-cache invalidate <GAME_NAME>` 删除着色器使其预重新编译。启用 overlay 时，游戏目录内的缓存会同时清理 lower 和 upper；如果 overlay 正在挂载，命令会拒绝执行，需要先关闭游戏并卸载
 
 ### 时间记录
 

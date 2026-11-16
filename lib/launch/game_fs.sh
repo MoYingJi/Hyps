@@ -25,57 +25,159 @@ _game_fs_require_install() {
     }
 }
 
-# install 根来源: game.install_dir > game_install_dir > 旧 overlay_auto_lower
-# 都没有时返回 2，由调用方决定是否允许 install 视图留空
-# 用法: game_fs_resolve_install_dir <game_exe> <out_var>
-game_fs_resolve_install_dir() {
-    local game_exe="$1"
-    local -n _out="$2"
-    local configured=""
-    local dir=""
+# 解析 exe / install / cwd
+# 至少需要 game.exe 或 game.install_dir
+# 结果写入 GAME_FS，并写回 CONFIG[game.exe] / CONFIG[game.cwd]
+game_fs_resolve_paths() {
+    local config_exe config_install config_cwd
+    local exe="" install=""
+    local round="" cwd=""
 
-    if config_has game.install_dir; then
-        config_read game.install_dir configured
-        [ -n "$configured" ] || {
-            log_error game-fs "配置项 'game.install_dir' 不能为空"
+    config_read game.exe config_exe
+    config_read game.install_dir config_install
+    config_read game.cwd config_cwd
+
+    if [ -n "$config_exe" ]; then
+        exe="$(realpath -m -- "$config_exe")"
+        [ -f "$exe" ] || {
+            log_error game-fs "game.exe 不存在: '$exe'"
             return 1
         }
-        configured="$(realpath -m -- "$configured")"
-        [ -d "$configured" ] || {
-            log_error game-fs "game.install_dir 目录不存在: '$configured'"
+    fi
+    if [ -n "$config_install" ]; then
+        install="$(realpath -m -- "$config_install")"
+        [ -d "$install" ] || {
+            log_error game-fs "game.install_dir 不存在: '$install'"
             return 1
         }
-        _out="$configured"
-        return 0
     fi
 
-    if [ "$(type -t game_install_dir)" = "function" ]; then
-        dir="$(game_install_dir "$game_exe")" || {
-            log_error game-fs "game_install_dir 执行失败: '$game_exe'"
+    if [ -z "$exe" ] && [ -z "$install" ]; then
+        log_error game-fs "至少需要 game.exe 或 game.install_dir"
+        return 1
+    fi
+
+    if [ -n "$exe" ] && [ -z "$install" ]; then
+        if [ "$(type -t game_install_dir)" = "function" ]; then
+            install="$(game_install_dir "$exe")" || {
+                log_error game-fs "game_install_dir 执行失败: '$exe'"
+                return 1
+            }
+            [ -n "$install" ] || {
+                log_error game-fs "game_install_dir 返回空路径: '$exe'"
+                return 1
+            }
+        elif [ "$(type -t overlay_auto_lower)" = "function" ]; then
+            log_warn game-fs "游戏仍在使用 overlay_auto_lower，请迁移到 game_install_dir"
+            install="$(overlay_auto_lower "$exe")" || {
+                log_error game-fs "overlay_auto_lower 执行失败: '$exe'"
+                return 1
+            }
+            [ -n "$install" ] || {
+                log_error game-fs "overlay_auto_lower 返回空路径: '$exe'"
+                return 1
+            }
+        fi
+        if [ -n "$install" ]; then
+            install="$(realpath -m -- "$install")"
+            [ -d "$install" ] || {
+                log_error game-fs "install 根目录不存在: '$install'"
+                return 1
+            }
+            case "$exe" in
+                "$install"/*) ;;
+                *)
+                    log_error game-fs "game.exe 不在 install 根内: '$exe' (install: '$install')"
+                    return 1
+                    ;;
+            esac
+        fi
+    elif [ -z "$exe" ] && [ -n "$install" ]; then
+        if [ "$(type -t game_executable)" != "function" ]; then
+            log_error game-fs "只填 game.install_dir 时需要 game_executable"
+            return 1
+        fi
+        exe="$(game_executable "$install")" || {
+            log_error game-fs "game_executable 执行失败: '$install'"
             return 1
         }
-    elif [ "$(type -t overlay_auto_lower)" = "function" ]; then
-        log_warn game-fs "游戏仍在使用 overlay_auto_lower，请迁移到 game_install_dir"
-        dir="$(overlay_auto_lower "$game_exe")" || {
-            log_error game-fs "overlay_auto_lower 执行失败: '$game_exe'"
+        case "$exe" in
+            *$'\n'*)
+                log_error game-fs "game_executable 只能返回一个主 exe"
+                return 1
+                ;;
+            /*) ;;
+            *)
+                log_error game-fs "game_executable 必须返回绝对路径: '$exe'"
+                return 1
+                ;;
+        esac
+        [ -n "$exe" ] || {
+            log_error game-fs "game_executable 返回空路径"
             return 1
         }
+        exe="$(realpath -m -- "$exe")"
+        [ -f "$exe" ] || {
+            log_error game-fs "game_executable 返回的 exe 不存在: '$exe'"
+            return 1
+        }
+        case "$exe" in
+            "$install"/*) ;;
+            *)
+                log_error game-fs "game_executable 返回的 exe 不在 install 根内: '$exe'"
+                return 1
+                ;;
+        esac
+        if [ "$(type -t game_install_dir)" = "function" ]; then
+            round="$(game_install_dir "$exe")" || {
+                log_error game-fs "game_install_dir 执行失败: '$exe'"
+                return 1
+            }
+            round="$(realpath -m -- "$round")"
+            [ "$round" = "$install" ] || {
+                log_error game-fs "game_install_dir 与 game_executable 不一致: '$round' != '$install'"
+                return 1
+            }
+        fi
     else
-        _out=""
-        return 2
+        case "$exe" in
+            "$install"/*) ;;
+            *)
+                log_error game-fs "game.exe 不在 install 根内: '$exe' (install: '$install')"
+                return 1
+                ;;
+        esac
+        if [ "$(type -t game_install_dir)" = "function" ]; then
+            round="$(game_install_dir "$exe")" || round=""
+            if [ -n "$round" ]; then
+                round="$(realpath -m -- "$round")"
+                [ "$round" = "$install" ] || log_warn game-fs "game_install_dir 与 game.install_dir 不一致，使用 game.install_dir: '$round' != '$install'"
+            fi
+        fi
     fi
 
-    [ -n "$dir" ] || {
-        log_error game-fs "install 根为空: '$game_exe'"
-        return 1
-    }
-    dir="$(realpath -m -- "$dir")"
-    [ -d "$dir" ] || {
-        log_error game-fs "install 根目录不存在: '$dir'"
-        return 1
-    }
+    GAME_FS[game_exe_install]="$exe"
+    GAME_FS[install_dir]="$install"
+    GAME_FS[install_ok]=0
+    [ -n "$install" ] && GAME_FS[install_ok]=1
 
-    _out="$dir"
+    if [ -n "$config_cwd" ]; then
+        cwd="$(realpath -m -- "$config_cwd")"
+        [ -d "$cwd" ] || {
+            log_error game-fs "game.cwd 不是目录: '$cwd'"
+            return 1
+        }
+    elif [ "${GAME_FS[install_ok]}" = "1" ]; then
+        cwd="$install"
+        log_debug game-fs "game.cwd 未配置，使用 install 根: '$cwd'"
+    else
+        path_dirname "$exe" cwd
+        log_debug game-fs "game.cwd 未配置，install 未知，使用 exe 目录: '$cwd'"
+    fi
+    GAME_FS[game_cwd_install]="$cwd"
+
+    config_set game.exe "$exe"
+    config_set game.cwd "$cwd"
 }
 
 # 解析 overlay 路径，不创建目录不挂载
@@ -247,33 +349,11 @@ game_fs_init() {
     GAME_FS[phase]=init
     GAME_FS[game_name]="$GAME_NAME"
 
-    local game_exe game_cwd
-    config_read game.exe game_exe
-    config_read game.cwd game_cwd
-    game_exe="$(realpath -m -- "$game_exe")"
-    game_cwd="$(realpath -m -- "$game_cwd")"
+    game_fs_resolve_paths || return 1
 
-    local install_dir=""
-    local install_rc=0
-    game_fs_resolve_install_dir "$game_exe" install_dir
-    install_rc=$?
-    [ "$install_rc" -eq 0 ] || [ "$install_rc" -eq 2 ] || return 1
-
-    GAME_FS[install_ok]=0
-    [ "$install_rc" -eq 2 ] || GAME_FS[install_ok]=1
-    GAME_FS[install_dir]="$install_dir"
-    GAME_FS[game_exe_install]="$game_exe"
-    GAME_FS[game_cwd_install]="$game_cwd"
-
-    if [ "${GAME_FS[install_ok]}" = "1" ]; then
-        case "$game_exe" in
-            "$install_dir"/*) ;;
-            *)
-                log_error game-fs "游戏可执行文件不在 install 根内: '$game_exe' (install: '$install_dir')"
-                return 1
-                ;;
-        esac
-    fi
+    local game_exe="${GAME_FS[game_exe_install]}"
+    local game_cwd="${GAME_FS[game_cwd_install]}"
+    local install_dir="${GAME_FS[install_dir]}"
 
     local prefix
     config_read game.prefix prefix

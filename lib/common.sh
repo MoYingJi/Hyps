@@ -48,7 +48,7 @@ hyps_main() {
         log_debug lifecycle "未找到游戏实现 $GAME_NAME"
     fi
 
-    load_config
+    load_config || exit $?
     run_hooks load_config || exit $?
 
     # LaunchPlan 的 exe/cwd 由 GameFS 派生
@@ -98,15 +98,12 @@ cleanup() {
 load_config() {
     load_common_config
     load_game_config "$GAME_NAME"
+    game_fs_resolve_paths || return 1
 
     local -a game_args=()
     config_has game.args && config_read_array game.args game_args
     launch_plan_args_set "${game_args[@]}"
 
-    local game_exe game_cwd
-    config_read game.exe game_exe
-    # 兜底写入 install 路径，稍后覆盖为 runtime
-    launch_plan_set_game_exe "$game_exe"
-    config_read game.cwd game_cwd
-    launch_plan_set_cwd "$game_cwd"
+    launch_plan_set_game_exe "${GAME_FS[game_exe_install]}"
+    launch_plan_set_cwd "${GAME_FS[game_cwd_install]}"
 }

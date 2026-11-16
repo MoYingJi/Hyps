@@ -6,13 +6,17 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
-# Overlay
+# 游戏安装根与可执行文件
 
 game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
     printf '%s\n' "$game_dir"
+}
+
+game_executable() {
+    printf '%s\n' "$1/StarRail.exe"
 }
 
 # 日常重置时间

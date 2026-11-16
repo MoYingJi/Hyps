@@ -16,6 +16,11 @@ game_install_dir() {
     esac
 }
 
+game_executable() {
+    local install_dir="$1"
+    printf '%s\n' "$install_dir/Client/Binaries/Win64/Client-Win64-Shipping.exe"
+}
+
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
 }

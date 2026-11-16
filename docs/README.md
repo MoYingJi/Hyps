@@ -158,7 +158,7 @@ overlay.enabled = true
 
 `overlay.lower` 未设置时默认使用游戏安装目录。只有需要把 lower 指向安装目录之外的路径时才需要显式设置；自定义 lower 必须包含配置中的 `game.exe`。旧的 `overlay.lower_auto` 不再需要
 
-overlay 需要知道游戏安装根。内置游戏会自动识别；其他游戏可以设置 `game.install_dir`
+overlay 需要知道游戏安装根。内置游戏会自动识别；其他游戏可以设置 `game.install_dir`。`game.exe` 和 `game.install_dir` 至少填一个
 
 启用 overlay 需要安装 `fuse-overlayfs`，并确保 `/dev/fuse` 可用
 

@@ -44,7 +44,15 @@ run_hooks cleanup_offline
 
 `lib/launch/game_fs.sh` 是游戏文件系统视图的唯一所有者。配置仍使用 `overlay.*`，`overlay.enabled` 控制开关，overlay 使用 FUSE OverlayFS。未启用 overlay 时，`runtime`、`writable`、`install` 都指向游戏安装目录
 
-install 根来源：`game.install_dir` 配置 > `game_install_dir` 回调 > 旧 `overlay_auto_lower`。都没有时 `install_ok=0`，overlay 和依赖 install 的功能会报错；纯启动仍可用 `game.exe` / `game.cwd`
+exe / install 根解析：
+
+- 至少需要 `game.exe` 或 `game.install_dir`
+- 只填 `game.exe`：install 由 `game_install_dir(exe)` 派生，没实现就留空
+- 只填 `game.install_dir`：exe 由 `game_executable(install)` 派生
+- 两者都填：使用配置，校验 exe 在 install 下
+- `game_executable` 只返回一个主 exe，必须绝对路径、存在、位于 install 下；显式 `game.exe` 优先
+- `game.cwd` 未配置时，install 已知取 install 根，否则取解析后 exe 所在目录
+- install 未知时 `install_ok=0`，overlay 和依赖 install 的功能会报错；纯启动仍可用 `game.exe` / `game.cwd`
 
 | 作用域 | overlay 关闭 | overlay 开启 | 用途 |
 | --- | --- | --- | --- |
@@ -63,6 +71,7 @@ install 根来源：`game.install_dir` 配置 > `game_install_dir` 回调 > 旧 
  - `game_fs_root <scope>`：输出某个作用域的根
  - `game_fs_display <scope> <相对路径>`：输出 `$USERPROFILE/...` 这类展示路径
  - `game_fs_init` / `game_fs_mount` / `game_fs_unmount`：由核心调用；feature 不要自己挂载
+ - `game_fs_resolve_paths`：解析 exe / install / cwd，并写回 `CONFIG`；供 `load_config` 和查询命令使用
  - `game_fs_set_phase`：核心和 CLI 设置当前阶段
  - `game_fs_require_launchable`：启动前检查；已有 overlay 挂载或依赖缺失时拒绝启动
  - `game_fs_require_offline`：CLI 用；overlay 挂载期间拒绝离线操作
@@ -89,6 +98,7 @@ install 根来源：`game.install_dir` 配置 > `game_install_dir` 回调 > 旧 
 
 游戏实现可以描述游戏本身，下面的函数都是可选实现
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
+ - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
  - `time_record_today_reset`: 不接受参数。在 stdout 输出游戏的日常刷新时间 (如 `04:00 Asia/Shanghai`)
  - `userdata_link`: 不接受参数，将游戏本体、prefix 内的用户数据 (如截图) 链接到一起。实现从 `GAME_FS` / `game_fs_write_path` 读取路径，路径均为 Linux 侧的路径。环境变量 `SCREENSHOTS` 为统一截图目录，常将已有截图移动到 `$SCREENSHOTS/<游戏目录>`，然后将游戏原截图目录软链接至此处。提供 `try_link_dir` 工具函数方便完成移动后创建链接这一重复操作。该函数在 `prepare` 阶段执行，此时 overlay 已挂载，因此能通过合并视图迁移 lower/upper 中已有的数据
  - `shader_cache_invalidate`: 不接受参数，删除游戏产出的着色器缓存。无需处理程序已负责的`__GL_SHADER_DISK_CACHE_PATH`、`DXVK_STATE_CACHE_PATH`、`VKD3D_SHADER_CACHE_PATH` 等，只负责游戏特定的部分。该命令离线执行，不挂载 overlay；游戏目录内的缓存应使用 `game_fs_write_paths all <相对路径>` 同时处理 lower 和 upper

@@ -9,13 +9,28 @@ source "$SCRIPT_DIR/shared/xwin_watch.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
-# Overlay
+# 游戏安装根与可执行文件
 
 game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
     printf '%s\n' "$game_dir"
+}
+
+game_executable() {
+    local install_dir="$1"
+    local server
+    if integration_hyp_read_server_from_game_config "$install_dir/config.ini" server 2>/dev/null; then
+        [ "$server" = "global" ] || { printf '%s\n' "$install_dir/YuanShen.exe"; return; }
+        printf '%s\n' "$install_dir/GenshinImpact.exe"
+        return
+    fi
+    if [ -f "$install_dir/GenshinImpact.exe" ] && [ ! -f "$install_dir/YuanShen.exe" ]; then
+        printf '%s\n' "$install_dir/GenshinImpact.exe"
+    else
+        printf '%s\n' "$install_dir/YuanShen.exe"
+    fi
 }
 
 # 日常重置时间

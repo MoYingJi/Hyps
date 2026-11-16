@@ -3,13 +3,17 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-# Overlay
+# 游戏安装根与可执行文件
 
 game_install_dir() {
     local game_exe="$1"
     local game_dir
     path_dirname "$game_exe" game_dir
     printf '%s\n' "$game_dir"
+}
+
+game_executable() {
+    printf '%s\n' "$1/Endfield.exe"
 }
 
 # 日常重置时间

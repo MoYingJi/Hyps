@@ -72,19 +72,16 @@ load_game_config() {
     fi
 
     config_require_realpath_which_exe runner.exe
-    config_require_realpath_file game.exe
+    if config_has game.exe; then
+        config_require_realpath_file game.exe
+    fi
     if config_has game.install_dir; then
         config_require_realpath_dir game.install_dir
     fi
 
     config_realpath game.prefix "$DATA_DIR/prefixes/${game_name}" >/dev/null
 
-    if ! config_has game.cwd; then
-        local game_exe game_exe_dir
-        config_read game.exe game_exe
-        path_dirname "$game_exe" game_exe_dir
-        config_set game.cwd "$game_exe_dir"
+    if config_has game.cwd; then
+        config_require_realpath_dir game.cwd
     fi
-
-    config_require_realpath_dir game.cwd
 }

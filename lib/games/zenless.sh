@@ -13,6 +13,10 @@ game_install_dir() {
     printf '%s\n' "$game_dir"
 }
 
+game_executable() {
+    printf '%s\n' "$1/ZenlessZoneZero.exe"
+}
+
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
 }

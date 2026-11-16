@@ -42,10 +42,20 @@ command_game_list() {
                     return 0
                 fi
 
+                # shellcheck disable=SC2034 # 供 source 的游戏实现使用
+                GAME_NAME="$name"
+                local game_impl="$SCRIPT_DIR/games/$name.sh"
+                if [ -f "$game_impl" ]; then
+                    #shellcheck source=/dev/null
+                    source "$game_impl"
+                fi
+
                 if log_should_output DEBUG; then
                     load_game_config "$name"
+                    game_fs_resolve_paths >/dev/null
                 else
                     load_game_config "$name" 2>/dev/null
+                    game_fs_resolve_paths >/dev/null 2>&1
                 fi
 
                 local game_exe_value
@@ -117,6 +127,7 @@ _game_outdated_collect() {
     [ -f "$game_impl" ] || return 2
 
     unset -f game_version_local game_version_remote game_version_variant_human_readable game_version_predownload_remote
+    unset -f game_install_dir game_executable overlay_auto_lower
     #shellcheck source=/dev/null
     source "$game_impl"
 
@@ -132,7 +143,14 @@ _game_outdated_collect() {
         [ "$has_local" -eq 1 ] || [ "$has_remote" -eq 1 ] || [ "$has_predownload" -eq 1 ] || return 2
     fi
 
+    config_unset game.exe
+    config_unset game.install_dir
+    config_unset game.cwd
     load_game_config "$game_name"
+    game_fs_resolve_paths || {
+        log_error game-outdated "无法解析 $game_name 的游戏路径"
+        return 1
+    }
     config_read game.exe game_exe
     _info[exe]="$game_exe"
 

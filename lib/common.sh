@@ -89,7 +89,7 @@ cleanup() {
         game_fs_set_phase cleanup_offline
         run_hooks cleanup_offline continue
     else
-        log_error lifecycle "overlay 未卸载，跳过 cleanup_offline，避免在挂载期间直接写 upper"
+        log_warn lifecycle "overlay 未正常卸载或已懒卸载，跳过 cleanup_offline，保留恢复标记"
     fi
 
     isy "$DEBUG_SKIP_REMOVE_TEMP" || rm -rf "$TEMP_DIR"

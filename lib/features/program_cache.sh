@@ -73,10 +73,17 @@ feat_program_cache_invalidate() {
 }
 
 program_cache_render() {
+    local path
+
+    # 显式配置的路径即使开关关闭也展示，因为 invalidate 仍会清理它
+    if config_has cache.shader.path; then
+        config_read cache.shader.path path
+        [ -n "$path" ] && printf '[program] %s\n' "$path"
+        return 0
+    fi
+
     config_is_true cache.shader.enabled || return 0
     config_default cache.shader.path "$CACHE_DIR/shader/$GAME_NAME"
-
-    local path
     config_read cache.shader.path path
     printf '[program] %s\n' "$path"
 }

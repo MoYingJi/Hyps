@@ -365,9 +365,9 @@ gi_patch_d3d12_prepare() {
     local target_ggm target_dir
     if [ "$GI_PATCH_D3D12_MODE" = "overlay" ]; then
         local ggm_rel_path
-        ggm_rel_path="$(realpath -m --relative-to="${GAME_FS[overlay_lower]}" -- "$ggm_path")"
+        ggm_rel_path="$(realpath -m --relative-to="${GAME_FS[install_dir]}" -- "$ggm_path")"
         case "$ggm_rel_path" in
-            /* | ../* | ..) die 1 gi-patch-d3d12 "globalgamemanagers 不在 overlay lower 内: $ggm_path" ;;
+            /* | ../* | ..) die 1 gi-patch-d3d12 "globalgamemanagers 不在 install 根内: $ggm_path" ;;
         esac
         # prepare_offline 阶段，挂载前写 upper
         target_ggm="$(game_fs_write_path writable "$ggm_rel_path")" \

@@ -180,6 +180,17 @@ game_fs_resolve_paths() {
     config_set game.cwd "$cwd"
 }
 
+# 将 install 在 lower 中的偏移拼到 overlay 视图根上
+_game_fs_view_root() {
+    local root="$1"
+    local rel="$2"
+    if [ -z "$rel" ] || [ "$rel" = "." ]; then
+        printf '%s\n' "$root"
+    else
+        printf '%s\n' "$root/$rel"
+    fi
+}
+
 # 解析 overlay 路径，不创建目录不挂载
 game_fs_init_overlay() {
     local install_dir="$1"
@@ -283,11 +294,25 @@ game_fs_init_overlay() {
         return 1
     fi
 
+    local install_rel
+    install_rel="$(realpath -m --relative-to="$lower" -- "$install_dir")" || {
+        log_error game-fs "无法计算 install 相对于 lower 的偏移: '$install_dir' (lower: '$lower')"
+        return 1
+    }
+    case "$install_rel" in
+        /* | ../* | ..)
+            log_error game-fs "install 根不在 overlay lower 内: '$install_dir' (lower: '$lower')"
+            return 1
+            ;;
+    esac
+    GAME_FS[install_rel_lower]="$install_rel"
     GAME_FS[overlay_mount]="$mount"
     GAME_FS[overlay_upper]="$upper"
     GAME_FS[overlay_work]="$work"
-    GAME_FS[runtime_dir]="$mount"
-    GAME_FS[writable_dir]="$upper"
+    GAME_FS[lower_view]="$(_game_fs_view_root "$lower" "$install_rel")"
+    GAME_FS[upper_view]="$(_game_fs_view_root "$upper" "$install_rel")"
+    GAME_FS[runtime_dir]="$(_game_fs_view_root "$mount" "$install_rel")"
+    GAME_FS[writable_dir]="$(_game_fs_view_root "$upper" "$install_rel")"
 }
 
 # 派生 runtime exe/cwd
@@ -380,6 +405,9 @@ game_fs_init() {
         GAME_FS[overlay_mount]=""
         GAME_FS[overlay_upper]=""
         GAME_FS[overlay_work]=""
+        GAME_FS[install_rel_lower]="."
+        GAME_FS[lower_view]="$install_dir"
+        GAME_FS[upper_view]="$install_dir"
         GAME_FS[runtime_dir]="$install_dir"
         GAME_FS[writable_dir]="$install_dir"
     fi
@@ -473,12 +501,6 @@ game_fs_write_path() {
     game_fs_path "$scope" "$rel"
 }
 
-game_fs_write_paths() {
-    local scope="$1" rel="$2"
-    game_fs_assert_mutation "$scope" || return 1
-    game_fs_paths "$scope" "$rel"
-}
-
 # 延迟解析 prefix 用户目录
 # 用法: game_fs_resolve_user_dirs [module]
 game_fs_resolve_user_dirs() {
@@ -509,7 +531,7 @@ game_fs_root() {
             ;;
         lower)
             _game_fs_require_install || return 1
-            printf '%s\n' "${GAME_FS[overlay_lower]}"
+            printf '%s\n' "${GAME_FS[lower_view]}"
             ;;
         runtime)
             _game_fs_require_install || return 1
@@ -522,7 +544,7 @@ game_fs_root() {
         upper)
             _game_fs_require_install || return 1
             if [ "${GAME_FS[overlay_enabled]}" = "1" ]; then
-                printf '%s\n' "${GAME_FS[overlay_upper]}"
+                printf '%s\n' "${GAME_FS[upper_view]}"
             else
                 printf '%s\n' "${GAME_FS[install_dir]}"
             fi
@@ -668,66 +690,6 @@ game_fs_paths() {
     [ "$upper" = "$lower" ] || printf 'upper\t%s\n' "$upper"
 }
 
-# 用法: game_fs_display <scope> <relpath>
-#shellcheck disable=SC2016 # 单引号里的 $VAR 是展示用字面占位符，不展开
-game_fs_display() {
-    _game_fs_require_init || return 1
-    local scope="$1"
-    local rel="$2"
-    local label
-
-    case "$scope" in
-        install)
-            _game_fs_require_install || return 1
-            label='$GAME_DIR'
-            ;;
-        lower)
-            _game_fs_require_install || return 1
-            if [ "${GAME_FS[overlay_enabled]}" = "1" ]; then
-                label='$OVERLAY_LOWER'
-            else
-                label='$GAME_DIR'
-            fi
-            ;;
-        upper)
-            _game_fs_require_install || return 1
-            label='$OVERLAY_UPPER'
-            ;;
-        runtime)
-            _game_fs_require_install || return 1
-            if [ "${GAME_FS[overlay_enabled]}" = "1" ]; then
-                label='$OVERLAY_MOUNT'
-            else
-                label='$GAME_DIR'
-            fi
-            ;;
-        writable)
-            _game_fs_require_install || return 1
-            if [ "${GAME_FS[overlay_enabled]}" = "1" ]; then
-                label='$OVERLAY_UPPER'
-            else
-                label='$GAME_DIR'
-            fi
-            ;;
-        prefix) label='$PREFIX' ;;
-        userprofile) label='$USERPROFILE' ;;
-        cache) label='$CACHE_DIR' ;;
-        data) label='$DATA_DIR' ;;
-        state) label='$STATE_DIR' ;;
-        temp) label='$TEMP_DIR' ;;
-        *)
-            log_error game-fs "未知的路径作用域: '$scope'"
-            return 1
-            ;;
-    esac
-
-    if [ -z "$rel" ]; then
-        printf '%s\n' "$label"
-    else
-        printf '%s/%s\n' "$label" "$rel"
-    fi
-}
-
 # 挂载点是否处于挂载状态
 game_fs_overlay_mounted() {
     [ "${GAME_FS[overlay_enabled]:-0}" = "1" ] || return 1
@@ -867,15 +829,30 @@ game_fs_unmount() {
     local mount="${GAME_FS[overlay_mount]}"
     local backend="${GAME_FS[overlay_backend]}"
     local ok=0
+    local deferred=0
+
+    GAME_FS[overlay_unmount_deferred]=0
 
     case "$backend" in
         fuse)
             if command_exists fusermount3; then
-                fusermount3 -uz "$mount" && ok=1
+                if ! fusermount3 -u "$mount"; then
+                    deferred=1
+                else
+                    ok=1
+                fi
             elif command_exists fusermount; then
-                fusermount -uz "$mount" && ok=1
+                if ! fusermount -u "$mount"; then
+                    deferred=1
+                else
+                    ok=1
+                fi
             elif command_exists umount; then
-                umount -l "$mount" && ok=1
+                if ! umount "$mount"; then
+                    deferred=1
+                else
+                    ok=1
+                fi
             else
                 log_error game-fs "没有可用的 overlay 卸载命令"
                 return 1
@@ -883,7 +860,11 @@ game_fs_unmount() {
             ;;
         kernel)
             if command_exists umount; then
-                umount -l "$mount" && ok=1
+                if ! umount "$mount"; then
+                    deferred=1
+                else
+                    ok=1
+                fi
             else
                 log_error game-fs "没有 umount，无法卸载 overlay"
                 return 1
@@ -895,13 +876,35 @@ game_fs_unmount() {
             ;;
     esac
 
-    if [ "$ok" -ne 1 ]; then
-        log_error game-fs "卸载 overlay 失败: '$mount'"
+    if [ "$ok" -eq 1 ]; then
+        GAME_FS[overlay_mounted]=0
+        GAME_FS[overlay_mounted_by_us]=0
+        return 0
+    fi
+    if [ "$deferred" -eq 1 ]; then
+        # 懒卸载只保证命名空间脱离，不保证没有进程仍持有挂载引用
+        # 这里不能把成功当作可以安全写 upper 的前提
+        GAME_FS[overlay_unmount_deferred]=1
+        case "$backend" in
+            fuse)
+                if command_exists fusermount3; then
+                    fusermount3 -uz "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
+                elif command_exists fusermount; then
+                    fusermount -uz "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
+                elif command_exists umount; then
+                    umount -l "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
+                fi
+                ;;
+            kernel)
+                umount -l "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
+                ;;
+        esac
+        log_warn game-fs "overlay 卸载繁忙，已尝试懒卸载；跳过 cleanup_offline，保留恢复标记"
         return 1
     fi
 
-    GAME_FS[overlay_mounted]=0
-    GAME_FS[overlay_mounted_by_us]=0
+    log_error game-fs "卸载 overlay 失败: '$mount'"
+    return 1
 }
 
 # 写入 LaunchPlan

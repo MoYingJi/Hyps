@@ -20,7 +20,7 @@
  - `pre_start`: 启动前最后检查。有副作用，任意失败立即跳到 `cleanup`
  - `post_start`: 启动后。有副作用，任意失败会继续执行
  - `cleanup`: runtime 视图卸载前的清理。有副作用，任意失败会继续执行
- - `cleanup_offline`: runtime 视图卸载后的清理（恢复/删除 upper 内的补丁文件）。有副作用，任意失败会继续执行
+ - `cleanup_offline`: runtime 视图正常卸载后的清理（恢复/删除 upper 内的补丁文件）。懒卸载或卸载繁忙时跳过并保留恢复标记。有副作用，任意失败会继续执行
 
 核心在两个阶段之间执行不是钩子的步骤：
 
@@ -54,6 +54,8 @@ exe / install 根解析：
 - `game.cwd` 未配置时，install 已知取 install 根，否则取解析后 exe 所在目录
 - install 未知时 `install_ok=0`，overlay 和依赖 install 的功能会报错；纯启动仍可用 `game.exe` / `game.cwd`
 
+自定义 `overlay.lower` 可以是 install 的祖先；`lower` / `runtime` / `writable` / `upper` / `all` 都会带上 install 相对 lower 的偏移
+
 | 作用域 | overlay 关闭 | overlay 开启 | 用途 |
 | --- | --- | --- | --- |
 | `install` | 游戏安装目录 | lower | 读原版文件、检测真实文件系统 |
@@ -66,10 +68,9 @@ exe / install 根解析：
 常用函数：
  - `game_fs_path <scope> <相对路径>`：只解析路径，不做阶段限制
  - `game_fs_paths <scope> <相对路径>`：每行输出 `<view>\t<绝对路径>`；`all` 在 overlay 关闭时输出 `install`，开启时输出 `lower`/`upper`
- - `game_fs_write_path` / `game_fs_write_paths`：解析路径并做写阶段校验
+ - `game_fs_write_path`：解析路径并做写阶段校验
  - `game_fs_assert_mutation <scope>`：外部工具或复杂操作写前显式校验
  - `game_fs_root <scope>`：输出某个作用域的根
- - `game_fs_display <scope> <相对路径>`：输出 `$USERPROFILE/...` 这类展示路径
  - `game_fs_init` / `game_fs_mount` / `game_fs_unmount`：由核心调用；feature 不要自己挂载
  - `game_fs_resolve_paths`：解析 exe / install / cwd，并写回 `CONFIG`；供 `load_config` 和查询命令使用
  - `game_fs_set_phase`：核心和 CLI 设置当前阶段
@@ -92,7 +93,7 @@ exe / install 根解析：
 
 ## 路径声明
 
-游戏实现用可选的 `game_paths` 声明路径角色，Hyps 负责解析、渲染和执行：
+游戏实现用可选的 `game_paths` 声明路径角色，Hyps 负责收集、解析和渲染，具体功能负责执行：
 
 ```bash
 game_paths() {
@@ -105,8 +106,9 @@ game_paths() {
 - `userdata:screenshot`：截图目录。第四个参数是 `$SCREENSHOTS` 下的子目录，默认取 `game_path_name`
 - `shader-cache`：着色器缓存路径，可以是文件或目录；`all` 在 overlay 下会展开 lower + upper
 - `path_plan_note <role> [text]`：只输出提示，不产生动作；空 text 表示声明了该 role，但没有路径和提示
-- `path_plan_load <role>` 返回 0 表示已声明，3 表示游戏没有声明该 role，4 表示游戏没有实现 `game_paths`
-- `path_plan_render <role>` 只读展示，`path_plan_apply <role>` 执行
+- `path_plan_collect <role>` 返回 0 表示已声明，3 表示游戏没有声明该 role，4 表示游戏没有实现 `game_paths`
+- `path_plan_paths <role>` 输出解析后的路径记录，截图和缓存功能各自消费
+- `path_plan_render <role>` 只读展示
 
 ## 游戏实现
 

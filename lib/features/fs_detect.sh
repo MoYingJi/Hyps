@@ -52,27 +52,26 @@ feat_fs_detect_error_prefix_in() {
 feat_fs_detect_pre_start() {
     config_is_true features.fs_detect.enabled true || return 0 # 总开关
 
-    if [ "${GAME_FS[install_ok]:-0}" != "1" ]; then
-        log_debug fs-detect "install 视图不可用，跳过游戏文件系统检测"
-        return 0
-    fi
-
-    # 检测 writable：游戏实际会写入的文件系统
-    # overlay 开启时是 upper，关闭时是安装目录
     local writable game_blkfs
-    if ! writable="$(game_fs_root writable)"; then
-        log_debug fs-detect "无法获取游戏写入目录，跳过游戏文件系统检测"
-        return 0
-    fi
-    game_blkfs="$(feat_fs_detect_get_blkfs "$writable")" \
-        || log_debug fs-detect "无法获取游戏写入目录所在的文件系统: '$writable'"
+    if [ "${GAME_FS[install_ok]:-0}" = "1" ]; then
+        # 检测 writable：游戏实际会写入的文件系统
+        # overlay 开启时是 upper，关闭时是安装目录
+        if ! writable="$(game_fs_root writable)"; then
+            log_debug fs-detect "无法获取游戏写入目录，跳过游戏文件系统检测"
+        else
+            game_blkfs="$(feat_fs_detect_get_blkfs "$writable")" \
+                || log_debug fs-detect "无法获取游戏写入目录所在的文件系统: '$writable'"
 
-    case "$game_blkfs" in
-        ntfs)  feat_fs_detect_warn_game_in "NTFS"         "ntfs"  ;;
-        exfat) feat_fs_detect_warn_game_in "exFAT"        "exfat" ;;
-        vfat)  feat_fs_detect_warn_game_in "FAT 文件系统" "vfat"  ;;
-        *)     log_debug fs-detect "游戏写入目录所在的文件系统: $game_blkfs" ;;
-    esac
+            case "$game_blkfs" in
+                ntfs)  feat_fs_detect_warn_game_in "NTFS"         "ntfs"  ;;
+                exfat) feat_fs_detect_warn_game_in "exFAT"        "exfat" ;;
+                vfat)  feat_fs_detect_warn_game_in "FAT 文件系统" "vfat"  ;;
+                *)     log_debug fs-detect "游戏写入目录所在的文件系统: $game_blkfs" ;;
+            esac
+        fi
+    else
+        log_debug fs-detect "install 视图不可用，跳过游戏目录检测"
+    fi
 
     local prefix_dir prefix_blkfs
     prefix_dir="${GAME_FS[prefix]}"

@@ -104,21 +104,53 @@ init_game_config_state() {
     config_parse_to_temp "$file"
 
     local exe="${TEMP_CONFIG[game.exe]:-}"
+    local install="${TEMP_CONFIG[game.install_dir]:-}"
     local runner="${TEMP_CONFIG[runner.name]:-}"
     local runner_exe="${TEMP_CONFIG[runner.exe]:-}"
     local runner_proton="${TEMP_CONFIG[runner.protonpath]:-}"
 
-    if [[ -z "$exe" ]]; then
-        printf '缺少 game.exe\n'
+    if [[ -z "$exe" && -z "$install" ]]; then
+        printf '缺少 game.exe 或 game.install_dir\n'
         return 0
     fi
-    if [[ "$exe" == *"/path/to/"* ]]; then
+    if [[ -n "$exe" && "$exe" == *"/path/to/"* ]]; then
         printf '示例占位未修改\n'
         return 0
     fi
-    if [[ ! -f "$exe" ]]; then
+    if [[ -n "$exe" && ! -f "$exe" ]]; then
         printf 'game.exe 无效\n'
         return 0
+    fi
+    if [[ -n "$install" && "$install" == *"/path/to/"* ]]; then
+        printf '示例占位未修改\n'
+        return 0
+    fi
+    if [[ -n "$install" && ! -d "$install" ]]; then
+        printf 'game.install_dir 无效\n'
+        return 0
+    fi
+
+    # install-only 配置需要游戏实现能派生 exe；在子 shell 中读取，避免副作用
+    if [[ -z "$exe" && -n "$install" ]]; then
+        local derived=""
+        local impl="$SCRIPT_DIR/games/$slug.sh"
+        if [[ -f "$impl" ]]; then
+            derived="$(
+                # shellcheck disable=SC2034 # 供 source 的游戏实现使用
+                GAME_NAME="$slug"
+                #shellcheck source=/dev/null
+                source "$impl" >/dev/null 2>&1
+                game_executable "$install"
+            )" || derived=""
+        fi
+        if [[ -z "$derived" ]]; then
+            printf '缺少 game.exe（该游戏不支持从 game.install_dir 派生）\n'
+            return 0
+        fi
+        if [[ ! -f "$derived" ]]; then
+            printf 'game.install_dir 无法派生有效 game.exe\n'
+            return 0
+        fi
     fi
 
     # 游戏配置里没有直接给出运行器时，从 runner.name 指向的配置补齐

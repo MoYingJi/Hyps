@@ -16,6 +16,8 @@ game_path_name() {
     printf '%s\n' "Honkai3"
 }
 
+# 游戏安装根与可执行文件
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir
@@ -27,15 +29,17 @@ game_executable() {
     printf '%s\n' "$1/BH3.exe"
 }
 
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
+# 游戏路径声明
+
+game_paths() {
+    # 我已经不玩崩崩崩了，这个路径是我在米游社找的
+    path_plan_declare userdata:screenshot userprofile "Pictures/bh3rd"
 }
 
-userdata_link() {
-    # 我已经不玩崩崩崩了，这个路径是我在米游社找的
-    local target
-    target="$(game_fs_write_path userprofile "Pictures/bh3rd")" || return 1
-    try_link_dir "$SCREENSHOTS/Honkai3" "$target"
+# 日常重置时间
+
+time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
 }
 
 # 游戏版本

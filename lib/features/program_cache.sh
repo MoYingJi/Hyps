@@ -71,3 +71,12 @@ feat_program_cache_invalidate() {
 
     program_cache_clear_dir cache.shader.path "着色器"
 }
+
+program_cache_render() {
+    config_is_true cache.shader.enabled || return 0
+    config_default cache.shader.path "$CACHE_DIR/shader/$GAME_NAME"
+
+    local path
+    config_read cache.shader.path path
+    printf '[program] %s\n' "$path"
+}

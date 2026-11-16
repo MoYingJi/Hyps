@@ -17,6 +17,8 @@ source "$SCRIPT_DIR/config.sh"
 source "$SCRIPT_DIR/launch/plan.sh"
 #shellcheck source=launch/game_fs.sh
 source "$SCRIPT_DIR/launch/game_fs.sh"
+#shellcheck source=launch/path_plan.sh
+source "$SCRIPT_DIR/launch/path_plan.sh"
 #shellcheck source=launch/game_handler.sh
 source "$SCRIPT_DIR/launch/game_handler.sh"
 #shellcheck source=launch/mode_script.sh

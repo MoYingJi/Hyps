@@ -29,18 +29,16 @@ game_executable() {
     printf '%s\n' "$1/StarRail.exe"
 }
 
+# 游戏路径声明
+
+game_paths() {
+    path_plan_declare userdata:screenshot runtime "StarRail_Data/ScreenShots"
+}
+
 # 日常重置时间
 
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
-}
-
-# 用户数据链接
-
-userdata_link() {
-    local target
-    target="$(game_fs_write_path runtime "StarRail_Data/ScreenShots")" || return 1
-    try_link_dir "$SCREENSHOTS/StarRail" "$target"
 }
 
 # 游戏版本

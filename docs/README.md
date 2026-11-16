@@ -166,7 +166,7 @@ overlay 需要知道游戏安装根。内置游戏会自动识别；其他游戏
 
 ### 着色器缓存
 
-设置 `cache.shader.enabled = true` 即可。会增加游戏流畅度。若驱动更新 / 游戏更新，而游戏未重新预编译着色器，可以使用 `_Hyps shader-cache invalidate <GAME_NAME>` 删除着色器使其预重新编译。启用 overlay 时，游戏目录内的缓存会同时清理 lower 和 upper；如果 overlay 正在挂载，命令会拒绝执行，需要先关闭游戏并卸载
+设置 `cache.shader.enabled = true` 即可。会增加游戏流畅度。若驱动更新 / 游戏更新，而游戏未重新预编译着色器，可以先用 `_Hyps shader-cache list <GAME_NAME>` 查看游戏声明的缓存，再用 `_Hyps shader-cache invalidate <GAME_NAME>` 删除。`[program]` 是 Hyps 通过环境变量提供的 program cache，不是游戏实现的声明。启用 overlay 时，游戏目录内的缓存会同时清理 lower 和 upper；如果 overlay 正在挂载，命令会拒绝执行，需要先关闭游戏并卸载
 
 ### 时间记录
 

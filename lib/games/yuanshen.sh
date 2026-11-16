@@ -43,18 +43,22 @@ game_executable() {
     fi
 }
 
+# 游戏路径声明
+
+game_paths() {
+    local dir
+
+    path_plan_declare userdata:screenshot runtime "ScreenShot"
+    # 国服目录为 原神，国际服目录为 Genshin Impact（后者未经本机验证），两者都尝试清除
+    for dir in "原神" "Genshin Impact"; do
+        path_plan_declare shader-cache userprofile "AppData/LocalLow/miHoYo/$dir/d3d12PSOcache"
+    done
+}
+
 # 日常重置时间
 
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
-}
-
-# 用户数据链接
-
-userdata_link() {
-    local target
-    target="$(game_fs_write_path runtime "ScreenShot")" || return 1
-    try_link_dir "$SCREENSHOTS/YuanShen" "$target"
 }
 
 # 游戏版本
@@ -73,21 +77,6 @@ game_version_remote() {
 
 game_version_predownload_remote() {
     integration_hyp_get_game_predownload_remote "genshin" "${1:-cn}"
-}
-
-# 着色器缓存
-
-shader_cache_invalidate() {
-    local dir cache
-
-    # 国服目录为 原神，国际服目录为 Genshin Impact（后者未经本机验证），两者都尝试清除
-    for dir in "原神" "Genshin Impact"; do
-        cache="$(game_fs_write_path userprofile "AppData/LocalLow/miHoYo/$dir/d3d12PSOcache")" || continue
-        if [ -e "$cache" ]; then
-            log_info shader-cache "清除游戏着色器缓存: $cache"
-            rm -rf -- "$cache"
-        fi
-    done
 }
 
 # FPS 解锁

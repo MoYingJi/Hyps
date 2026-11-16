@@ -544,10 +544,13 @@ game_fs_root() {
 }
 
 # 拼接根与相对路径，校验越界
-# 用法: _game_fs_join <root> <relpath>
+# 用法: _game_fs_join <root> <relpath> [allow_symlink_escape]
+# allow_symlink_escape=1 用于 userprofile/cache 等前缀目录，允许中间级符号链接
 _game_fs_join() {
     local root="$1"
     local rel="$2"
+    local allow_symlink_escape="${3:-0}"
+    local path
 
     [ -n "$root" ] || {
         log_error game-fs "路径根为空"
@@ -571,6 +574,20 @@ _game_fs_join() {
             return 1
             ;;
     esac
+
+    if [ "$allow_symlink_escape" = "1" ]; then
+        # 前缀目录中的符号链接是正常结构；只做词法规范化，不跟随链接
+        path="$(realpath -m -s -- "$root/$rel")" || {
+            log_error game-fs "无法解析路径: '$root/$rel'"
+            return 1
+        }
+        if [ "$path" = "$root" ] || [[ "$path" != "$root"/* ]]; then
+            log_error game-fs "路径越界: '$rel' (根: '$root')"
+            return 1
+        fi
+        printf '%s\n' "$path"
+        return 0
+    fi
 
     local dir base parent
     path_dirname "$rel" dir
@@ -604,17 +621,22 @@ game_fs_path() {
     local rel="$2"
     local root
 
+    local allow_symlink_escape=0
     case "$scope" in
         all)
             game_fs_paths all "$rel"
             return
+            ;;
+        prefix | userprofile | cache | data | state | temp)
+            allow_symlink_escape=1
+            root="$(game_fs_root "$scope")" || return 1
             ;;
         *)
             root="$(game_fs_root "$scope")" || return 1
             ;;
     esac
 
-    _game_fs_join "$root" "$rel"
+    _game_fs_join "$root" "$rel" "$allow_symlink_escape"
 }
 
 # 用法: game_fs_paths <scope> <relpath>

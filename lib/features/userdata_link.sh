@@ -6,8 +6,8 @@ source "$SCRIPT_DIR/libs.sh"
 feat_userdata_link_prepare() {
     config_is_true features.userdata_link.enabled || return 0
 
-    if [ ! "$(type -t userdata_link)" = "function" ]; then
-        log_debug userdata-link "未定义 userdata_link 函数，跳过 userdata_link 功能"
+    if [ ! "$(type -t game_paths)" = "function" ]; then
+        log_debug userdata-link "未定义 game_paths，跳过 userdata_link 功能"
         return 0
     fi
 
@@ -20,10 +20,46 @@ feat_userdata_link_prepare() {
     config_require_realpath_mkdir features.userdata_link.screenshots "$(xdg-user-dir PICTURES)/HypsScreenshots"
     config_read features.userdata_link.screenshots screenshots_dir
 
-    # 在 prepare 阶段执行，overlay 已挂载
-    if ! SCREENSHOTS="$screenshots_dir" userdata_link; then
-        log_warn userdata-link "userdata_link 执行失败，跳过"
-    fi
+    local rc
+    path_plan_collect userdata:screenshot
+    rc=$?
+    case "$rc" in
+        0) ;;
+        3)
+            log_debug userdata-link "游戏未声明截图目录"
+            return 0
+            ;;
+        4)
+            log_debug userdata-link "游戏未实现路径声明"
+            return 0
+            ;;
+        *)
+            log_warn userdata-link "加载截图目录声明失败，跳过"
+            return 0
+            ;;
+    esac
+
+    local plan
+    plan="$(path_plan_paths userdata:screenshot)" || {
+        log_warn userdata-link "解析截图目录失败，跳过"
+        return 0
+    }
+
+    local kind scope path label
+    local failures=0
+    while IFS=$'\t' read -r kind scope path label; do
+        [ "$kind" = "link" ] || continue
+        if ! game_fs_assert_mutation "$scope"; then
+            failures=$((failures + 1))
+            continue
+        fi
+        if ! SCREENSHOTS="$screenshots_dir" try_link_dir "$screenshots_dir/$label" "$path"; then
+            log_warn userdata-link "创建截图链接失败: '$path' -> '$screenshots_dir/$label'"
+            failures=$((failures + 1))
+        fi
+    done <<<"$plan"
+
+    [ "$failures" -eq 0 ] || log_warn userdata-link "部分截图链接失败"
 }
 
 register_hook prepare feat_userdata_link_prepare

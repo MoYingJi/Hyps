@@ -26,35 +26,24 @@ game_executable() {
     printf '%s\n' "$1/Endfield.exe"
 }
 
+# 游戏路径声明
+
+game_paths() {
+    local dir file
+
+    path_plan_declare userdata:screenshot userprofile "Pictures/ENDFIELD"
+    # 国服目录为 Hypergryph，国际服目录为 Gryphline（后者未经本机验证），两者都尝试清除
+    for dir in Hypergryph Gryphline; do
+        for file in vulkan_pso_cache.bin dx11_pso_cache.bin; do
+            path_plan_declare shader-cache userprofile "AppData/LocalLow/$dir/Endfield/$file"
+        done
+    done
+}
+
 # 日常重置时间
 
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
-}
-
-# 用户数据链接
-
-userdata_link() {
-    local target
-    target="$(game_fs_write_path userprofile "Pictures/ENDFIELD")" || return 1
-    try_link_dir "$SCREENSHOTS/Endfield" "$target"
-}
-
-# 着色器缓存
-
-shader_cache_invalidate() {
-    local dir file cache
-
-    # 国服目录为 Hypergryph，国际服目录为 Gryphline（后者未经本机验证），两者都尝试清除
-    for dir in "Hypergryph" "Gryphline"; do
-        for file in vulkan_pso_cache.bin dx11_pso_cache.bin; do
-            cache="$(game_fs_write_path userprofile "AppData/LocalLow/$dir/Endfield/$file")" || continue
-            if [ -e "$cache" ]; then
-                log_info shader-cache "清除游戏着色器缓存: $cache"
-                rm -f -- "$cache"
-            fi
-        done
-    done
 }
 
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）

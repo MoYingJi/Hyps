@@ -13,6 +13,8 @@ game_path_name() {
     printf '%s\n' "WutheringWaves"
 }
 
+# 游戏安装根与可执行文件
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir
@@ -31,28 +33,15 @@ game_executable() {
     printf '%s\n' "$install_dir/Client/Binaries/Win64/Client-Win64-Shipping.exe"
 }
 
+# 游戏路径声明
+
+game_paths() {
+    path_plan_declare userdata:screenshot runtime "Client/Saved/ScreenShot"
+    path_plan_declare shader-cache all "Client/Saved/PSO"
+}
+
+# 日常重置时间
+
 time_record_today_reset() {
     echo "04:00 Asia/Shanghai"
-}
-
-userdata_link() {
-    local target
-    target="$(game_fs_write_path runtime "Client/Saved/ScreenShot")" || return 1
-    try_link_dir "$SCREENSHOTS/WutheringWaves" "$target"
-}
-
-shader_cache_invalidate() {
-    local view path
-    local found=0
-
-    # 离线执行，同时清 lower/upper
-    while IFS=$'\t' read -r view path; do
-        found=1
-        if [ -e "$path" ]; then
-            log_info shader-cache "清除游戏着色器缓存 ($view): $path"
-            rm -rf -- "$path" || log_warn shader-cache "清除失败 ($view): $path"
-        fi
-    done < <(game_fs_write_paths all "Client/Saved/PSO")
-
-    [ "$found" -eq 1 ] || log_warn shader-cache "无法解析游戏着色器缓存路径"
 }

@@ -86,9 +86,27 @@ exe / install 根解析：
 
 读路径不限制阶段，`fs_detect` 这类只读 `writable` 的 feature 不受影响。写操作必须走 `game_fs_write_path(s)` 或显式 `game_fs_assert_mutation`
 
-路径校验只解析父目录，保留末级符号链接。末级链接指向根外时仍可删除/修复，中间级链接越界会被拒绝
+游戏目录路径校验只解析父目录，保留末级符号链接；末级链接指向根外时仍可删除/修复，中间级链接越界会被拒绝。`userprofile` / `cache` 等前缀目录允许符号链接，只做词法越界检查
 
 `GAME_FS[overlay_mounted_by_us]` 用于区分本次挂载与外部已有挂载：外部挂载不会在 cleanup 中被自动卸载，启动也会要求先手动处理
+
+## 路径声明
+
+游戏实现用可选的 `game_paths` 声明路径角色，Hyps 负责解析、渲染和执行：
+
+```bash
+game_paths() {
+    path_plan_declare userdata:screenshot userprofile "Pictures/ENDFIELD"
+    path_plan_declare shader-cache all "Client/Saved/PSO"
+    path_plan_note shader-cache "清理后可能需要手动重新触发编译"
+}
+```
+
+- `userdata:screenshot`：截图目录。第四个参数是 `$SCREENSHOTS` 下的子目录，默认取 `game_path_name`
+- `shader-cache`：着色器缓存路径，可以是文件或目录；`all` 在 overlay 下会展开 lower + upper
+- `path_plan_note <role> [text]`：只输出提示，不产生动作；空 text 表示声明了该 role，但没有路径和提示
+- `path_plan_load <role>` 返回 0 表示已声明，3 表示游戏没有声明该 role，4 表示游戏没有实现 `game_paths`
+- `path_plan_render <role>` 只读展示，`path_plan_apply <role>` 执行
 
 ## 游戏实现
 
@@ -102,8 +120,7 @@ exe / install 根解析：
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
  - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
  - `time_record_today_reset`: 不接受参数。在 stdout 输出游戏的日常刷新时间 (如 `04:00 Asia/Shanghai`)
- - `userdata_link`: 不接受参数，将游戏本体、prefix 内的用户数据 (如截图) 链接到一起。实现从 `GAME_FS` / `game_fs_write_path` 读取路径，路径均为 Linux 侧的路径。环境变量 `SCREENSHOTS` 为统一截图目录，常将已有截图移动到 `$SCREENSHOTS/<游戏目录>`，然后将游戏原截图目录软链接至此处。提供 `try_link_dir` 工具函数方便完成移动后创建链接这一重复操作。该函数在 `prepare` 阶段执行，此时 overlay 已挂载，因此能通过合并视图迁移 lower/upper 中已有的数据
- - `shader_cache_invalidate`: 不接受参数，删除游戏产出的着色器缓存。无需处理程序已负责的`__GL_SHADER_DISK_CACHE_PATH`、`DXVK_STATE_CACHE_PATH`、`VKD3D_SHADER_CACHE_PATH` 等，只负责游戏特定的部分。该命令离线执行，不挂载 overlay；游戏目录内的缓存应使用 `game_fs_write_paths all <相对路径>` 同时处理 lower 和 upper
+ - `game_paths`: 不接受参数，声明游戏路径角色；使用 `path_plan_declare <role> <scope> <rel> [label]` 和 `path_plan_note <role> [text]`，不直接执行任何操作。角色目前有 `userdata:screenshot` 和 `shader-cache`
  - `game_version_local`: 接受游戏可执行文件路径和两个 nameref 变量名，将本地版本和变体标识写入变量。本地版本只包含游戏本体已安装的版本。预下载内容不会安装到游戏本体，因此本函数不应返回预下载版本。当前没有本地预下载版本接口，`game_version_predownload_remote` 只报告远程预下载版本。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准
  - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身
  - `game_version_remote`: 接受变体标识，在 stdout 输出远程版本

@@ -13,6 +13,8 @@ game_path_name() {
     printf '%s\n' "Arknights"
 }
 
+# 游戏安装根与可执行文件
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir
@@ -24,12 +26,14 @@ game_executable() {
     printf '%s\n' "$1/Arknights.exe"
 }
 
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
+# 游戏路径声明
+
+game_paths() {
+    path_plan_declare userdata:screenshot userprofile "Pictures/Arknights_Screenshots"
 }
 
-userdata_link() {
-    local target
-    target="$(game_fs_write_path userprofile "Pictures/Arknights_Screenshots")" || return 1
-    try_link_dir "$SCREENSHOTS/Arknights" "$target"
+# 日常重置时间
+
+time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
 }

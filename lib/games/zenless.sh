@@ -16,6 +16,8 @@ game_path_name() {
     printf '%s\n' "ZenlessZoneZero"
 }
 
+# 游戏安装根与可执行文件
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir
@@ -27,14 +29,20 @@ game_executable() {
     printf '%s\n' "$1/ZenlessZoneZero.exe"
 }
 
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
+# 游戏路径声明
+
+game_paths() {
+    path_plan_declare userdata:screenshot runtime "ScreenShot"
+    path_plan_note shader-cache "清除着色器缓存后，游戏并不会重新预编译着色器"
+    path_plan_note shader-cache "需要启动游戏，在启动页（「点击进入游戏」那个界面）点击右下角四"
+    path_plan_note shader-cache "个图标中的扳手图标，点击「确认修复」，重新触发着色器编译，见："
+    path_plan_note shader-cache "https://www.miyoushe.com/zzz/article/76056101"
 }
 
-userdata_link() {
-    local target
-    target="$(game_fs_write_path runtime "ScreenShot")" || return 1
-    try_link_dir "$SCREENSHOTS/ZenlessZoneZero" "$target"
+# 日常重置时间
+
+time_record_today_reset() {
+    echo "04:00 Asia/Shanghai"
 }
 
 # 游戏版本
@@ -53,11 +61,4 @@ game_version_remote() {
 
 game_version_predownload_remote() {
     integration_hyp_get_game_predownload_remote "zenless" "${1:-cn}"
-}
-
-shader_cache_invalidate() {
-    log_warn shader-cache "清除着色器缓存后，游戏并不会重新预编译着色器"
-    log_warn shader-cache "需要启动游戏，在启动页（「点击进入游戏」那个界面）点击右下角四"
-    log_warn shader-cache "个图标中的扳手图标，点击「确认修复」，重新触发着色器编译，见："
-    log_warn shader-cache "https://www.miyoushe.com/zzz/article/76056101"
 }

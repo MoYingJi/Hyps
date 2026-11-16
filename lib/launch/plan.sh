@@ -194,5 +194,21 @@ launch_plan_run() {
 }
 
 launch_plan_kill() {
-    [[ -n "$LP_PID" ]] && kill "$LP_PID" 2>/dev/null
+    [[ -n "$LP_PID" ]] || return 0
+
+    # 主流程可能已经 wait，不能向复用后的 PID 发信号
+    local pid
+    while IFS= read -r pid; do
+        if [[ "$pid" = "$LP_PID" ]]; then
+            kill "$LP_PID" 2>/dev/null || true
+            break
+        fi
+    done < <(jobs -pr)
+}
+
+launch_plan_wait() {
+    [[ -n "$LP_PID" ]] || return 0
+    # 发送信号不代表 runtime 使用者已完成收尾
+    wait "$LP_PID" 2>/dev/null || true
+    LP_PID=""
 }

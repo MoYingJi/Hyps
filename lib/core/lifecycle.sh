@@ -329,13 +329,21 @@ clear_hooks() {
     log_debug lifecycle "已清除所有钩子"
 }
 
+lifecycle_has_hooks() {
+    [[ -n "${HOOKS_BY_PHASE[$1]:-}" ]]
+}
+
 # 检查指定阶段是否已注册某个函数
 # 参数: $1=phase $2=fn
 # 返回: 0 已注册，1 未注册
 hook_registered() {
+    local IFS=$' \t\n'
     local phase="$1"
     local fn="$2"
-    local raw="${HOOKS_BY_PHASE[$phase]:-}"
-    [[ " $raw " == *" $fn "* ]] && return 0
+    local entry
+    for entry in ${HOOKS_BY_PHASE[$phase]:-}; do
+        entry="${entry#*:}"
+        [[ "${entry%%:*}" = "$fn" ]] && return 0
+    done
     return 1
 }

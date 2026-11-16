@@ -309,6 +309,10 @@ game_fs_init_overlay() {
     GAME_FS[overlay_mount]="$mount"
     GAME_FS[overlay_upper]="$upper"
     GAME_FS[overlay_work]="$work"
+    # 按 upper 标识会话，修改 mount/work 配置也不能绕过旧后端的占用
+    local upper_key
+    upper_key="$(printf '%s' "$upper" | sha256sum)" || return 1
+    GAME_FS[overlay_session_file]="$STATE_DIR/overlay/${upper_key%% *}.session"
     GAME_FS[lower_view]="$(_game_fs_view_root "$lower" "$install_rel")"
     GAME_FS[upper_view]="$(_game_fs_view_root "$upper" "$install_rel")"
     GAME_FS[runtime_dir]="$(_game_fs_view_root "$mount" "$install_rel")"
@@ -369,6 +373,11 @@ game_fs_init_runtime_exe() {
 
 # 初始化 GAME_FS，不写文件不挂载
 game_fs_init() {
+    # 重新初始化也不能遗忘仍在使用 upper 的后端
+    if [ "${GAME_FS[overlay_mounted_by_us]:-0}" = 1 ] \
+        || [ "${GAME_FS[overlay_unmount_deferred]:-0}" = 1 ]; then
+        game_fs_require_offline || return 1
+    fi
     GAME_FS=()
     GAME_FS[initialized]=1
     GAME_FS[phase]=init
@@ -699,8 +708,106 @@ game_fs_overlay_mounted() {
     if command_exists mountpoint; then
         mountpoint -q -- "$mount" 2>/dev/null
     else
-        findmnt -n -T "$mount" >/dev/null 2>&1
+        findmnt -n -M "$mount" >/dev/null 2>&1
     fi
+}
+
+# 旧会话记录只用于判断占用，不用于向旧进程发送信号
+_game_fs_require_released() {
+    if _game_fs_fuse_running; then
+        log_error game-fs "本次 FUSE 服务尚未退出，不能离线操作或复用 upper"
+        return 1
+    fi
+    local file="${GAME_FS[overlay_session_file]:-}"
+    [ -n "$file" ] && [ -e "$file" ] || return 0
+
+    local backend boot pid starttime current_boot
+    if ! IFS=$'\t' read -r backend boot pid starttime < "$file" \
+        || ! IFS= read -r current_boot < /proc/sys/kernel/random/boot_id; then
+        log_error game-fs "无法读取 overlay 会话记录，拒绝离线操作: '$file'"
+        return 1
+    fi
+    [ -n "$boot" ] && [[ "$pid" =~ ^[0-9]+$ && "$starttime" =~ ^[0-9]+$ ]] || {
+        log_error game-fs "overlay 会话记录无效，拒绝离线操作: '$file'"
+        return 1
+    }
+    case "$backend" in
+        fuse|kernel) ;;
+        *)
+            log_error game-fs "overlay 会话记录包含未知后端: '$file'"
+            return 1
+            ;;
+    esac
+    [ "$boot" = "$current_boot" ] || return 0
+
+    if [ "$backend" = fuse ]; then
+        if ! process_is_running "$pid" "$starttime"; then
+            return 0
+        fi
+        log_error game-fs "旧 FUSE 服务仍在使用 overlay upper (PID: $pid)"
+    else
+        log_error game-fs "旧 overlay 已懒卸载，无法确认后端已释放"
+        log_error game-fs "确认旧挂载已释放后再移除会话记录，或重启系统: '$file'"
+    fi
+    return 1
+}
+
+_game_fs_record_session() {
+    local pid="${1:-0}" starttime="${2:-0}"
+    local file="${GAME_FS[overlay_session_file]}" boot tmp
+    IFS= read -r boot < /proc/sys/kernel/random/boot_id || return 1
+    mkdir -p -- "${file%/*}" || return 1
+    tmp="$(mktemp "$file.XXXXXX")" || return 1
+    if ! printf '%s\t%s\t%s\t%s\n' "${GAME_FS[overlay_backend]}" "$boot" "$pid" "$starttime" > "$tmp" \
+        || ! mv -f -- "$tmp" "$file"; then
+        rm -f -- "$tmp"
+        return 1
+    fi
+}
+
+_game_fs_fuse_running() {
+    process_is_running "${GAME_FS[overlay_fuse_pid]:-}" "${GAME_FS[overlay_fuse_starttime]:-}"
+}
+
+# 只向本次直接启动的服务发信号，不能按进程名终止服务
+_game_fs_stop_fuse() {
+    local pid="${GAME_FS[overlay_fuse_pid]:-}" attempt
+    [ -n "$pid" ] || {
+        log_error game-fs "没有本次 FUSE 服务的 PID，无法确认后端已停止"
+        return 1
+    }
+    if _game_fs_fuse_running; then
+        kill -TERM "$pid" 2>/dev/null || {
+            _game_fs_fuse_running && return 1
+        }
+        for ((attempt = 0; attempt < 50; attempt++)); do
+            _game_fs_fuse_running || break
+            sleep 0.1
+        done
+        if _game_fs_fuse_running; then
+            log_error game-fs "FUSE 服务尚未退出，保留会话记录并跳过离线清理 (PID: $pid)"
+            return 1
+        fi
+    fi
+    wait "$pid" 2>/dev/null || true
+}
+
+_game_fs_umount() {
+    local lazy="${1:-0}" mount="${GAME_FS[overlay_mount]}"
+    if [ "${GAME_FS[overlay_backend]}" = fuse ]; then
+        if command_exists fusermount3; then
+            if [ "$lazy" -eq 1 ]; then fusermount3 -uz "$mount"; else fusermount3 -u "$mount"; fi
+            return $?
+        elif command_exists fusermount; then
+            if [ "$lazy" -eq 1 ]; then fusermount -uz "$mount"; else fusermount -u "$mount"; fi
+            return $?
+        fi
+    fi
+    command_exists umount || {
+        log_error game-fs "没有可用的 overlay 卸载命令"
+        return 1
+    }
+    if [ "$lazy" -eq 1 ]; then umount -l "$mount"; else umount "$mount"; fi
 }
 
 # 启动前检查挂载和 backend
@@ -714,6 +821,7 @@ game_fs_require_launchable() {
         log_error game-fs "请先关闭游戏并手动卸载后重试"
         return 1
     fi
+    _game_fs_require_released || return 1
 
     case "${GAME_FS[overlay_backend]}" in
         fuse)
@@ -740,6 +848,7 @@ game_fs_mount() {
     _game_fs_require_init || return 1
     [ "${GAME_FS[overlay_enabled]}" = "1" ] || return 0
     _game_fs_require_install || return 1
+    _game_fs_require_released || return 1
 
     local mount="${GAME_FS[overlay_mount]}"
     local upper="${GAME_FS[overlay_upper]}"
@@ -773,7 +882,7 @@ game_fs_mount() {
                 log_error game-fs "未安装 fuse-overlayfs，无法使用 overlay.backend = fuse"
                 return 1
             }
-            cmd=(fuse-overlayfs -o "$(IFS=,; echo "${options[*]}")" "$mount")
+            cmd=(fuse-overlayfs -f -o "$(IFS=,; echo "${options[*]}")" "$mount")
             ;;
         kernel)
             command_exists mount || {
@@ -790,7 +899,34 @@ game_fs_mount() {
     esac
 
     log_debug game-fs "挂载 overlay: $(quote_args "${cmd[@]}")"
-    if ! "${cmd[@]}"; then
+    if [ "$backend" = fuse ]; then
+        (
+            trap - EXIT
+            local service_pid="$BASHPID"
+            # 先登记再访问 upper，启动器异常退出时也能识别遗留服务
+            if ! _game_fs_record_session "$service_pid" "$(_process_starttime "$service_pid")"; then
+                log_error game-fs "无法记录 FUSE 服务，取消挂载"
+                exit 1
+            fi
+            exec "${cmd[@]}"
+        ) &
+        GAME_FS[overlay_fuse_pid]=$!
+        GAME_FS[overlay_fuse_starttime]="$(_process_starttime "${GAME_FS[overlay_fuse_pid]}")"
+        GAME_FS[overlay_mounted_by_us]=1
+        # 前台服务异步启动，挂载就绪后才能运行 prepare
+        local attempt
+        for ((attempt = 0; attempt < 100; attempt++)); do
+            _game_fs_fuse_running || break
+            if game_fs_overlay_mounted; then
+                GAME_FS[overlay_mounted]=1
+                return 0
+            fi
+            sleep 0.1
+        done
+        log_error game-fs "FUSE 服务退出或挂载未就绪: '$mount'"
+        _game_fs_stop_fuse
+        return 1
+    elif ! "${cmd[@]}"; then
         # 失败时按实际挂载状态清理
         if game_fs_overlay_mounted; then
             GAME_FS[overlay_mounted]=1
@@ -809,102 +945,76 @@ game_fs_mount() {
     fi
 }
 
-# 卸载 overlay，可重复调用
+# $1=1 要求后端释放（默认），$1=0 允许懒卸载
+# 返回 0 表示可以离线清理，懒卸载返回 1
 game_fs_unmount() {
     [ "${GAME_FS[initialized]:-0}" = "1" ] || return 0
     [ "${GAME_FS[overlay_enabled]:-0}" = "1" ] || return 0
 
-    # 以实际挂载状态为准
-    if ! game_fs_overlay_mounted; then
-        GAME_FS[overlay_mounted]=0
-        GAME_FS[overlay_mounted_by_us]=0
-        return 0
-    fi
-    if [ "${GAME_FS[overlay_mounted_by_us]:-0}" != "1" ]; then
+    local require_offline="${1:-1}"
+    local backend="${GAME_FS[overlay_backend]}"
+    local mounted=0
+    game_fs_overlay_mounted && mounted=1
+    if [ "$mounted" -eq 1 ] && [ "${GAME_FS[overlay_mounted_by_us]:-0}" != "1" ]; then
         log_error game-fs "检测到外部 overlay 挂载，拒绝自动卸载: '${GAME_FS[overlay_mount]}'"
         log_error game-fs "请手动卸载后再重新启动"
         return 1
     fi
 
-    local mount="${GAME_FS[overlay_mount]}"
-    local backend="${GAME_FS[overlay_backend]}"
-    local ok=0
-    local deferred=0
-
-    GAME_FS[overlay_unmount_deferred]=0
-
-    case "$backend" in
-        fuse)
-            if command_exists fusermount3; then
-                if ! fusermount3 -u "$mount"; then
-                    deferred=1
-                else
-                    ok=1
-                fi
-            elif command_exists fusermount; then
-                if ! fusermount -u "$mount"; then
-                    deferred=1
-                else
-                    ok=1
-                fi
-            elif command_exists umount; then
-                if ! umount "$mount"; then
-                    deferred=1
-                else
-                    ok=1
-                fi
-            else
-                log_error game-fs "没有可用的 overlay 卸载命令"
+    if [ "$mounted" -eq 1 ] && ! _game_fs_umount; then
+        if [ "$require_offline" -eq 1 ]; then
+            if [ "$backend" != fuse ]; then
+                log_error game-fs "overlay 卸载失败，保留挂载，跳过离线清理；请手动卸载"
                 return 1
             fi
-            ;;
-        kernel)
-            if command_exists umount; then
-                if ! umount "$mount"; then
-                    deferred=1
-                else
-                    ok=1
-                fi
-            else
-                log_error game-fs "没有 umount，无法卸载 overlay"
+            # 撤销服务前先提交内核缓存中的写入
+            if _game_fs_fuse_running && ! sync -f -- "${GAME_FS[overlay_mount]}"; then
+                log_error game-fs "overlay 同步失败，保留 FUSE 服务并跳过离线清理"
                 return 1
             fi
-            ;;
-        *)
-            log_error game-fs "未知的 overlay backend: '$backend'"
+            log_warn game-fs "撤销本次 FUSE 服务；旧挂载的使用者后续访问可能失败"
+            _game_fs_stop_fuse || return 1
+            # 服务退出时可能已经自行卸载
+            if game_fs_overlay_mounted; then
+                _game_fs_umount 1 || return 1
+            fi
+        else
+            # kernel 没有可追踪的服务，懒卸载后无法确认是否已释放
+            if [ "$backend" = kernel ]; then
+                _game_fs_record_session || return 1
+            fi
+            _game_fs_umount 1 || return 1
+            GAME_FS[overlay_unmount_deferred]=1
+            GAME_FS[overlay_mounted]=0
+            log_warn game-fs "overlay 已懒卸载，后端释放前禁止离线操作和复用 upper"
             return 1
-            ;;
-    esac
-
-    if [ "$ok" -eq 1 ]; then
-        GAME_FS[overlay_mounted]=0
-        GAME_FS[overlay_mounted_by_us]=0
-        return 0
+        fi
+    elif [ "$backend" = fuse ] && [ -n "${GAME_FS[overlay_fuse_pid]:-}" ]; then
+        # 普通卸载后仍需等待服务完成后端清理
+        # 外部懒卸载后不要求离线时，保留服务和会话记录
+        if [ "$mounted" -eq 0 ] && [ "$require_offline" -eq 0 ] && _game_fs_fuse_running; then
+            GAME_FS[overlay_unmount_deferred]=1
+            return 1
+        fi
+        _game_fs_stop_fuse || return 1
     fi
-    if [ "$deferred" -eq 1 ]; then
-        # 懒卸载只保证命名空间脱离，不保证没有进程仍持有挂载引用
-        # 这里不能把成功当作可以安全写 upper 的前提
-        GAME_FS[overlay_unmount_deferred]=1
-        case "$backend" in
-            fuse)
-                if command_exists fusermount3; then
-                    fusermount3 -uz "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
-                elif command_exists fusermount; then
-                    fusermount -uz "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
-                elif command_exists umount; then
-                    umount -l "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
-                fi
-                ;;
-            kernel)
-                umount -l "$mount" || log_warn game-fs "懒卸载失败: '$mount'"
-                ;;
-        esac
-        log_warn game-fs "overlay 卸载繁忙，已尝试懒卸载；跳过 cleanup_offline，保留恢复标记"
+
+    # 挂载点消失不代表后端已释放
+    _game_fs_require_released || return 1
+    if [ "${GAME_FS[overlay_mounted_by_us]:-0}" = 1 ]; then
+        local file="${GAME_FS[overlay_session_file]:-}"
+        if [ -n "$file" ]; then
+            rm -f -- "$file" || return 1
+        fi
+    elif [ "${GAME_FS[overlay_unmount_deferred]:-0}" = 1 ]; then
         return 1
     fi
-
-    log_error game-fs "卸载 overlay 失败: '$mount'"
-    return 1
+    GAME_FS[overlay_unmount_deferred]=0
+    GAME_FS[overlay_mounted]=0
+    GAME_FS[overlay_mounted_by_us]=0
+    GAME_FS[overlay_fuse_pid]=""
+    GAME_FS[overlay_fuse_starttime]=""
+    return 0
 }
 
 # 写入 LaunchPlan
@@ -922,4 +1032,5 @@ game_fs_require_offline() {
         log_error game-fs "请先关闭游戏并卸载 overlay 后再执行"
         return 1
     fi
+    _game_fs_require_released
 }

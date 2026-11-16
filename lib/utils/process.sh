@@ -64,3 +64,17 @@ _process_starttime() {
     read -ra fields <<< "$stat"
     echo "${fields[19]:-0}"
 }
+
+# PID 可能复用，需要同时校验启动时间
+# 僵尸进程已释放文件系统资源
+process_is_running() {
+    local pid="$1" expected_starttime="${2:-}" stat
+    local -a fields
+
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+    { IFS= read -r stat < "/proc/$pid/stat"; } 2>/dev/null || return 1
+    stat="${stat##*) }"
+    read -ra fields <<< "$stat"
+    [[ "${fields[0]}" != Z && "${fields[0]}" != X ]] || return 1
+    [[ -z "$expected_starttime" || "${fields[19]}" = "$expected_starttime" ]]
+}

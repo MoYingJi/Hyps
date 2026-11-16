@@ -19,8 +19,8 @@
  - `prepare`: 在 runtime 视图内完成的准备（overlay 开启时为 mount）。有副作用，任意失败立即跳到 `cleanup`
  - `pre_start`: 启动前最后检查。有副作用，任意失败立即跳到 `cleanup`
  - `post_start`: 启动后。有副作用，任意失败会继续执行
- - `cleanup`: runtime 视图卸载前的清理。有副作用，任意失败会继续执行
- - `cleanup_offline`: runtime 视图正常卸载后的清理（恢复/删除 upper 内的补丁文件）。懒卸载或卸载繁忙时跳过并保留恢复标记。有副作用，任意失败会继续执行
+ - `cleanup`: runtime 视图卸载前的清理。需要 runtime 的外部程序必须在此阶段返回前完成收尾。有副作用，任意失败会继续执行
+ - `cleanup_offline`: runtime 后端停止访问底层目录后的清理（恢复/删除 upper 内的补丁文件）。普通卸载并等待服务退出，或撤销本次 FUSE 服务并移除失效挂载后才能执行；未达到条件时跳过并保留恢复标记。有副作用，任意失败会继续执行
 
 核心在两个阶段之间执行不是钩子的步骤：
 
@@ -33,12 +33,24 @@ run_hooks prepare_offline
 game_fs_mount        # overlay 开启时
 run_hooks prepare
 ...
+launch_plan_kill
 run_hooks cleanup
+launch_plan_wait
 game_fs_unmount
 run_hooks cleanup_offline
 ```
 
 核心在每个阶段前调用 `game_fs_set_phase`，写路径 helper 据此校验。可通过 `register_hook <阶段> <函数名> [优先级] [依赖关系]` 注册钩子。`defer_mkdir` 统一在 `prepare` 阶段创建（即 runtime 视图内）；如果某个目录必须在挂载前创建，应在 `prepare_offline` 中用 `game_fs_write_path writable` 显式创建
+
+Hyps 管理的外部程序如果需要 `runtime`，其所有者必须在 `cleanup` 返回前停止其 runtime 访问、等待进程及相关后台任务结束，并释放文件描述符、工作目录等引用。只发退出信号、只等主 PID 而留下仍使用 runtime 的子进程，都不算完成收尾。不得把这部分工作交给 `cleanup_offline`，也不得在 `cleanup` 中启动会继续使用 runtime 的未等待任务。这个约定同时适用于启动失败和异常退出；注册清理时应考虑部分初始化。
+
+主 runner 由 Launch Plan 负责终止并等待，feature 自己启动的程序由 feature 的 `cleanup` 钩子负责。等待 runner 不代表所有 Wine 后代进程都已结束；需要启动并管理额外进程的功能必须自行完成收尾。路径 scope 校验只能约束调用 helper 的写操作，不能替代外部进程的生命周期管理。宿主上的无关进程不属于 Hyps 的清理对象。
+
+核心在所有 `cleanup` 钩子返回后检查是否注册了 `cleanup_offline` 钩子：
+
+- 没有离线钩子：优先普通卸载，失败时允许懒卸载，不主动终止仍服务于旧引用的 FUSE 服务。
+- 有离线钩子：优先普通卸载并等待本次 FUSE 服务退出；卸载失败时，先同步该文件系统的写入，再仅向本次直接启动的 FUSE 服务发送退出信号，等待实际退出，最后移除可能残留的失效挂载。旧引用上的访问可能失败。同步失败、服务未退出或挂载未移除时，不执行离线钩子。
+- 懒卸载只让挂载点脱离路径，不能证明 upper 已空闲。会话记录保存在 `$STATE_DIR/overlay/`，按 upper 路径区分，记录服务 PID、进程启动时间和系统启动标识；旧服务仍在运行时，拒绝再次启动或执行离线操作。记录不会被用于终止上次会话的进程。
 
 ## GameFS
 
@@ -74,8 +86,8 @@ exe / install 根解析：
  - `game_fs_init` / `game_fs_mount` / `game_fs_unmount`：由核心调用；feature 不要自己挂载
  - `game_fs_resolve_paths`：解析 exe / install / cwd，并写回 `CONFIG`；供 `load_config` 和查询命令使用
  - `game_fs_set_phase`：核心和 CLI 设置当前阶段
- - `game_fs_require_launchable`：启动前检查；已有 overlay 挂载或依赖缺失时拒绝启动
- - `game_fs_require_offline`：CLI 用；overlay 挂载期间拒绝离线操作
+ - `game_fs_require_launchable`：启动前检查；已有 overlay 挂载、旧后端尚未释放或依赖缺失时拒绝启动
+ - `game_fs_require_offline`：CLI 用；overlay 挂载期间或旧后端尚未释放时拒绝离线操作
  - `game_fs_resolve_user_dirs`：延迟解析 prefix 中的用户目录
 
 写路径的阶段规则（overlay 开启时）：
@@ -85,7 +97,7 @@ exe / install 根解析：
  - `prefix` / `userprofile` / `cache` / `data` / `state` / `temp` 不受 overlay 视图限制
  - overlay 关闭时所有作用域等价，全部允许
 
-读路径不限制阶段，`fs_detect` 这类只读 `writable` 的 feature 不受影响。写操作必须走 `game_fs_write_path(s)` 或显式 `game_fs_assert_mutation`
+读路径不限制阶段，`fs_detect` 这类只读 `writable` 的 feature 不受影响。路径解析不保证对应视图当前可用；外部程序即使只读 runtime，也必须遵守上面的收尾约定。写操作必须走 `game_fs_write_path(s)` 或显式 `game_fs_assert_mutation`
 
 游戏目录路径校验只解析父目录，保留末级符号链接；末级链接指向根外时仍可删除/修复，中间级链接越界会被拒绝。`userprofile` / `cache` 等前缀目录允许符号链接，只做词法越界检查
 

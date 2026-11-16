@@ -84,12 +84,18 @@ cleanup() {
     launch_plan_kill
     game_fs_set_phase cleanup
     run_hooks cleanup continue
+    launch_plan_wait
 
-    if game_fs_unmount; then
-        game_fs_set_phase cleanup_offline
-        run_hooks cleanup_offline continue
-    else
-        log_warn lifecycle "overlay 未正常卸载或已懒卸载，跳过 cleanup_offline，保留恢复标记"
+    # cleanup 也可能注册离线钩子，需要在其返回后判断
+    local require_offline=0
+    lifecycle_has_hooks cleanup_offline && require_offline=1
+    if game_fs_unmount "$require_offline"; then
+        if [ "$require_offline" -eq 1 ]; then
+            game_fs_set_phase cleanup_offline
+            run_hooks cleanup_offline continue
+        fi
+    elif [ "$require_offline" -eq 1 ]; then
+        log_warn lifecycle "overlay 未达到离线清理条件，跳过 cleanup_offline，保留恢复标记"
     fi
 
     isy "$DEBUG_SKIP_REMOVE_TEMP" || rm -rf "$TEMP_DIR"

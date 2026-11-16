@@ -3,6 +3,16 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+# 游戏元数据
+
+game_display_name() {
+    printf '%s\n' "鸣潮"
+}
+
+game_path_name() {
+    printf '%s\n' "WutheringWaves"
+}
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir

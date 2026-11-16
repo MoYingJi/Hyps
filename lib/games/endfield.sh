@@ -3,6 +3,16 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+# 游戏元数据
+
+game_display_name() {
+    printf '%s\n' "明日方舟：终末地"
+}
+
+game_path_name() {
+    printf '%s\n' "Endfield"
+}
+
 # 游戏安装根与可执行文件
 
 game_install_dir() {

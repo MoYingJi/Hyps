@@ -6,6 +6,16 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
+# 游戏元数据
+
+game_display_name() {
+    printf '%s\n' "崩坏：星穹铁道"
+}
+
+game_path_name() {
+    printf '%s\n' "StarRail"
+}
+
 # 游戏安装根与可执行文件
 
 game_install_dir() {

@@ -9,6 +9,16 @@ source "$SCRIPT_DIR/shared/xwin_watch.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
+# 游戏元数据
+
+game_display_name() {
+    printf '%s\n' "原神"
+}
+
+game_path_name() {
+    printf '%s\n' "YuanShen"
+}
+
 # 游戏安装根与可执行文件
 
 game_install_dir() {

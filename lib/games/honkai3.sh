@@ -6,6 +6,16 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../integrations/hyp.sh
 source "$SCRIPT_DIR/integrations/hyp.sh"
 
+# 游戏元数据
+
+game_display_name() {
+    printf '%s\n' "崩坏三"
+}
+
+game_path_name() {
+    printf '%s\n' "Honkai3"
+}
+
 game_install_dir() {
     local game_exe="$1"
     local game_dir

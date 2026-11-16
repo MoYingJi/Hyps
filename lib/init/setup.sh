@@ -9,18 +9,23 @@ source "$SCRIPT_DIR/libs.sh"
 # 初始化：配置目录与示例配置的脚手架
 # 约定：只创建缺失的配置，已有配置默认不覆盖（--force 时先备份）
 
-declare -A INIT_GAME_LABELS=(
-    [yuanshen]="原神"
-    [starrail]="崩坏：星穹铁道"
-    [zenless]="绝区零"
-    [honkai3]="崩坏三"
-    [wuwa]="鸣潮"
-    [arknights]="明日方舟"
-    [endfield]="明日方舟：终末地"
-)
-
 init_game_label() {
-    printf '%s\n' "${INIT_GAME_LABELS[$1]:-$1}"
+    local game="$1"
+    local impl="$SCRIPT_DIR/games/$game.sh"
+    local label=""
+
+    if [ -f "$impl" ]; then
+        label="$(
+            # shellcheck disable=SC2034 # 供 source 的游戏实现和 game_meta_display_name 使用
+            GAME_NAME="$game"
+            #shellcheck source=/dev/null
+            source "$impl" >/dev/null 2>&1
+            game_meta_display_name
+        )" || label=""
+    fi
+
+    [ -n "$label" ] || label="$game"
+    printf '%s\n' "$label"
 }
 
 _init_short_path() {

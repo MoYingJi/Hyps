@@ -96,7 +96,9 @@ exe / install 根解析：
 
 **实现方式**：游戏文件只写游戏特有的逻辑，并通过**可选函数**与通用模块对接。这些函数用 `type -t` 检测，不存在时不会报错
 
-游戏实现可以描述游戏本身，下面的函数都是可选实现
+游戏实现可以描述游戏本身，下面的函数都是可选实现。`GAME_NAME` 目前同时是游戏 ID、配置文件/脚本标识；显示名和路径名由游戏实现单独声明
+ - `game_display_name`: 不接受参数，在 stdout 输出人类可读的游戏名（当前使用中文），用于 init 和 UI；未实现或为空时回退到 `GAME_NAME`
+ - `game_path_name`: 不接受参数，在 stdout 输出路径友好的游戏名，只允许 `[A-Za-z0-9._-]+`；未实现或为空时回退到 `GAME_NAME`。只用于截图等用户可见目录，不用于内部数据目录
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
  - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
  - `time_record_today_reset`: 不接受参数。在 stdout 输出游戏的日常刷新时间 (如 `04:00 Asia/Shanghai`)

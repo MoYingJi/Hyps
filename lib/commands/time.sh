@@ -47,6 +47,8 @@ command_time_today() {
             game_name="${game##*/}"
 
             reset_time="$(
+                # shellcheck disable=SC2034 # 供 source 的游戏实现使用
+                GAME_NAME="$game_name"
                 local game_impl="$SCRIPT_DIR/games/$game_name.sh"
                 #shellcheck source=/dev/null
                 [ -f "$game_impl" ] && source "$game_impl"

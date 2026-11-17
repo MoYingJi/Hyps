@@ -101,22 +101,22 @@ help_game_outdated() {
     echo "  game outdated [<游戏名>]  检查游戏版本与预下载；不指定游戏名时列出所有支持检查的游戏"
 }
 
-# 收集单个游戏的版本信息，写入 nameref 关联数组
-# 键: name/exe/variant/local_version/remote_version/pre_version (原始数据)
-#     local_ok/remote_ok/pre_ok (0|1 各项是否成功获取)
-# 返回: 0 成功 / 1 本地读取失败 / 2 不支持版本检查
-# remote/pre 失败不阻断展示；local 失败无检查意义，直接报错
-#shellcheck disable=SC2154,SC2102,SC2031  # nameref 下标被误认为独立变量/范围
-_game_outdated_collect() {
+# 每个游戏在独立子 shell 中加载，收集和渲染共用该环境
+# 返回: 0 成功 / 1 查询失败 / 2 不支持版本检查
+# 远程失败仍输出结果，本地失败不输出
+_game_outdated_collect() (
     local game_name="$1"
-    local -n _info="$2"
-    local mode="${3:-}"
+    local mode="${2:-list}"
     local game_impl="$SCRIPT_DIR/games/$game_name.sh"
+    local -A gameinfo=(
+        [name]="$game_name"
+        [exe]="" [variant]=""
+        [local_version]="" [remote_version]="" [pre_version]=""
+        [local_ok]=0 [remote_ok]=0 [pre_ok]=0
+    )
 
-    _info[name]="$game_name"
-    _info[exe]="" _info[variant]=""
-    _info[local_version]="" _info[remote_version]="" _info[pre_version]=""
-    _info[local_ok]=0 _info[remote_ok]=0 _info[pre_ok]=0
+    #shellcheck disable=SC2034 # 供游戏实现使用
+    GAME_NAME="$game_name"
 
     if [ ! -f "$CONFIG_DIR/games/$game_name.conf" ]; then
         if [[ "$mode" == "report" ]]; then
@@ -126,10 +126,8 @@ _game_outdated_collect() {
     fi
     [ -f "$game_impl" ] || return 2
 
-    unset -f game_version_local game_version_remote game_version_variant_human_readable game_version_predownload_remote
-    unset -f game_install_dir game_executable overlay_auto_lower
     #shellcheck source=/dev/null
-    source "$game_impl"
+    source "$game_impl" || return 1
 
     local has_local=0 has_remote=0 has_predownload=0
     [ "$(type -t game_version_local)" = "function" ] && has_local=1
@@ -143,50 +141,49 @@ _game_outdated_collect() {
         [ "$has_local" -eq 1 ] || [ "$has_remote" -eq 1 ] || [ "$has_predownload" -eq 1 ] || return 2
     fi
 
-    config_unset game.exe
-    config_unset game.install_dir
-    config_unset game.cwd
     load_game_config "$game_name"
     game_fs_resolve_paths || {
         log_error game-outdated "无法解析 $game_name 的游戏路径"
         return 1
     }
+    local game_exe
     config_read game.exe game_exe
-    _info[exe]="$game_exe"
+    gameinfo[exe]="$game_exe"
 
     if [ "$has_local" -eq 1 ]; then
-        local variant=""
-        if ! game_version_local "$game_exe" _info[local_version] variant \
-            || [ -z "${_info[local_version]}" ]; then
+        local local_variant=""
+        if ! game_version_local "$game_exe" "gameinfo[local_version]" local_variant \
+            || [ -z "${gameinfo[local_version]}" ]; then
             log_error game-outdated "无法读取 $game_name 的本地版本"
             return 1
         fi
-        _info[local_ok]=1
-        _info[variant]="$variant"
+        gameinfo[local_ok]=1
+        gameinfo[variant]="$local_variant"
     fi
 
     if [ "$has_remote" -eq 1 ]; then
-        local remote_version
-        if remote_version="$(game_version_remote "${_info[variant]}")" \
-            && [ -n "$remote_version" ]; then
-            _info[remote_ok]=1
-            _info[remote_version]="$remote_version"
+        local queried_version
+        if queried_version="$(game_version_remote "${gameinfo[variant]}")" \
+            && [ -n "$queried_version" ]; then
+            gameinfo[remote_ok]=1
+            gameinfo[remote_version]="$queried_version"
         else
             log_error game-outdated "无法获取 $game_name 的远程版本"
         fi
     fi
 
     # 预下载与远程版本同源，远程失败时不再重复请求
-    if [ "$has_predownload" -eq 1 ] && [ "${_info[remote_ok]}" -eq 1 ]; then
+    if [ "$has_predownload" -eq 1 ] && [ "${gameinfo[remote_ok]}" -eq 1 ]; then
         local pre_tag
-        if pre_tag="$(game_version_predownload_remote "${_info[variant]}")"; then
-            _info[pre_ok]=1
-            _info[pre_version]="$pre_tag"
+        if pre_tag="$(game_version_predownload_remote "${gameinfo[variant]}")"; then
+            gameinfo[pre_ok]=1
+            gameinfo[pre_version]="$pre_tag"
         fi
     fi
 
-    return 0
-}
+    _game_outdated_render gameinfo "$mode"
+    [ "${gameinfo[remote_ok]}" -eq 1 ] || [ "$has_remote" -eq 0 ]
+)
 
 # 比较结论，三态: 已是最新 / 可更新 / 无法判断 (远程不可得时)
 #shellcheck disable=SC2178,SC2034  # nameref 输出参数
@@ -218,7 +215,7 @@ _game_outdated_render() {
     local mode="${2:-list}"
 
     local status status_style local_style="bright_blue"
-    _game_outdated_status gameinfo status status_style
+    _game_outdated_status "$1" status status_style
 
     # 未实现 human_readable 时直接显示变体标识
     local variant_display="${_info[variant]}"
@@ -274,19 +271,6 @@ _game_outdated_render() {
     fi
 }
 
-# 收集 + 渲染，远程失败时已输出行并以 1 退出
-_game_outdated_check() {
-    local game_name="$1"
-    local -A gameinfo=()
-
-    _game_outdated_collect "$game_name" gameinfo "${2:-}"
-    local collect_status=$?
-    [ "$collect_status" -eq 0 ] || return "$collect_status"
-
-    _game_outdated_render gameinfo "${2:-list}"
-    [ "${gameinfo[remote_ok]}" -eq 1 ] || [ "$(type -t game_version_remote)" != "function" ]
-}
-
 command_game_outdated() {
     [ "$#" -le 1 ] || die 1 "用法: game outdated [<游戏名>]"
 
@@ -297,16 +281,14 @@ command_game_outdated() {
         game_name="$1"
         [[ "$game_name" =~ ^[[:alnum:]_-]+$ ]] || die 1 "无效的游戏名: $game_name"
 
-        local -A gameinfo=()
-        _game_outdated_collect "$game_name" gameinfo report
+        local report
+        report="$(_game_outdated_collect "$game_name" report)"
         local collect_status=$?
         [ "$collect_status" -ne 2 ] || die 1 game-outdated "游戏不支持版本检查: $game_name"
-        [ "$collect_status" -eq 0 ] || return "$collect_status"
-
-        _game_outdated_render gameinfo report | column -t -s $'\t'
-        [ "${gameinfo[remote_ok]}" -eq 1 ] || [ "$(type -t game_version_remote)" != "function" ]
+        [ -z "$report" ] || printf '%s\n' "$report" | column -t -s $'\t'
+        return "$collect_status"
     else
-        local results="" game_config game_name
+        local results="" game_config game_name row
         local errors=0
         for game_config in "$CONFIG_DIR"/games/*.conf; do
             [ -f "$game_config" ] || continue
@@ -314,11 +296,14 @@ command_game_outdated() {
             game_name="${game_name%.conf}"
             [ "$game_name" != "_common" ] || continue
 
-            local -A gameinfo=()
-            _game_outdated_collect "$game_name" gameinfo
+            row="$(_game_outdated_collect "$game_name")"
             case $? in
-                0) results+="$(_game_outdated_render gameinfo list)"$'\n' ;;
-                1) results+="$(_game_outdated_render gameinfo list)"$'\n'; errors=1 ;;
+                0) results+="$row"$'\n' ;;
+                2) continue ;;
+                *)
+                    [ -z "$row" ] || results+="$row"$'\n'
+                    errors=1
+                    ;;
             esac
         done
 

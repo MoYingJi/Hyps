@@ -23,8 +23,13 @@ game_install_dir() {
             path_dirname "$game_exe" game_dir
             printf '%s\n' "$game_dir"
             ;;
-        */"Client/Binaries/Win64/Client-Win64-Shipping.exe") realpath -m "$game_exe/../../../..";;
-        *) die 1 "overlay" "无法识别游戏路径: $game_exe";;
+        */"Client/Binaries/Win64/Client-Win64-Shipping.exe")
+            realpath -m "$game_exe/../../../.."
+            ;;
+        *)
+            log_error game-fs "无法识别游戏路径: $game_exe"
+            return 1
+            ;;
     esac
 }
 

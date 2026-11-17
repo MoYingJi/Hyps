@@ -215,7 +215,11 @@ try_edit_prefix_reg() {
     local prefix file key game_prefix
 
     config_read game.prefix game_prefix
-    prefix="$(find_wineprefix "$game_prefix" || die 1 gi-reg-hdr "无法找到 WINEPREFIX")"
+    if ! prefix="$(find_wineprefix "$game_prefix")" || [ -z "$prefix" ]; then
+        log_error gi-reg-hdr "无法找到 WINEPREFIX: '$game_prefix'"
+        return 1
+    fi
+
     file="$prefix/user.reg"
     config_read gi.reg_hdr.key key
 

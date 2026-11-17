@@ -17,38 +17,32 @@ game_script_name() {
     return 1
 }
 
-# 当前游戏实现的显示名；未实现或为空时回退到 GAME_NAME
+# 当前游戏实现的显示名，未设置或为空时回退到 GAME_NAME
 game_meta_display_name() {
-    local name=""
+    local name="${GAME_DISPLAY_NAME:-}"
 
-    if [ "$(type -t game_display_name)" = "function" ]; then
-        name="$(game_display_name)" || name=""
-    fi
     if [ -z "$name" ]; then
         [ -n "${GAME_NAME:-}" ] || {
             log_error game-meta "GAME_NAME 为空，无法确定游戏显示名"
             return 1
         }
-        log_debug game-meta "game_display_name 未实现或为空，回退到 GAME_NAME: '$GAME_NAME'"
+        log_debug game-meta "GAME_DISPLAY_NAME 未设置或为空，回退到 GAME_NAME: '$GAME_NAME'"
         name="$GAME_NAME"
     fi
 
     printf '%s\n' "$name"
 }
 
-# 当前游戏实现的路径友好名；未实现或为空时回退到 GAME_NAME
+# 当前游戏实现的路径友好名，未设置或为空时回退到 GAME_NAME
 game_meta_path_name() {
-    local name=""
+    local name="${GAME_PATH_NAME:-}"
 
-    if [ "$(type -t game_path_name)" = "function" ]; then
-        name="$(game_path_name)" || name=""
-    fi
     if [ -z "$name" ]; then
         [ -n "${GAME_NAME:-}" ] || {
             log_error game-meta "GAME_NAME 为空，无法确定游戏路径名"
             return 1
         }
-        log_debug game-meta "game_path_name 未实现或为空，回退到 GAME_NAME: '$GAME_NAME'"
+        log_debug game-meta "GAME_PATH_NAME 未设置或为空，回退到 GAME_NAME: '$GAME_NAME'"
         name="$GAME_NAME"
     fi
 

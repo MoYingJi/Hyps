@@ -1,17 +1,14 @@
 #!/hint/bash
+#shellcheck disable=SC2034 # 游戏元数据由通用模块读取
 
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
 # 游戏元数据
 
-game_display_name() {
-    printf '%s\n' "鸣潮"
-}
-
-game_path_name() {
-    printf '%s\n' "WutheringWaves"
-}
+GAME_DISPLAY_NAME="鸣潮"
+GAME_PATH_NAME="WutheringWaves"
+GAME_DAILY_RESET="04:00 Asia/Shanghai"
 
 # 游戏安装根与可执行文件
 
@@ -43,10 +40,4 @@ game_executable() {
 game_paths() {
     path_plan_declare userdata:screenshot runtime "Client/Saved/ScreenShot"
     path_plan_declare shader-cache all "Client/Saved/PSO"
-}
-
-# 日常重置时间
-
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
 }

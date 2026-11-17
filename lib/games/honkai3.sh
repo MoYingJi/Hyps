@@ -1,4 +1,5 @@
 #!/hint/bash
+#shellcheck disable=SC2034 # 游戏元数据由通用模块读取
 
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
@@ -8,13 +9,9 @@ source "$SCRIPT_DIR/integrations/hyp.sh"
 
 # 游戏元数据
 
-game_display_name() {
-    printf '%s\n' "崩坏三"
-}
-
-game_path_name() {
-    printf '%s\n' "Honkai3"
-}
+GAME_DISPLAY_NAME="崩坏三"
+GAME_PATH_NAME="Honkai3"
+GAME_DAILY_RESET="04:00 Asia/Shanghai"
 
 # 游戏安装根与可执行文件
 
@@ -34,12 +31,6 @@ game_executable() {
 game_paths() {
     # 我已经不玩崩崩崩了，这个路径是我在米游社找的
     path_plan_declare userdata:screenshot userprofile "Pictures/bh3rd"
-}
-
-# 日常重置时间
-
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
 }
 
 # 游戏版本

@@ -1,4 +1,5 @@
 #!/hint/bash
+#shellcheck disable=SC2034 # 游戏元数据由通用模块读取
 
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
@@ -8,13 +9,9 @@ source "$SCRIPT_DIR/integrations/hyp.sh"
 
 # 游戏元数据
 
-game_display_name() {
-    printf '%s\n' "绝区零"
-}
-
-game_path_name() {
-    printf '%s\n' "ZenlessZoneZero"
-}
+GAME_DISPLAY_NAME="绝区零"
+GAME_PATH_NAME="ZenlessZoneZero"
+GAME_DAILY_RESET="04:00 Asia/Shanghai"
 
 # 游戏安装根与可执行文件
 
@@ -37,12 +34,6 @@ game_paths() {
     path_plan_note shader-cache "需要启动游戏，在启动页（「点击进入游戏」那个界面）点击右下角四"
     path_plan_note shader-cache "个图标中的扳手图标，点击「确认修复」，重新触发着色器编译，见："
     path_plan_note shader-cache "https://www.miyoushe.com/zzz/article/76056101"
-}
-
-# 日常重置时间
-
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
 }
 
 # 游戏版本

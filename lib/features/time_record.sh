@@ -13,12 +13,7 @@ feat_time_record_load_config() {
     config_default features.time_record.min_sec 60
 
     if ! config_has features.time_record.today.reset; then
-        local reset_time
-        if [ "$(type -t time_record_today_reset)" = "function" ]; then
-            reset_time="$(time_record_today_reset)"
-        else
-            reset_time="$TIME_RECORD_TODAY_RESET_DEFAULT"
-        fi
+        local reset_time="${GAME_DAILY_RESET-$TIME_RECORD_TODAY_RESET_DEFAULT}"
         [ -z "$reset_time" ] || isn "$reset_time" || time_day_start "$reset_time" >/dev/null || die 1 time-record "无效的重置时间: $reset_time"
         config_set features.time_record.today.reset "$reset_time"
     fi

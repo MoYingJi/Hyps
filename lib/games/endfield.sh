@@ -1,17 +1,14 @@
 #!/hint/bash
+#shellcheck disable=SC2034 # 游戏元数据由通用模块读取
 
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
 # 游戏元数据
 
-game_display_name() {
-    printf '%s\n' "明日方舟：终末地"
-}
-
-game_path_name() {
-    printf '%s\n' "Endfield"
-}
+GAME_DISPLAY_NAME="明日方舟：终末地"
+GAME_PATH_NAME="Endfield"
+GAME_DAILY_RESET="04:00 Asia/Shanghai"
 
 # 游戏安装根与可执行文件
 
@@ -38,12 +35,6 @@ game_paths() {
             path_plan_declare shader-cache userprofile "AppData/LocalLow/$dir/Endfield/$file"
         done
     done
-}
-
-# 日常重置时间
-
-time_record_today_reset() {
-    echo "04:00 Asia/Shanghai"
 }
 
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）

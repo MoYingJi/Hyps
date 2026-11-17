@@ -115,7 +115,7 @@ game_paths() {
 }
 ```
 
-- `userdata:screenshot`：截图目录。第四个参数是 `$SCREENSHOTS` 下的子目录，默认取 `game_path_name`
+- `userdata:screenshot`：截图目录。第四个参数是 `$SCREENSHOTS` 下的子目录，默认取 `GAME_PATH_NAME`，未设置或为空时回退到 `GAME_NAME`
 - `shader-cache`：着色器缓存路径，可以是文件或目录；`all` 在 overlay 下会展开 lower + upper
 - `path_plan_note <role> [text]`：只输出提示，不产生动作；空 text 表示声明了该 role，但没有路径和提示
 - `path_plan_collect <role>` 返回 0 表示已声明，3 表示游戏没有声明该 role，4 表示游戏没有实现 `game_paths`
@@ -130,14 +130,24 @@ game_paths() {
 
 加载游戏文件只定义函数、初始化内存状态和注册钩子。启动外部程序、挂载和文件修改放在明确调用的函数或生命周期钩子中，子 shell 不会撤销这些操作
 
-**实现方式**：游戏文件只写游戏特有的逻辑，并通过**可选函数**与通用模块对接。这些函数用 `type -t` 检测，不存在时不会报错
+游戏文件只写游戏特有的声明和逻辑，固定属性用变量，需要计算或执行行为的接口用函数。`GAME_NAME` 同时是游戏 ID、配置文件/脚本标识，显示名和路径名由游戏实现单独声明
 
-游戏实现可以描述游戏本身，下面的函数都是可选实现。`GAME_NAME` 目前同时是游戏 ID、配置文件/脚本标识；显示名和路径名由游戏实现单独声明
- - `game_display_name`: 不接受参数，在 stdout 输出人类可读的游戏名（当前使用中文），用于 init 和 UI；未实现或为空时回退到 `GAME_NAME`
- - `game_path_name`: 不接受参数，在 stdout 输出路径友好的游戏名，只允许 `[A-Za-z0-9._-]+`；未实现或为空时回退到 `GAME_NAME`。只用于截图等用户可见目录，不用于内部数据目录
+下面的变量都是可选声明：
+
+```bash
+GAME_DISPLAY_NAME="原神"
+GAME_PATH_NAME="YuanShen"
+GAME_DAILY_RESET="04:00 Asia/Shanghai"
+```
+
+- `GAME_DISPLAY_NAME`：人类可读的游戏名（当前使用中文），用于 init 和 UI，未设置或为空时回退到 `GAME_NAME`
+- `GAME_PATH_NAME`：路径友好的游戏名，只允许 `[A-Za-z0-9._-]+`，且不能是 `.` 或 `..`，未设置或为空时回退到 `GAME_NAME`。只用于截图等用户可见目录，不用于内部数据目录
+- `GAME_DAILY_RESET`：日常刷新时间，未设置时使用 `04:00 Asia/Shanghai`，空值或假值表示不参与日常状态判断。用户配置 `features.time_record.today.reset` 优先于游戏声明
+
+下面的函数都是可选实现，通过 `type -t` 检测，不存在时不会报错：
+
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
  - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
- - `time_record_today_reset`: 不接受参数。在 stdout 输出游戏的日常刷新时间 (如 `04:00 Asia/Shanghai`)
  - `game_paths`: 不接受参数，声明游戏路径角色；使用 `path_plan_declare <role> <scope> <rel> [label]` 和 `path_plan_note <role> [text]`，不直接执行任何操作。角色目前有 `userdata:screenshot` 和 `shader-cache`
  - `game_version_local`: 接受游戏可执行文件路径和两个 nameref 变量名，将本地版本和变体标识写入变量。本地版本只包含游戏本体已安装的版本。预下载内容不会安装到游戏本体，因此本函数不应返回预下载版本。当前没有本地预下载版本接口，`game_version_predownload_remote` 只报告远程预下载版本。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准
  - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身

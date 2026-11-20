@@ -16,6 +16,9 @@ declare -a ENV_EXPORTS=(
     "env.DXVK_HUD|DXVK_HUD|string"
     "env.DXVK_HDR|DXVK_HDR|bool_to_01"
     "env.DXVK_CONFIG|DXVK_CONFIG|string"
+    "env.DXVK_ASYNC|DXVK_ASYNC|bool_to_01"
+    "env.DXVK_GPLASYNCCACHE|DXVK_GPLASYNCCACHE|bool_to_01"
+    "env.DXVK_FRAME_PACE|DXVK_FRAME_PACE|string"
     # VKD3D
     "env.VKD3D_CONFIG|VKD3D_CONFIG|comma_separated_array_to_string"
     "env.VKD3D_DEBUG|VKD3D_DEBUG|string"
@@ -41,6 +44,8 @@ declare -a ENV_EXPORTS=(
     "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
     "env.PROTON_USE_OPTISCALER|PROTON_USE_OPTISCALER|bool_to_01"
     "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
+    "env.PROTON_DXVK_GPLASYNC|PROTON_DXVK_GPLASYNC|bool_to_01"
+    "env.PROTON_DXVK_LLASYNC|PROTON_DXVK_LLASYNC|bool_to_01"
     # Wine
     "env.WINEDLLOVERRIDES|WINEDLLOVERRIDES|semicolon_separated_array_to_string"
     "wine.dll_overrides|WINEDLLOVERRIDES|semicolon_separated_array_to_string"

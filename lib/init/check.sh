@@ -288,6 +288,24 @@ init_check_runner_file() {
     fi
 }
 
+_init_nvidia_version() {
+    if [ -r /sys/module/nvidia/version ]; then
+        local version
+        IFS= read -r version < /sys/module/nvidia/version || [[ -n "$version" ]] || return 1
+        printf '%s\n' "$version"
+        return 0
+    fi
+
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null \
+            | head -n1 | tr -d '[:space:]'
+        return 0
+    fi
+
+    echo "unknown"
+    return 1
+}
+
 init_check_graphics() {
     local -a vendors=()
     local -A seen=()
@@ -323,7 +341,7 @@ init_check_graphics() {
 
     if [[ -n "${seen[0x10de]:-}" ]]; then
         local nvidia_version
-        if nvidia_version="$(nvidia_version)"; then
+        if nvidia_version="$(_init_nvidia_version)"; then
             init_check_add graphics ok "NVIDIA 驱动" "$nvidia_version"
         else
             init_check_add graphics warn "NVIDIA 驱动" "检测到 NVIDIA GPU，但未找到驱动版本"

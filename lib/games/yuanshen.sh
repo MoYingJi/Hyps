@@ -343,7 +343,7 @@ gi_patch_d3d12_prepare() {
     # 上次异常退出可能遗留了补丁，必须先恢复，否则下面的校验会因 md5 不符而拒绝启动
     gi_patch_d3d12_recover "$GI_PATCH_D3D12_MARKER" "$GI_PATCH_D3D12_OFFICIAL"
 
-    verify_file_with_pkg_version "$pkg_version_file" "$ggm_remote_path" "$ggm_path" \
+    integration_hyp_verify_file_with_pkg_version "$pkg_version_file" "$ggm_remote_path" "$ggm_path" \
         || die 1 gi-patch-d3d12 "globalgamemanagers 文件校验失败，拒绝执行"
 
     # 校验通过后，官方副本与当前文件不一致时（如游戏更新）才刷新

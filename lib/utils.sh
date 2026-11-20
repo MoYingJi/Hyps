@@ -19,8 +19,6 @@ source "$SCRIPT_DIR/utils/fs.sh"
 source "$SCRIPT_DIR/utils/wine.sh"
 #shellcheck source=utils/process.sh
 source "$SCRIPT_DIR/utils/process.sh"
-#shellcheck source=utils/misc.sh
-source "$SCRIPT_DIR/utils/misc.sh"
 #shellcheck source=utils/game_script.sh
 source "$SCRIPT_DIR/utils/game_script.sh"
 #shellcheck source=utils/time.sh

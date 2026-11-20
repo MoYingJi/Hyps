@@ -214,3 +214,45 @@ integration_hyp_get_game_predownload_remote() {
     _integration_hyp_load_branches "$game" "$variant" || return 1
     printf "%s\n" "${_HYP_BRANCH_PREDOWNLOAD[$game_biz]:-}"
 }
+
+integration_hyp_extract_pkg_version() {
+    local pkg_version_file="$1"
+    local target_remote_name="$2"
+
+    if [ -z "$pkg_version_file" ] || [ ! -f "$pkg_version_file" ]; then
+        die 1 hyp "未找到 pkg_version 文件"
+    fi
+
+    if [ -z "$target_remote_name" ]; then
+        die 1 hyp "未指定目标远程文件名"
+    fi
+
+    if command_exists jq; then
+        jq -r --arg target "$target_remote_name" '
+            select(.remoteName == $target) |
+            [.md5, (.fileSize | tostring)] | @tsv
+        ' "$pkg_version_file"
+    else
+        grep -F "\"remoteName\": \"$target_remote_name\"" "$pkg_version_file" \
+            | sed -E 's/.*"md5": "([^"]+)".*"fileSize": ([0-9]+).*/\1\t\2/'
+    fi
+}
+
+integration_hyp_verify_file_with_pkg_version() {
+    local pkg_version_file="$1"
+    local target_remote_name="$2"
+    local file_to_verify="$3"
+
+    if [ ! -f "$file_to_verify" ]; then
+        die 1 hyp "文件不存在: $file_to_verify"
+    fi
+
+    local expected_md5 expected_size
+    IFS=$'\t' read -r expected_md5 expected_size < <(integration_hyp_extract_pkg_version "$pkg_version_file" "$target_remote_name")
+
+    local actual_md5 actual_size
+    actual_md5=$(md5sum "$file_to_verify" | awk '{print $1}')
+    actual_size=$(stat -c%s "$file_to_verify")
+
+    [ "$expected_md5" == "$actual_md5" ] && [ "$expected_size" == "$actual_size" ]
+}

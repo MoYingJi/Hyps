@@ -42,19 +42,20 @@ load_game_config() {
     game_config_file="$CONFIG_DIR/games/${game_name}.conf"
     [ -f "$game_config_file" ] || die 1 config "游戏配置文件不存在：$game_config_file"
 
-    if config_has runner.name; then
-        # 如果已经有 runner，直接读
-        config_read runner.name runner_name
-        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
-        config_parse_file "$game_config_file"
+    # 先确定最终 runner，游戏配置优先，未设置时继承共用配置
+    config_parse_to_temp "$game_config_file"
+    if config_has runner.name TEMP_CONFIG; then
+        config_read runner.name runner_name "" TEMP_CONFIG
     else
-        # 为了保证优先级 runner < games
-        # 先从 games 读 runner，再读 runner 配置，然后将 games 配置合并上去
-        config_parse_to_temp "$game_config_file"
-        runner_name="${TEMP_CONFIG[runner.name]}"
-        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
-        config_merge_temp
+        config_read runner.name runner_name
     fi
+
+    # 配置覆盖顺序为 共用配置 < runner 配置 < 游戏配置
+    # 空名称不加载预设，允许直接配置 runner.exe / runner.protonpath
+    if [[ -n "$runner_name" ]]; then
+        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
+    fi
+    config_merge_temp
 
     if ! config_has runner.exe && config_has runner.protonpath; then
         local proton_path

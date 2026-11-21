@@ -20,19 +20,12 @@ SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 
 #shellcheck source=libs.sh
 source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=modules.sh
+source "$SCRIPT_DIR/modules.sh"
+#shellcheck source=environment.sh
+source "$SCRIPT_DIR/environment.sh"
 
-#shellcheck source=config/environment.sh
-source "$SCRIPT_DIR/config/environment.sh"
-
-for shared_script in "$SCRIPT_DIR"/shared/*.sh; do
-    #shellcheck source=/dev/null
-    source "$shared_script"
-done
-
-for feature_script in "$SCRIPT_DIR"/features/*.sh; do
-    #shellcheck source=/dev/null
-    source "$feature_script"
-done
+hyps_load_modules || return $?
 
 hyps_main() {
     # defer_mkdir 在 prepare 创建，游戏目录内的目录会落到 upper
@@ -43,11 +36,12 @@ hyps_main() {
     if [ -f "$game_impl" ]; then
         log_debug lifecycle "加载游戏实现: $game_impl"
         #shellcheck source=/dev/null
-        source "$game_impl"
+        source "$game_impl" || exit $?
     else
         log_debug lifecycle "未找到游戏实现 $GAME_NAME"
     fi
 
+    environment_capture
     load_config || exit $?
     run_hooks load_config || exit $?
 
@@ -57,7 +51,8 @@ hyps_main() {
     # 挂载点已存在时在 prepare_offline 前拒绝
     game_fs_require_launchable || exit $?
 
-    export_env_vars
+    environment_resolve || exit $?
+    environment_check || exit $?
 
     trap cleanup EXIT
 
@@ -69,11 +64,11 @@ hyps_main() {
     game_fs_set_phase prepare || exit $?
     run_hooks prepare || exit $?
 
-    launch_plan_select_mode
-    launch_plan_build_command
+    launch_plan_select_mode || exit $?
+    launch_plan_build_command || exit $?
     game_fs_set_phase pre_start || exit $?
     run_hooks pre_start || exit $?
-    launch_plan_run
+    launch_plan_run || exit $?
     game_fs_set_phase post_start || exit $?
     run_hooks post_start continue
     wait "$(launch_plan_get_pid)"
@@ -102,12 +97,14 @@ cleanup() {
 }
 
 load_config() {
-    load_common_config
-    load_game_config "$GAME_NAME"
+    load_common_config || return $?
+    load_game_config "$GAME_NAME" || return $?
+    config_require_launch || return $?
+    config_validate || return $?
     game_fs_resolve_paths || return 1
 
     local -a game_args=()
-    config_has game.args && config_read_array game.args game_args
+    config_read_array game.args game_args
     launch_plan_args_set "${game_args[@]}"
 
     launch_plan_set_game_exe "${GAME_FS[game_exe_install]}"

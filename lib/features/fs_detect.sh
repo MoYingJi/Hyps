@@ -3,6 +3,13 @@
 # shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+config_declare features.fs_detect.enabled bool --default true
+for fs_config in ntfs exfat vfat; do
+    config_declare "features.fs_detect.game_in_$fs_config" bool --default true --when features.fs_detect.enabled
+    config_declare "features.fs_detect.prefix_in_$fs_config" bool --default true --when features.fs_detect.enabled
+done
+unset fs_config
+
 feat_fs_detect_get_blkfs() {
     local path="$1"
     [ -n "$path" ] || return 1
@@ -23,7 +30,7 @@ feat_fs_detect_warn_game_in() {
     local fs="$1"
     local fs_config="$2"
 
-    config_is_true features.fs_detect.game_in_"$fs_config" true || return 0
+    config_is_true features.fs_detect.game_in_"$fs_config" || return 0
 
     if [ "${GAME_FS[overlay_enabled]:-0}" = "1" ]; then
         log_warn fs-detect "游戏运行时的写入目录（overlay upper）在 $fs 上！"
@@ -40,7 +47,7 @@ feat_fs_detect_error_prefix_in() {
     local fs="$1"
     local fs_config="$2"
 
-    config_is_true features.fs_detect.prefix_in_"$fs_config" true || return 0
+    config_is_true features.fs_detect.prefix_in_"$fs_config" || return 0
 
     log_error fs-detect "Wine Prefix 在 $fs 上！这很可能导致兼容层无法正常工作！"
     log_error fs-detect "推荐将其设置到其他文件系统上 (如 ext4 / btrfs)"
@@ -50,7 +57,7 @@ feat_fs_detect_error_prefix_in() {
 }
 
 feat_fs_detect_pre_start() {
-    config_is_true features.fs_detect.enabled true || return 0 # 总开关
+    config_is_true features.fs_detect.enabled || return 0
 
     local writable game_blkfs
     if [ "${GAME_FS[install_ok]:-0}" = "1" ]; then

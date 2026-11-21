@@ -5,15 +5,42 @@ source "$SCRIPT_DIR/libs.sh"
 
 #shellcheck source=../config/environment.sh
 source "$SCRIPT_DIR/config/environment.sh"
+#shellcheck source=../environment.sh
+source "$SCRIPT_DIR/environment.sh"
+
+program_cache_default_path() {
+    [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 3
+    local -n result="$1"
+    #shellcheck disable=SC2034 # 通过 nameref 写回调用方
+    result="$CACHE_DIR/shader/$CONFIG_GAME_NAME"
+}
+
+config_declare cache.shader.enabled bool --default false --description "重定向图形组件的着色器缓存"
+config_declare cache.shader.path path --default-fn program_cache_default_path --when cache.shader.enabled \
+    --description "着色器缓存根目录"
+config_declare cache.shader.nv_enabled bool --default true --when cache.shader.enabled
+config_declare cache.shader.nv_skip_cleanup bool --default true --when cache.shader.enabled
+config_declare cache.shader.nv_max_size size --default 10G --when cache.shader.enabled
+config_declare cache.shader.mesa_max_size size --default 10G --when cache.shader.enabled
+
+env_encode_shader_nvidia() { env_encode_string "$1/nvidia" "$2"; }
+env_encode_shader_mesa() { env_encode_string "$1/mesa" "$2"; }
+env_encode_shader_dxvk() { env_encode_string "$1/dxvk" "$2"; }
+env_encode_shader_vkd3d() { env_encode_string "$1/vkd3d" "$2"; }
+
+# 缓存重定向开启时由功能接管路径，保持与目录准备和清理一致
+env_bind cache.shader.path __GL_SHADER_DISK_CACHE_PATH --encode shader_nvidia --policy replace
+env_bind cache.shader.path MESA_SHADER_CACHE_DIR --encode shader_mesa --policy replace
+env_bind cache.shader.path DXVK_STATE_CACHE_PATH --encode shader_dxvk --policy replace
+env_bind cache.shader.path VKD3D_SHADER_CACHE_PATH --encode shader_vkd3d --policy replace
+env_bind cache.shader.nv_enabled __GL_SHADER_DISK_CACHE --encode bool01
+env_bind cache.shader.nv_skip_cleanup __GL_SHADER_DISK_CACHE_SKIP_CLEANUP --encode bool01
+env_bind cache.shader.nv_max_size __GL_SHADER_DISK_CACHE_SIZE --encode bytes
+env_bind cache.shader.mesa_max_size MESA_SHADER_CACHE_MAX_SIZE
 
 feat_program_cache_load_config() {
     if config_is_true cache.shader.enabled; then
-        config_default cache.shader.path "$CACHE_DIR/shader/$GAME_NAME"
-
-        config_default cache.shader.nv_enabled true
-        config_default cache.shader.nv_skip_cleanup true
-        config_default cache.shader.nv_max_size "10G"
-        config_default cache.shader.mesa_max_size "10G"
+        config_validate cache.shader
 
         local shader_path
         config_read cache.shader.path shader_path
@@ -21,18 +48,6 @@ feat_program_cache_load_config() {
         for subdir in nvidia mesa dxvk vkd3d; do
             defer_mkdir "$shader_path/$subdir"
         done
-
-        export __GL_SHADER_DISK_CACHE_PATH="$shader_path/nvidia"
-        export MESA_SHADER_CACHE_DIR="$shader_path/mesa"
-        export DXVK_STATE_CACHE_PATH="$shader_path/dxvk"
-        export VKD3D_SHADER_CACHE_PATH="$shader_path/vkd3d"
-
-        ENV_EXPORTS+=(
-            "cache.shader.nv_enabled|__GL_SHADER_DISK_CACHE|bool_to_01"
-            "cache.shader.nv_skip_cleanup|__GL_SHADER_DISK_CACHE_SKIP_CLEANUP|bool_to_01"
-            "cache.shader.nv_max_size|__GL_SHADER_DISK_CACHE_SIZE|size_string_to_bytes_uint"
-            "cache.shader.mesa_max_size|MESA_SHADER_CACHE_MAX_SIZE|string"
-        )
     fi
 }
 
@@ -44,11 +59,6 @@ program_cache_clear_dir() {
     local key="$1"
     local label="$2"
     local path
-
-    if ! config_has "$key"; then
-        log_warn program-cache "未指定 $label 缓存路径 ($key)，跳过清除"
-        return 0
-    fi
 
     config_read "$key" path
     if [ -z "$path" ] || [ "$path" = / ]; then
@@ -66,10 +76,9 @@ program_cache_clear_dir() {
 }
 
 feat_program_cache_invalidate() {
-    # 应用默认路径，与游戏启动时的行为保持一致
-    feat_program_cache_load_config
-
-    program_cache_clear_dir cache.shader.path "着色器"
+    if config_has cache.shader.path || config_is_true cache.shader.enabled; then
+        program_cache_clear_dir cache.shader.path "着色器"
+    fi
 }
 
 program_cache_render() {
@@ -83,7 +92,6 @@ program_cache_render() {
     fi
 
     config_is_true cache.shader.enabled || return 0
-    config_default cache.shader.path "$CACHE_DIR/shader/$GAME_NAME"
     config_read cache.shader.path path
     printf '[program] %s\n' "$path"
 }

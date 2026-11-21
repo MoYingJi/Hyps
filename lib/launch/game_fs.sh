@@ -201,7 +201,7 @@ game_fs_init_overlay() {
     }
 
     local backend
-    config_read overlay.backend backend "fuse"
+    config_read overlay.backend backend
     case "$backend" in
         fuse | kernel) ;;
         *)
@@ -230,7 +230,7 @@ game_fs_init_overlay() {
     GAME_FS[overlay_lower]="$lower"
 
     local overlay_dir
-    config_read overlay.dir overlay_dir "$DATA_DIR/overlays"
+    config_read overlay.dir overlay_dir
     [ -n "$overlay_dir" ] || overlay_dir="$DATA_DIR/overlays"
     overlay_dir="$(realpath -m -- "$overlay_dir")/$GAME_NAME"
 

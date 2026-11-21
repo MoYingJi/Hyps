@@ -28,6 +28,7 @@ _shader_cache_load_game() {
 
     load_common_config
     load_game_config "$GAME_NAME"
+    config_require_game_paths
 
     game_fs_init || die 1 shader-cache "初始化游戏环境失败"
     game_fs_set_phase offline || die 1 shader-cache "设置离线阶段失败"

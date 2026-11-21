@@ -1,56 +1,166 @@
 # 开发指南
 
-> 先写一点基础的
+## 模块边界
 
-## 总览
+| 位置 | 职责与边界 |
+| --- | --- |
+| `core/`、`utils/` | 基础机制与工具，不加载 feature 或游戏实现 |
+| `config/`、`environment.sh` | 配置声明、读取和环境绑定，不发现功能模块 |
+| `launch/` | 启动计划、命令和游戏文件系统，不依赖具体游戏或外部产品 |
+| `shared/` | 可选的共享运行能力，统一管理资源与生命周期，如 xwin-watch |
+| `integrations/` | 外部产品的数据格式、API 和协议适配，如 HoYoPlay，不接管启动流程 |
+| `features/` | 可组合的具体功能，消费启动能力或共享能力 |
+| `games/`、`commands/` | 游戏行为与命令用例 |
+| `libs.sh` | 基础库聚合入口 |
+| `modules.sh`、`common.sh` | 应用组装与主流程 |
 
-项目主体在 `lib/` 下，用 bash 写，游戏和 CLI 入口点在 `scripts/`
+- 调用其他模块的函数时，显式 `source` 并提供 `#shellcheck source=...` 指令。共享能力不反向加载其消费者，也不通过另一个 feature 获取隐含依赖
+- 启动与配置查询共用 `hyps_load_modules` 的模块清单，feature 发现集中于此。基础模块和共享模块直接声明依赖，避免通过 `libs.sh` 加载整个应用
+- 加载模块只定义函数、保存声明和注册钩子。文件修改、挂载、启动进程等操作放到明确调用的函数或生命周期钩子中
+- 模块可能在函数内被 source，模块级数组使用 `declare -g`。重复加载不能清空状态或重复激活资源
+- 每份状态只有一个所有者：配置原始值归配置模块，环境解析结果归环境模块，主 runner 和命令归 Launch Plan，路径视图归 GameFS，窗口监控进程和订阅归 xwin-watch
 
-在 `tools/` 下有一些小工具，都完全可以脱离本项目独立运行，有使用 Python 和 C 语言写的
- - C 语言推荐使用 clangd 作为 LSP，执行 `development/gen-compile-db.sh` 生成 `compile_commands.json` 文件给 clangd 用
- - `gryph-surrogate` 需要用 `mingw-w64` 交叉编译
- - `xwin-watch` 中，`protocols/` 下是协议 XML 文件，`generated/` 是 `wayland-scanner` 生成的文件，也一并提交到了 git，当协议 XML 文件有变动时，执行 `development/gen-wayland-protocols.sh` 重新生成文件到 `generated/`
+source 保证 API 已定义，钩子的 `before`、`after` 保证同一阶段的执行顺序，两者需要分别声明。例如窗口计时依赖 xwin-watch，并需要在它的配置钩子之前注册监控需求。新增模块先明确依赖、状态所有者和执行阶段，没有独立职责时留在已有模块中。
+
+目前 `launch/* → libs.sh → launch/*` 及 feature 的宽泛导入仍待清理，加载 guard 只避免重复执行，不能消除结构依赖。
+
+## 配置系统
+
+### 声明与读取
+
+声明放在所属模块或游戏实现中，加载时不计算默认值：
+
+```bash
+time_record_default_dir() {
+    local -n result="$1"
+    result="$DATA_DIR/time"
+}
+
+config_declare features.time_record.enabled bool --default true
+config_declare features.time_record.dir path --default-fn time_record_default_dir
+config_declare features.time_record.min_sec uint --default 60 \
+    --when features.time_record.enabled
+
+local dir origin
+config_read features.time_record.dir dir
+config_source features.time_record.dir origin
+local -a args=()
+config_read_array game.args args
+```
+
+类型：`string`、`bool`、`uint`、`int`、`path`、`array`、`enum`、`size`。`enum` 用 `--choices a,b` 指定可选值，`size` 保留 `10G` 这类表达式。其他声明选项：
+
+| 选项 | 契约 |
+| --- | --- |
+| `--default <值>` | 只补缺失值，空字符串也可作为默认值 |
+| `--default-fn <函数>` | 与 `--default` 互斥；接受输出变量名，通过 nameref 写回；返回 `3` 表示当前上下文无默认值，其他非零表示失败 |
+| `--when <布尔键>` | 控制批量校验和有效值展示的适用范围，直接读取仍校验 |
+| `--required` | 要求值存在且非空 |
+| `--validate <函数>` | 接受规范化后的值，返回 `0` 表示通过 |
+| `--description <说明>` | 供 `config schema` 展示 |
+
+默认值函数可读取其他配置，循环依赖会报错，结果不缓存。默认值与校验函数不得修改文件、导出环境或注册钩子。相同声明可重复注册，不同内容的重复声明报错。
+
+`CONFIG` / `CONFIG_SOURCE` 只保存显式值与来源，读取不写回默认值或规范化结果：
+
+- `config_read` 对缺失的可选值输出空字符串；`config_has <键>` 只判断显式值，不包含默认值
+- `config_read_array` 每次替换整个输出数组；`config_is_true <键>` 读取布尔值并判断
+- `config_set <键> <值> [来源]` 覆盖显式值，`config_unset <键>` 删除后恢复使用默认值
+- `config_validate [前缀...]` 检查当前适用的已声明配置，多个前缀取并集，无匹配声明时报错
+
+缺失、空字符串、`false`、空数组互不等价。布尔拼写错误会报错，整数按十进制规范化，相对路径以项目根目录为基准。数组支持 `[a, b]` 与 `(a b)`，仅支持一维字符串和方括号末尾逗号，不执行 shell 表达式。配置解析保留文件行号，格式错误或文件不可读时终止。
+
+### 开放命名空间
+
+```bash
+config_declare_namespace plugin.limits uint
+config_declare_namespace plugin.limits.special bool
+config_declare plugin.limits.special.count uint --default 1
+```
+
+具体键完整覆盖命名空间约束，否则按点分隔匹配最长前缀：`plugin.limits.workers` 为 uint，`plugin.limits.special.enabled` 为 bool。命名空间不包含前缀自身，不继承父级条件或校验。
+
+命名空间支持 `--choices`、`--when`、`--validate`、`--description`，不支持默认值或 `--required`，只约束实际出现的成员。`config_is_declared` 同时识别具体键和命名空间，`config_validate <前缀>` 接受尚无成员的已声明命名空间。`env.*` 的环境输出与 `nvapi.drs.*` 的聚合仍由所属模块负责。
+
+### 加载与操作检查
+
+字段优先级从低到高为 **schema 默认值 < 共用配置 < 选中的 runner 预设 < 游戏配置**。runner 名称优先取游戏配置，否则继承共用配置；显式空名称跳过预设。
+
+`load_common_config` 读取 bootstrap 与共用配置、解析目录变量，目录仍允许环境覆盖。`load_game_config <游戏名>` 选择 runner 并合并配置。这两步不创建目录、不检查游戏或 runner 是否安装。
+
+`config_require <键> [value|file|dir|executable]` 只检查本次操作的存在性要求。启动调用 `config_require_launch`，仅提供 `runner.protonpath` 时由它查找 Proton 并派生 `runner.exe`；离线命令可单独调用 `config_require_game_paths`，无需 runner。
+
+启动先校验配置，再运行 `load_config` 钩子以激活功能。查询直接读取配置，不运行激活钩子；关闭时间记录不影响查询历史，缓存预览不创建目录。组合选项的互斥和操作条件由功能自己检查。CLI 用法见 [使用文档](README.md#查看和检查配置)，未声明的键在 `config check` 中警告。
+
+### 环境与构建设置
+
+```bash
+#shellcheck source=../environment.sh
+source "$SCRIPT_DIR/environment.sh"
+
+env_declare MY_FEATURE bool --encode bool01 --default false
+config_declare features.example.cache_size size --default 2G
+env_bind features.example.cache_size MY_CACHE_BYTES --encode bytes
+```
+
+`env_declare NAME type` 声明 `env.NAME` 并绑定同名输出，接受配置声明和绑定选项。`env_bind <键> <变量名>` 支持 `--encode`、`--when`、`--check file|dir`、`--policy inherit|replace`，绑定与配置自身的条件都必须满足。名称须为合法 shell 变量名；相同绑定可重复注册，不同选项报错。
+
+内置编码器为 `string`、`bool01`、`bytes`、`comma`、`colon`、`semicolon`，后三者要求数组；对应的 `*_list` 还接受已编码字符串。自定义 `env_encode_<名称>` 接受规范化值、输出变量名、来源键，通过 nameref 写回字符串，只能计算输出。`wine.dll_overrides`、`mangohud.config` 是数组，外部的 `env.WINEDLLOVERRIDES` 等可直接用字符串。
+
+候选优先级为 **replace 策略 > 已导出的输入环境（含空值）> 显式 env.NAME > 显式语义配置 > 默认值**。仅对最高优先级候选编码和检查路径，同级不同值报错，配置类型仍独立校验。shader cache 目录用 `replace`，使准备、运行与清理使用同一路径，其余绑定默认遵守输入环境优先。
+
+`environment_capture` 在配置与钩子之前保存输入快照；`environment_resolve` 只计算结果，`environment_check` 在准备阶段前检查最终路径。`environment_read <变量> <输出变量>` 对缺失项返回 `1`、显式空值返回 `0`，`environment_source` 查询来源。
+
+`environment_command_get <输出数组> <程序> [参数...]` 要求解析成功，检查路径后组装 `env -- NAME=value ... 程序 参数...`，调用方直接执行，不向当前 shell 导出：
+
+```bash
+local -a command=()
+environment_command_get command "$runner_exe" "${runner_args[@]}" || return $?
+"${command[@]}" &
+local pid="$!"
+```
+
+异步执行不要再包后台 shell 函数或子 shell，否则 `$!` 可能指向包装进程。是否携带游戏环境由调用方按操作决定：
+
+| 命令 | 环境作用域 |
+| --- | --- |
+| 游戏 wrapper → runner → 游戏 | 解析后的游戏环境，附加 Launch Plan 的 `LD_PRELOAD` |
+| 直接模式的准备批处理 runner | 同一份游戏环境，不附加游戏 preload；失败时停止启动并清理 |
+| 脚本模式的 prepare / before / 游戏 / after | 同一次 runner 调用，共享环境与 preload |
+| 编译、补丁、挂载、下载、窗口监控等宿主工具 | 原始宿主环境 |
+| 指定 Wine prefix 的控制命令 | 调用方显式传入所需变量，如 `WINEPREFIX` |
+
+作用域覆盖 runner 及其后代，不能缩到单个游戏 exe。Hyps 已继承的输入变量仍属于宿主环境。
+
+动态目标可用 `environment_register_provider <函数>`，解析时通过 `environment_offer` 提供与 `env_bind` 相同的候选；跨变量规则用 `environment_register_finalizer <函数>`。两者也必须无环境导出或激活副作用。
+
+runner 将 `game.prefix` 绑定到 `runner.prefix_var`，`GAMEID` / `UMU_ID` 按最终优先级统一，同级冲突或最终为空时报错。预设的兜底 ID 应写 `game.umu_id = "umu-default"`，以供游戏覆盖；`env.UMU_ID` 表达优先级更高的环境覆盖。`LD_PRELOAD` 由 Launch Plan 独占管理。
+
+构建配置由 `config/build.sh` 独立处理：`CC`、`CFLAGS`、`HYPS_WIN_CC`、`MINGW_CFLAGS` 优先于对应配置，在 `load_config` 生成构建输入，支持 Bash flags 数组。显式空 flags 表示不用配置中的 flags，空编译器在实际构建时报错。
 
 ## 生命周期
 
-一共有七个阶段
- - `load_config`: 加载和校验配置。无文件系统副作用，不挂载。任意失败立即退出
- - `prepare_offline`: 必须在游戏 runtime 视图之外完成的准备（写 lower/upper、打游戏文件补丁、恢复上次残留）。有副作用，任意失败立即跳到 `cleanup`
- - `prepare`: 在 runtime 视图内完成的准备（overlay 开启时为 mount）。有副作用，任意失败立即跳到 `cleanup`
- - `pre_start`: 启动前最后检查。有副作用，任意失败立即跳到 `cleanup`
- - `post_start`: 启动后。有副作用，任意失败会继续执行
- - `cleanup`: runtime 视图卸载前的清理。需要 runtime 的外部程序必须在此阶段返回前完成收尾。有副作用，任意失败会继续执行
- - `cleanup_offline`: runtime 后端停止访问底层目录后的清理（恢复/删除 upper 内的补丁文件）。普通卸载并等待服务退出，或撤销本次 FUSE 服务并移除失效挂载后才能执行；未达到条件时跳过并保留恢复标记。有副作用，任意失败会继续执行
+| 阶段 | 约束与失败处理 |
+| --- | --- |
+| `load_config` | 检查功能条件、注册运行钩子、构建启动计划，无文件系统副作用；失败退出 |
+| `prepare_offline` | runtime 之外的准备，如写 lower/upper、游戏补丁、恢复残留；失败进入 cleanup |
+| `prepare` | runtime 内准备，overlay 开启时已挂载；失败进入 cleanup |
+| `pre_start` | 启动前最后检查；失败进入 cleanup |
+| `post_start` | 启动后；失败仍继续 |
+| `cleanup` | 卸载前收尾，返回前必须停止对 runtime 的访问；失败仍继续 |
+| `cleanup_offline` | 后端停止访问底层目录后恢复或删除 upper 补丁；条件未满足时跳过并保留恢复标记，钩子失败仍继续 |
 
-核心在两个阶段之间执行不是钩子的步骤：
+通过 `register_hook <阶段> <函数> [优先级] [依赖关系]` 注册。核心在配置钩子后初始化 GameFS 和解析、检查环境，在 `prepare_offline` 与 `prepare` 之间挂载，在 `cleanup` 与 `cleanup_offline` 之间等待 runner 并卸载。完整顺序见 `common.sh`。
 
-```text
-run_hooks load_config
-game_fs_init
-game_fs_apply_launch_plan
-game_fs_require_launchable
-run_hooks prepare_offline
-game_fs_mount        # overlay 开启时
-run_hooks prepare
-...
-launch_plan_kill
-run_hooks cleanup
-launch_plan_wait
-game_fs_unmount
-run_hooks cleanup_offline
-```
+核心在每阶段前设置 GameFS phase。`defer_mkdir` 在 `prepare` 创建目录；必须在挂载前创建的目录应在 `prepare_offline` 中通过 `game_fs_write_path writable` 获取写路径。
 
-核心在每个阶段前调用 `game_fs_set_phase`，写路径 helper 据此校验。可通过 `register_hook <阶段> <函数名> [优先级] [依赖关系]` 注册钩子。`defer_mkdir` 统一在 `prepare` 阶段创建（即 runtime 视图内）；如果某个目录必须在挂载前创建，应在 `prepare_offline` 中用 `game_fs_write_path writable` 显式创建
+需要 runtime 的外部程序由其所有者在 `cleanup` 返回前停止并等待，包括子进程、后台任务、文件描述符和工作目录引用。只发退出信号或只等主 PID 不算完成，也不能交给 `cleanup_offline`。主 runner 由 Launch Plan 终止并等待，不代表所有 Wine 后代已结束；feature 管理的程序由 feature 清理。此约定同样适用于部分初始化和启动失败，宿主无关进程不在清理范围内。
 
-Hyps 管理的外部程序如果需要 `runtime`，其所有者必须在 `cleanup` 返回前停止其 runtime 访问、等待进程及相关后台任务结束，并释放文件描述符、工作目录等引用。只发退出信号、只等主 PID 而留下仍使用 runtime 的子进程，都不算完成收尾。不得把这部分工作交给 `cleanup_offline`，也不得在 `cleanup` 中启动会继续使用 runtime 的未等待任务。这个约定同时适用于启动失败和异常退出；注册清理时应考虑部分初始化。
+核心在全部 `cleanup` 返回后判断是否存在 `cleanup_offline` 钩子：
 
-主 runner 由 Launch Plan 负责终止并等待，feature 自己启动的程序由 feature 的 `cleanup` 钩子负责。等待 runner 不代表所有 Wine 后代进程都已结束；需要启动并管理额外进程的功能必须自行完成收尾。路径 scope 校验只能约束调用 helper 的写操作，不能替代外部进程的生命周期管理。宿主上的无关进程不属于 Hyps 的清理对象。
-
-核心在所有 `cleanup` 钩子返回后检查是否注册了 `cleanup_offline` 钩子：
-
-- 没有离线钩子：优先普通卸载，失败时允许懒卸载，不主动终止仍服务于旧引用的 FUSE 服务。
-- 有离线钩子：优先普通卸载并等待本次 FUSE 服务退出；卸载失败时，先同步该文件系统的写入，再仅向本次直接启动的 FUSE 服务发送退出信号，等待实际退出，最后移除可能残留的失效挂载。旧引用上的访问可能失败。同步失败、服务未退出或挂载未移除时，不执行离线钩子。
-- 懒卸载只让挂载点脱离路径，不能证明 upper 已空闲。会话记录保存在 `$STATE_DIR/overlay/`，按 upper 路径区分，记录服务 PID、进程启动时间和系统启动标识；旧服务仍在运行时，拒绝再次启动或执行离线操作。记录不会被用于终止上次会话的进程。
+- 无离线钩子：优先普通卸载，失败时允许懒卸载，不主动终止服务于旧引用的 FUSE 服务
+- 有离线钩子：普通卸载并等待服务退出；卸载失败时先同步写入，再仅终止本次启动的 FUSE 服务、等待退出并移除失效挂载。任一步失败都不执行离线钩子，旧引用的访问可能失败
+- 懒卸载不能证明 upper 空闲。`$STATE_DIR/overlay/` 按 upper 记录 PID、进程启动时间和系统启动标识；旧服务仍在运行时拒绝重启或离线操作，不通过记录终止上次会话的进程
 
 ## GameFS
 
@@ -167,3 +277,7 @@ Game Handler 负责 wine 侧的组装，接受一个 nameref 参数，自行获�
 > [!NOTE]
 >
 > 不像在 Linux 侧 Launch Plan 会提供 Runner Wrapper 这种允许共存的修改，在 Wine 侧只有一个独占的 Game Handler，这是有意为之，因为 Wine 侧的 Wrapper 通常直接与游戏接触，它们本来就互斥
+
+## 工具开发
+
+`development/gen-compile-db.sh` 为 clangd 生成编译数据库；`gryph-surrogate` 需要 mingw-w64 交叉编译。修改 xwin-watch 的 `protocols/` XML 后运行 `development/gen-wayland-protocols.sh`，生成的 `generated/` 文件也需要提交。

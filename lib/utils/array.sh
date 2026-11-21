@@ -7,233 +7,118 @@ __UTILS_ARRAY_SH_LOADED=1
 
 is_array() {
     local string="$1"
-
     # 去除字符串首尾空白
     string="${string#"${string%%[![:space:]]*}"}"
     string="${string%"${string##*[![:space:]]}"}"
-
-    [[ "$string" == \[*\] ]] || [[ "$string" == \(*\) ]] || return 1
+    [[ "$string" == \[*\] || "$string" == \(*\) ]]
 }
 
 parse_array() {
     local string="$1"
-    #shellcheck disable=SC2178
-    local -n reply_array="$2"
-
     # 去除字符串首尾空白
     string="${string#"${string%%[![:space:]]*}"}"
     string="${string%"${string##*[![:space:]]}"}"
-
-    if [[ "$string" == \[*\] ]]; then
-        parse_json_array "$string" "$2"
-    elif [[ "$string" == \(*\) ]]; then
-        parse_bash_array "$string" "$2"
-    else
-        return 1
-    fi
+    case "$string" in
+        \[*\]) _parse_flat_array "${string:1:-1}" "$2" comma ;;
+        \(*\)) _parse_flat_array "${string:1:-1}" "$2" space ;;
+        *) return 1 ;;
+    esac
 }
-
 
 parse_json_array() {
     local json="$1"
-    #shellcheck disable=SC2178
-    local -n reply_array="$2"
-
     # 去除字符串首尾空白
     json="${json#"${json%%[![:space:]]*}"}"
     json="${json%"${json##*[![:space:]]}"}"
-
     # 必须以 [ 开头，] 结尾
     [[ "$json" == \[*\] ]] || return 1
-
-    local inner="${json:1:${#json}-2}"
-    # 去除内部首尾空白
-    inner="${inner#"${inner%%[![:space:]]*}"}"
-    inner="${inner%"${inner##*[![:space:]]}"}"
-
-    # 空数组
-    [[ -z "$inner" ]] && return 0
-
-    local elem=""
-    local in_quote=""       # 当前引号类型：' " 或空
-    local current_quoted=false   # 当前元素是否以引号开始（用于决定是否 trim）
-    local current_has_content=false
-    local char
-    local -i i
-
-    for ((i = 0; i < ${#inner}; i++)); do
-        char="${inner:i:1}"
-
-        if [[ -n "$in_quote" ]]; then
-            # ---------- 引号内部 ----------
-            # 仅在双引号内支持反斜杠转义
-            if [[ "$in_quote" == "\"" && "$char" == "\\" ]]; then
-                if (( i + 1 < ${#inner} )); then
-                    i=$((i + 1))
-                    elem+="${inner:i:1}"   # 转义字符，去掉反斜杠
-                else
-                    elem+="\\"             # 末尾孤立反斜杠，保留
-                fi
-                continue
-            fi
-
-            if [[ "$char" == "$in_quote" ]]; then
-                in_quote=""               # 关闭引号
-            else
-                elem+="$char"
-            fi
-        else
-            # ---------- 引号外部 ----------
-            case "$char" in
-                '"'|"'")
-                    in_quote="$char"
-                    current_quoted=true
-                    current_has_content=true
-                    ;;
-                ',')
-                    # 结束当前元素
-                    if [[ "$current_has_content" == true ]]; then
-                        if [[ "$current_quoted" == true ]]; then
-                            # 引号元素：保留原始内容，不 trim
-                            reply_array+=("$elem")
-                        else
-                            # 非引号元素：去除首尾空白
-                            local trimmed="${elem#"${elem%%[![:space:]]*}"}"
-                            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-                            [[ -n "$trimmed" ]] && reply_array+=("$trimmed")
-                        fi
-                    fi
-                    # 重置状态
-                    elem=""
-                    current_quoted=false
-                    current_has_content=false
-                    ;;
-                [[:space:]])
-                    if [[ "$current_quoted" == true ]]; then
-                        # 引号元素关闭后的空白忽略
-                        :
-                    elif [[ -z "$elem" ]]; then
-                        # 非引号元素开头的空白忽略
-                        :
-                    else
-                        # 非引号元素内部的空白保留（后面会 trim）
-                        elem+="$char"
-                    fi
-                    ;;
-                *)
-                    elem+="$char"
-                    current_has_content=true
-                    ;;
-            esac
-        fi
-    done
-
-    # 处理最后一个元素
-    if [[ "$current_has_content" == true ]]; then
-        if [[ "$current_quoted" == true ]]; then
-            reply_array+=("$elem")
-        else
-            local trimmed="${elem#"${elem%%[![:space:]]*}"}"
-            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-            [[ -n "$trimmed" ]] && reply_array+=("$trimmed")
-        fi
-    fi
-
-    return 0
+    _parse_flat_array "${json:1:-1}" "$2" comma
 }
 
 parse_bash_array() {
     local bash_array="$1"
-    #shellcheck disable=SC2178
-    local -n reply_array="$2"
-
     # 去除字符串首尾空白
     bash_array="${bash_array#"${bash_array%%[![:space:]]*}"}"
     bash_array="${bash_array%"${bash_array##*[![:space:]]}"}"
-
     # 必须以 ( 开头，) 结尾
     [[ "$bash_array" == \(*\) ]] || return 1
+    _parse_flat_array "${bash_array:1:-1}" "$2" space
+}
 
-    local inner="${bash_array:1:${#bash_array}-2}"
-    # 去除内部首尾空白
-    inner="${inner#"${inner%%[![:space:]]*}"}"
-    inner="${inner%"${inner##*[![:space:]]}"}"
-
-    # 空数组
-    [[ -z "$inner" ]] && return 0
-
-    local elem=""
-    local in_quote=""       # 当前引号类型：' " 或空
-    local current_quoted=false   # 当前元素是否以引号开始（用于决定是否 trim）
-    local current_has_content=false
-    local char
-    local -i i
-
-    for ((i = 0; i < ${#inner}; i++)); do
-        char="${inner:i:1}"
-
-        if [[ -n "$in_quote" ]]; then
+# 只解析一维字符串数组，不执行变量替换、命令替换或 shell 表达式
+# 完整解析成功后才替换输出，允许方括号数组的末尾逗号
+_parse_flat_array() {
+    local _arr_text="$1" _arr_mode="$3"
+    local -n _arr_out="$2"
+    local -a _arr_result=()
+    local _arr_elem="" _arr_quote="" _arr_state=start _arr_char _arr_trimmed
+    local _arr_i
+    for ((_arr_i = 0; _arr_i < ${#_arr_text}; _arr_i++)); do
+        _arr_char="${_arr_text:_arr_i:1}"
+        if [[ -n "$_arr_quote" ]]; then
             # ---------- 引号内部 ----------
             # 仅在双引号内支持反斜杠转义
-            if [[ "$in_quote" == "\\" && "$char" == "\\" ]]; then
-                if (( i + 1 < ${#inner} )); then
-                    i=$((i + 1))
-                    elem+="${inner:i:1}"   # 转义字符，去掉反斜杠
-                else
-                    elem+="\\"             # 末尾孤立反斜杠，保留
-                fi
-                continue
-            fi
-
-            if [[ "$char" == "$in_quote" ]]; then
-                in_quote=""               # 关闭引号
+            if [[ "$_arr_quote" == '"' && "$_arr_char" == \\ ]]; then
+                ((_arr_i += 1))
+                [[ "$_arr_i" -lt ${#_arr_text} ]] || return 1
+                _arr_elem+="${_arr_text:_arr_i:1}"
+            elif [[ "$_arr_char" == "$_arr_quote" ]]; then
+                _arr_quote=""
+                _arr_state=closed
             else
-                elem+="$char"
+                _arr_elem+="$_arr_char"
             fi
-        else
-            # ---------- 引号外部 ----------
-            case "$char" in
-                '"'|"'")
-                    in_quote="$char"
-                    current_quoted=true
-                    current_has_content=true
-                    ;;
-                [[:space:]])
+            continue
+        fi
+        # ---------- 引号外部 ----------
+        case "$_arr_char" in
+            '"' | "'")
+                [[ "$_arr_state" == start ]] || return 1
+                _arr_quote="$_arr_char"
+                _arr_state=quoted
+                ;;
+            ',')
+                if [[ "$_arr_mode" == space ]]; then
+                    [[ "$_arr_state" != closed ]] || return 1
+                    _arr_elem+=","
+                    _arr_state=plain
+                    continue
+                fi
+                # 结束当前元素
+                [[ "$_arr_state" != start ]] || return 1
+                if [[ "$_arr_state" == plain ]]; then
+                    # 非引号元素：去除首尾空白
+                    _arr_elem="${_arr_elem%"${_arr_elem##*[![:space:]]}"}"
+                fi
+                _arr_result+=("$_arr_elem")
+                # 重置状态
+                _arr_elem=""
+                _arr_state=start
+                ;;
+            [[:space:]])
+                if [[ "$_arr_mode" == space && "$_arr_state" != start ]]; then
                     # 空白字符作为元素分隔符
-                    if [[ "$current_has_content" == true ]]; then
-                        if [[ "$current_quoted" == true ]]; then
-                            # 引号元素：保留原始内容，不 trim
-                            reply_array+=("$elem")
-                        else
-                            # 非引号元素：去除首尾空白
-                            local trimmed="${elem#"${elem%%[![:space:]]*}"}"
-                            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-                            [[ -n "$trimmed" ]] && reply_array+=("$trimmed")
-                        fi
-                        # 重置状态
-                        elem=""
-                        current_quoted=false
-                        current_has_content=false
-                    fi
-                    ;;
-                *)
-                    elem+="$char"
-                    current_has_content=true
-                    ;;
-            esac
-        fi
+                    _arr_result+=("$_arr_elem")
+                    _arr_elem=""
+                    _arr_state=start
+                elif [[ "$_arr_state" == plain ]]; then
+                    _arr_elem+="$_arr_char"
+                fi
+                ;;
+            '[' | ']' | '(' | ')') return 1 ;;
+            *)
+                [[ "$_arr_state" != closed ]] || return 1
+                _arr_elem+="$_arr_char"
+                _arr_state=plain
+                ;;
+        esac
     done
-
+    [[ -z "$_arr_quote" ]] || return 1
     # 处理最后一个元素
-    if [[ "$current_has_content" == true ]]; then
-        if [[ "$current_quoted" == true ]]; then
-            reply_array+=("$elem")
-        else
-            local trimmed="${elem#"${elem%%[![:space:]]*}"}"
-            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-            [[ -n "$trimmed" ]] && reply_array+=("$trimmed")
-        fi
+    if [[ "$_arr_state" != start ]]; then
+        _arr_trimmed="$_arr_elem"
+        [[ "$_arr_state" != plain ]] || _arr_trimmed="${_arr_elem%"${_arr_elem##*[![:space:]]}"}"
+        _arr_result+=("$_arr_trimmed")
     fi
-
-    return 0
+    _arr_out=("${_arr_result[@]}")
 }

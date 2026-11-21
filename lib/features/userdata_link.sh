@@ -3,6 +3,18 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck disable=SC2034
+userdata_link_default_screenshots() {
+    local -n result="$1"
+    local pictures
+    pictures="$(xdg-user-dir PICTURES)" || return 1
+    result="$pictures/HypsScreenshots"
+}
+
+config_declare features.userdata_link.enabled bool --default false
+config_declare features.userdata_link.screenshots path --default-fn userdata_link_default_screenshots \
+    --when features.userdata_link.enabled --description "截图保存目录"
+
 feat_userdata_link_prepare() {
     config_is_true features.userdata_link.enabled || return 0
 
@@ -17,8 +29,9 @@ feat_userdata_link_prepare() {
     fi
 
     local screenshots_dir
-    config_require_realpath_mkdir features.userdata_link.screenshots "$(xdg-user-dir PICTURES)/HypsScreenshots"
     config_read features.userdata_link.screenshots screenshots_dir
+    [[ -n "$screenshots_dir" ]] || die 1 userdata-link "截图目录不能为空"
+    mkdir -p -- "$screenshots_dir" || die 1 userdata-link "无法创建截图目录 '$screenshots_dir'"
 
     local rc
     path_plan_collect userdata:screenshot

@@ -6,6 +6,8 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../shared/xwin_watch.sh
 source "$SCRIPT_DIR/shared/xwin_watch.sh"
 
+config_declare features.window_time_indicator.enabled bool --default false
+
 feat_window_time_indicator_load_config() {
     config_is_true features.window_time_indicator.enabled || return 0
     config_set features.xwin_watch.enabled true

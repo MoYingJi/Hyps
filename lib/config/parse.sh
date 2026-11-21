@@ -2,14 +2,21 @@
 
 #shellcheck source=../core/log.sh
 source "$SCRIPT_DIR/core/log.sh"
-#shellcheck source=../utils.sh
-source "$SCRIPT_DIR/utils.sh"
+#shellcheck source=state.sh
+source "$SCRIPT_DIR/config/state.sh"
 
 # 本文件部分使用 LLM 生成
 
 config_parse_file() {
     local file="$1"
     local target_map="${2:-CONFIG}"
+    local source_map="${3:-}"
+    if [[ -z "$source_map" ]]; then
+        case "$target_map" in
+            CONFIG) source_map=CONFIG_SOURCE ;;
+            TEMP_CONFIG) source_map=TEMP_CONFIG_SOURCE ;;
+        esac
+    fi
 
     [[ -f "$file" ]] || {
         log_debug config "配置文件不存在，跳过：$file"
@@ -22,11 +29,12 @@ config_parse_file() {
     local pending_key=""
     local pending_value=""
     local pending_type=""
+    local pending_line=0
     local stripped_line
     local current_section=""
 
     while IFS= read -r line || [[ -n "$line" ]]; do
-        ((line_no++))
+        ((line_no += 1))
 
         # 去除首尾空白
         line="${line#"${line%%[![:space:]]*}"}"   # 去除前导空白
@@ -36,7 +44,7 @@ config_parse_file() {
         [[ -z "$line" || "$line" == \#* ]] && continue
 
         # 解析节标题 [section] 或 [section.subsection]
-        if [[ "$line" =~ ^\[([^\]]+)\]$ ]]; then
+        if [[ -z "$pending_key" && "$line" =~ ^\[([^\]]+)\]$ ]]; then
             current_section="${BASH_REMATCH[1]}"
             # 去除节名称中的空白
             current_section="${current_section#"${current_section%%[![:space:]]*}"}"
@@ -52,6 +60,11 @@ config_parse_file() {
             key="${key%"${key##*[![:space:]]}"}"
             value="${value#"${value%%[![:space:]]*}"}"
             value="${value%"${value##*[![:space:]]}"}"
+            _strip_trailing_comment value
+            # 如果有节前缀，添加到键名中
+            [[ -z "$current_section" ]] || key="${current_section}.${key}"
+            [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] ||
+                die 1 config "$file:$line_no 配置键 '$key' 无效"
 
             # 检查值是否为未闭合的数组开始
             if [[ "$value" == "["* ]] && [[ "$value" != *"]" ]]; then
@@ -59,32 +72,24 @@ config_parse_file() {
                 pending_key="$key"
                 pending_value="$value"
                 pending_type="square"
+                pending_line="$line_no"
             elif [[ "$value" == "("* ]] && [[ "$value" != *")" ]]; then
                 # 进入多行模式（圆括号数组）
                 pending_key="$key"
                 pending_value="$value"
                 pending_type="paren"
+                pending_line="$line_no"
             else
                 # 单行值，直接存储
-                _strip_trailing_comment value
-                # 如果有节前缀，添加到键名中
-                if [[ -n "$current_section" ]]; then
-                    key="${current_section}.${key}"
-                fi
-                _config_store_value "$target_map" "$key" "$value"
+                _config_store_value "$target_map" "$key" "$value" "$source_map" "$file:$line_no"
             fi
         elif [[ -n "$pending_key" ]]; then
             # 多行模式：继续累积值
-            # 跳过注释行？一般来说数组内不应有注释，但可跳过纯注释行
-            if [[ "$line" == \#* ]]; then
-                continue
-            fi
-
             stripped_line="$line"
             _strip_trailing_comment stripped_line
 
             if [[ "$pending_type" == "square" ]]; then
-                if [[ "$pending_value" == *"," ]]; then
+                if [[ "$pending_value" == "[" || "$pending_value" == *"," || "$stripped_line" == "]" ]]; then
                     pending_value+=" $stripped_line"
                 else
                     pending_value+=", $stripped_line"
@@ -97,25 +102,20 @@ config_parse_file() {
             if [[ "$pending_type" == "square" && "$pending_value" == *"]" ]] || \
                [[ "$pending_type" == "paren" && "$pending_value" == *")" ]]; then
                 # 闭合，存储
-                local final_key="$pending_key"
-                # 如果有节前缀，添加到键名中
-                if [[ -n "$current_section" ]]; then
-                    final_key="${current_section}.${pending_key}"
-                fi
-                _config_store_value "$target_map" "$final_key" "$pending_value"
+                _config_store_value "$target_map" "$pending_key" "$pending_value" "$source_map" "$file:$pending_line"
                 pending_key=""
                 pending_value=""
                 pending_type=""
             fi
         else
-            log_warn "配置文件 $file 第 $line_no 行格式错误，忽略：$line"
+            die 1 config "$file:$line_no 配置格式错误：$line"
         fi
-    done < "$file"
+    done < "$file" || die 1 config "无法读取配置文件：$file"
 
-    # 文件结束仍处于多行模式，发出警告
     if [[ -n "$pending_key" ]]; then
-        log_warn "配置文件 $file 中数组 '$pending_key' 未闭合，忽略"
+        die 1 config "$file:$pending_line 数组 '$pending_key' 未闭合"
     fi
+    return 0
 }
 
 _strip_trailing_comment() {
@@ -165,19 +165,28 @@ _config_store_value() {
     local -n map_ref="$1"
     local key="$2"
     local value="$3"
+    local source_map="${4:-}"
+    local origin="${5:-}"
 
-    if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
+    if [[ "$value" == \"* || "$value" == \'* ]]; then
+        [[ ${#value} -ge 2 && "${value: -1}" == "${value:0:1}" ]] ||
+            die 1 config "$origin 配置项 '$key' 的引号未闭合"
         value="${value:1:-1}"
     fi
 
     #shellcheck disable=SC2034
     map_ref["$key"]="$value"
+    if [[ -n "$source_map" ]]; then
+        local -n origins_ref="$source_map"
+        #shellcheck disable=SC2034
+        origins_ref["$key"]="$origin"
+    fi
 }
 
 config_parse_to_temp() {
     local file="$1"
-    [[ -f "$file" ]] || return 0
     TEMP_CONFIG=()
+    TEMP_CONFIG_SOURCE=()
     config_parse_file "$file" TEMP_CONFIG
 }
 
@@ -186,6 +195,7 @@ config_merge_temp() {
     local key
     for key in "${!TEMP_CONFIG[@]}"; do
         CONFIG["$key"]="${TEMP_CONFIG[$key]}"
+        CONFIG_SOURCE["$key"]="${TEMP_CONFIG_SOURCE[$key]:-运行时}"
     done
     log_debug config "已合并临时配置到主配置"
 }

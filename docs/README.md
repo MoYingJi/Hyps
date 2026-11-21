@@ -81,6 +81,25 @@
 
 初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后仍需要按提示修改游戏配置里的 `game.exe` 和 `runner.name`，然后运行 `scripts` 下对应的脚本。
 
+### 查看和检查配置
+
+```bash
+./scripts/_Hyps config schema yuanshen                 # 查看该游戏及通用模块的配置声明
+./scripts/_Hyps config show endfield                   # 查看当前启用项的有效值及来源
+./scripts/_Hyps config show --prefix features.time_record
+./scripts/_Hyps config check endfield                  # 按声明检查类型、必需项和自定义约束
+```
+
+省略游戏名时使用共用配置。`schema` 可以在初始化配置之前使用，`show` 和 `check` 只解析配置，游戏和 runner 的安装检查在启动时执行。涉及多个选项的组合约束仍会由对应功能检查。
+
+默认值只补缺失的配置，显式空值、`false` 和空数组不会被默认值覆盖。布尔值拼写错误、未闭合数组等会报错，路径中的相对路径以项目根目录为基准。
+
+`wine.dll_overrides`、`mangohud.config` 现在要求数组，例如 `wine.dll_overrides = ["winemenubuilder.exe=d"]`。`env.WINEDLLOVERRIDES`、`env.MANGOHUD_CONFIG` 仍可使用已编码的字符串。
+
+环境变量通常按「启动 Hyps 时已导出的值 > 显式 `env.NAME` > 语义配置 > 默认值」选择，着色器缓存重定向开启后会接管缓存目录。配置生成的环境只传给游戏 runner 及其子进程；需要同一 Wine 环境的准备批处理也会继承，宿主工具继续使用原始环境。
+
+配置声明的开发接口见 [开发指南](DEVELOPMENT.md#配置系统)。
+
 ## 依赖
 
  - `bash`: 主要的脚本用它编写

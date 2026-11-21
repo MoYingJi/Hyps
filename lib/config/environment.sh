@@ -3,401 +3,134 @@
 [[ -n "${__CONFIG_ENVIRONMENT_SH_LOADED:-}" ]] && return 0
 __CONFIG_ENVIRONMENT_SH_LOADED=1
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=../environment.sh
+source "$SCRIPT_DIR/environment.sh"
+#shellcheck source=core.sh
+source "$SCRIPT_DIR/config/core.sh"
+#shellcheck source=../utils/wine.sh
+source "$SCRIPT_DIR/utils/wine.sh"
 
-declare -a ENV_EXPORTS=(
-    # 跳过导出 在项目内设置
-    "env.LD_PRELOAD|LD_PRELOAD|noop"
-    # Spritz
-    "env.WINE_ENABLE_TIMEOUT_FIX|WINE_ENABLE_TIMEOUT_FIX|bool_to_01"
-    "env.WINE_ENABLE_STEAM_STUB|WINE_ENABLE_STEAM_STUB|bool_to_01"
-    # DXVK
-    "env.DXVK_HUD|DXVK_HUD|string"
-    "env.DXVK_HDR|DXVK_HDR|bool_to_01"
-    "env.DXVK_CONFIG|DXVK_CONFIG|string"
-    "env.DXVK_ASYNC|DXVK_ASYNC|bool_to_01"
-    "env.DXVK_GPLASYNCCACHE|DXVK_GPLASYNCCACHE|bool_to_01"
-    "env.DXVK_FRAME_PACE|DXVK_FRAME_PACE|string"
-    # VKD3D
-    "env.VKD3D_CONFIG|VKD3D_CONFIG|comma_separated_array_to_string"
-    "env.VKD3D_DEBUG|VKD3D_DEBUG|string"
-    # UMU
-    "runner.protonpath|PROTONPATH|protonpath"
-    "env.PROTONPATH|PROTONPATH|protonpath"
-    "env.UMU_LOG|UMU_LOG|string"
-    "env.PROTON_VERB|PROTON_VERB|string"
-    "env.UMU_RUNTIME_UPDATE|UMU_RUNTIME_UPDATE|bool_to_01"
-    "env.UMU_NO_PROTON|UMU_NO_PROTON|bool_to_01"
-    "env.UMU_HTTP_TIMEOUT|UMU_HTTP_TIMEOUT|uint"
-    "env.UMU_HTTP_RETRIES|UMU_HTTP_RETRIES|uint"
-    # Proton
-    "env.UMU_USE_STEAM|UMU_USE_STEAM|bool_to_01"
-    "env.UMU_ID|UMU_ID|string"
-    "env.STEAM_COMPAT_CLIENT_INSTALL_PATH|STEAM_COMPAT_CLIENT_INSTALL_PATH|path_dir"
-    "env.PRESSURE_VESSEL_FILESYSTEMS_RW|PRESSURE_VESSEL_FILESYSTEMS_RW|colon_separated_array_to_string"
-    "env.PRESSURE_VESSEL_SYSTEMD_SCOPE|PRESSURE_VESSEL_SYSTEMD_SCOPE|bool_to_01"
-    "env.PROTON_DLSS_INDICATOR|PROTON_DLSS_INDICATOR|bool_to_01"
-    "env.PROTON_FSR4_INDICATOR|PROTON_FSR4_INDICATOR|bool_to_01"
-    "env.PROTON_PREFER_SDL|PROTON_PREFER_SDL|bool_to_01"
-    "env.PROTON_ENABLE_WAYLAND|PROTON_ENABLE_WAYLAND|bool_to_01"
-    "env.PROTON_ENABLE_HDR|PROTON_ENABLE_HDR|bool_to_01"
-    "env.PROTON_USE_OPTISCALER|PROTON_USE_OPTISCALER|bool_to_01"
-    "env.PROTON_OPTISCALER_NAME|PROTON_OPTISCALER_NAME|string"
-    "env.PROTON_DXVK_GPLASYNC|PROTON_DXVK_GPLASYNC|bool_to_01"
-    "env.PROTON_DXVK_LLASYNC|PROTON_DXVK_LLASYNC|bool_to_01"
-    # Wine
-    "env.WINEDLLOVERRIDES|WINEDLLOVERRIDES|semicolon_separated_array_to_string"
-    "wine.dll_overrides|WINEDLLOVERRIDES|semicolon_separated_array_to_string"
-    # MangoHud
-    "env.MANGOHUD|MANGOHUD|bool_to_01"
-    "mangohud.config|MANGOHUD_CONFIG|comma_separated_array_to_string"
-    "env.MANGOHUD_CONFIG|MANGOHUD_CONFIG|comma_separated_array_to_string"
-    "mangohud.configfile|MANGOHUD_CONFIGFILE|path_file"
-    "env.MANGOHUD_CONFIGFILE|MANGOHUD_CONFIGFILE|path_file"
-    "mangohud.presetsfile|MANGOHUD_PRESETSFILE|path_file"
-    "env.MANGOHUD_PRESETSFILE|MANGOHUD_PRESETSFILE|path_file"
-    "env.MANGOHUD_DLSYM|MANGOHUD_DLSYM|bool_to_01"
-    # NVIDIA
-    "env.NVPRESENT_ENABLE_SMOOTH_MOTION|NVPRESENT_ENABLE_SMOOTH_MOTION|bool_to_01"
-    # OBS Game Capture
-    "obs_vkcapture.env|OBS_VKCAPTURE|bool_to_01"
-    "env.OBS_VKCAPTURE|OBS_VKCAPTURE|bool_to_01"
-    "obs_vkcapture.name|OBS_VKCAPTURE_NAME|string"
-    "env.OBS_VKCAPTURE_NAME|OBS_VKCAPTURE_NAME|string"
-    # 我是 Steam Deck 别杀我 ✋😭🤚
-    "env.STEAMDECK|STEAMDECK|bool_to_01"
-    "env.SteamDeck|SteamDeck|bool_to_01"
-    "env.SteamOS|SteamOS|bool_to_01"
-)
+config_declare_namespace env string --description "环境变量，未单独声明的成员按字符串透传"
+# 跳过导出 在项目内设置
+config_declare env.LD_PRELOAD string
+env_reserve LD_PRELOAD
+# Spritz
+env_declare WINE_ENABLE_TIMEOUT_FIX bool --encode bool01
+env_declare WINE_ENABLE_STEAM_STUB bool --encode bool01
+# DXVK
+# 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
+env_declare DXVK_HUD string --default 0
+env_declare DXVK_HDR bool --encode bool01
+env_declare DXVK_CONFIG string
+env_declare DXVK_ASYNC bool --encode bool01
+env_declare DXVK_GPLASYNCCACHE bool --encode bool01
+env_declare DXVK_FRAME_PACE string
+# VKD3D
+env_declare VKD3D_CONFIG string --encode comma_list
+env_declare VKD3D_DEBUG string
+# UMU
+env_declare UMU_LOG string
+env_declare PROTON_VERB string
+env_declare UMU_RUNTIME_UPDATE bool --encode bool01
+env_declare UMU_NO_PROTON bool --encode bool01
+env_declare UMU_HTTP_TIMEOUT uint
+env_declare UMU_HTTP_RETRIES uint
+# Proton
+env_declare UMU_USE_STEAM bool --encode bool01
+env_declare UMU_ID string
+env_declare STEAM_COMPAT_CLIENT_INSTALL_PATH path --check dir
+env_declare PRESSURE_VESSEL_FILESYSTEMS_RW string --encode colon_list
+env_declare PRESSURE_VESSEL_SYSTEMD_SCOPE bool --encode bool01
+env_declare PROTON_DLSS_INDICATOR bool --encode bool01
+env_declare PROTON_FSR4_INDICATOR bool --encode bool01
+env_declare PROTON_PREFER_SDL bool --encode bool01
+env_declare PROTON_ENABLE_WAYLAND bool --encode bool01
+env_declare PROTON_ENABLE_HDR bool --encode bool01
+env_declare PROTON_USE_OPTISCALER bool --encode bool01
+env_declare PROTON_OPTISCALER_NAME string
+env_declare PROTON_DXVK_GPLASYNC bool --encode bool01
+env_declare PROTON_DXVK_LLASYNC bool --encode bool01
+# Wine
+env_declare WINEDLLOVERRIDES string --encode semicolon_list
+config_declare wine.dll_overrides array
+env_bind wine.dll_overrides WINEDLLOVERRIDES --encode semicolon
+# MangoHud
+env_declare MANGOHUD bool --encode bool01
+config_declare mangohud.config array
+env_bind mangohud.config MANGOHUD_CONFIG --encode comma
+env_declare MANGOHUD_CONFIG string --encode comma_list
+config_declare mangohud.configfile path
+env_bind mangohud.configfile MANGOHUD_CONFIGFILE --check file
+env_declare MANGOHUD_CONFIGFILE path --check file
+config_declare mangohud.presetsfile path
+env_bind mangohud.presetsfile MANGOHUD_PRESETSFILE --check file
+env_declare MANGOHUD_PRESETSFILE path --check file
+env_declare MANGOHUD_DLSYM bool --encode bool01
+# NVIDIA
+env_declare NVPRESENT_ENABLE_SMOOTH_MOTION bool --encode bool01
+# OBS Game Capture
+config_declare obs_vkcapture.env bool
+env_bind obs_vkcapture.env OBS_VKCAPTURE --encode bool01
+env_declare OBS_VKCAPTURE bool --encode bool01
+config_declare obs_vkcapture.name string
+env_bind obs_vkcapture.name OBS_VKCAPTURE_NAME
+env_declare OBS_VKCAPTURE_NAME string
+# 我是 Steam Deck 别杀我 ✋😭🤚
+env_declare STEAMDECK bool --encode bool01
+env_declare SteamDeck bool --encode bool01
+env_declare SteamOS bool --encode bool01
 
-env_load_config() {
-    # 有些 proton 默认开启 DXVK_HUD=compiler，此处如果未设置则显式指定为关闭
-    config_default env.DXVK_HUD 0
+env_bind runner.protonpath PROTONPATH --encode protonpath
+env_declare PROTONPATH string --encode protonpath
+env_bind game.umu_id GAMEID
+env_bind game.umu_id UMU_ID
 
-    # prefix 变量导出
-    config_default runner.prefix_var "WINEPREFIX"
+env_encode_protonpath() {
+    local -n _env_proton_out="$2"
+    [[ -n "$1" ]] || die 1 environment "配置项 '$3' 不能为空"
+    if [[ -d "$1" ]]; then
+        _env_proton_out="$(realpath -- "$1")"
+    else
+        _env_proton_out="$(find_proton_by_name "$1")" ||
+            die 4 environment "未找到 Proton: '$1' ($3)"
+    fi
+}
+
+runner_environment_collect() {
+    # prefix 变量名由 runner 决定
     local prefix_var
     config_read runner.prefix_var prefix_var
-    ENV_EXPORTS+=("game.prefix|$prefix_var|string")
-
-
-    env_parse_compile_settings
-    env_parse_ld_preload
+    environment_offer game.prefix "$prefix_var"
 }
 
-register_hook load_config env_load_config
-
-export_env_vars() {
-    local key raw_value final_value env_name
-
-    env_export_game_umu_id
-
-    for entry in "${ENV_EXPORTS[@]}"; do
-        IFS='|' read -r conf_key env_name transform <<< "$entry"
-        raw_value="${CONFIG[$conf_key]:-}"
-        [[ -z "${CONFIG[$conf_key]+exists}" ]] && continue
-        "env_transform_$transform" "$raw_value" "final_value" "$conf_key"
-        _export_env_var "$env_name" "$final_value" "显式"
-    done
-
-    for key in "${!CONFIG[@]}"; do
-        [[ "$key" != env.* ]] && continue
-        local already_handled=false
-        for entry in "${ENV_EXPORTS[@]}"; do
-            IFS='|' read -r conf_key _ <<< "$entry"
-            [[ "$conf_key" == "$key" ]] && already_handled=true && break
-        done
-        $already_handled && continue
-        raw_value="${CONFIG[$key]}"
-        env_name="${key#env.}"
-        _export_env_var "$env_name" "$raw_value" "自动"
-    done
-}
-
-env_export_game_umu_id() {
-    config_has game.umu_id || return 0
-
-    local configured_id gameid_env umu_id_env game_id
-    config_read game.umu_id configured_id
-    [[ -n "$configured_id" ]] || die 1 environment "配置项 'game.umu_id' 不能为空"
-
-    gameid_env="${GAMEID:-}"
-    umu_id_env="${UMU_ID:-}"
-    if [[ -n "$gameid_env" && -n "$umu_id_env" && "$gameid_env" != "$umu_id_env" ]]; then
-        die 1 environment "环境变量 GAMEID ('$gameid_env') 与 UMU_ID ('$umu_id_env') 不一致"
-    fi
-
-    if [[ -n "$gameid_env" ]]; then
-        game_id="$gameid_env"
-    elif [[ -n "$umu_id_env" ]]; then
-        game_id="$umu_id_env"
+# GAMEID 与 UMU_ID 是同一标识，按最终来源优先级统一
+runner_environment_finalize() {
+    local chosen other
+    if [[ -n "${ENV_OUTPUT[GAMEID]+exists}" ]]; then
+        chosen=GAMEID
+    elif [[ -n "${ENV_OUTPUT[UMU_ID]+exists}" ]]; then
+        chosen=UMU_ID
     else
-        game_id="$configured_id"
-    fi
-
-    if [[ "$game_id" != "$configured_id" ]]; then
-        log_debug environment "环境变量中的 UMU 游戏 ID '$game_id' 覆盖配置 game.umu_id='$configured_id'"
-    fi
-
-    export GAMEID="$game_id"
-    export UMU_ID="$game_id"
-    log_debug environment "统一 UMU 游戏 ID: GAMEID=UMU_ID='$game_id'"
-}
-
-_export_env_var() {
-    local key="$1"
-    local value="$2"
-    local prefix="$3"
-
-    if [[ -z "${!key:-}" ]]; then
-        export "${key}=${value}"
-        log_debug environment "[$prefix] export $key=$value"
-    else
-        log_debug environment "[$prefix] 跳过 export $key，已存在于环境变量中，保持环境值"
-        log_debug environment "[$prefix]  - [环境值] $key=${!key}"
-        log_debug environment "[$prefix]  - [配置值] $key=$value"
-    fi
-}
-
-
-env_transform_noop() {
-    return 0
-}
-
-env_transform_string() {
-    local value="$1"
-    local -n result="$2"
-    result="$value"
-}
-
-env_transform_bool_to_01() {
-    local value="$1"
-    local -n result="$2"
-    [ -z "$value" ] && return 1
-    isy "$value" && result="1" || result="0"
-    return 0
-}
-
-env_transform_uint() {
-    local value="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$value" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    if [[ "$value" =~ ^[0-9]+$ ]]; then
-        result="$value"
-    else
-        die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是无符号整数"
-    fi
-}
-
-env_transform_size_string_to_bytes_uint() {
-    local value="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$value" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    result="$(size_string_to_bytes_uint "$value")" || die 1 environment "配置项 '$conf_key' 的值 '$value' 无效: 不是有效的大小字符串"
-}
-
-env_transform_path_dir() {
-    local dir_path="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    if [[ -d "$dir_path" ]]; then
-        result="$(realpath "$dir_path")"
-    else
-        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 目录不存在"
-    fi
-}
-
-env_transform_path_mkdir() {
-    local dir_path="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$dir_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    if [[ -d "$dir_path" ]]; then
-        result="$(realpath "$dir_path")"
-        return 0
-    elif [[ -e "$dir_path" ]]; then
-        die 1 environment "配置项 '$conf_key' 的值 '$dir_path' 无效: 路径已存在但不是目录"
-    else
-        result="$(realpath -m "$dir_path")"
-        defer_mkdir "$result"
-        log_debug environment "目录待创建: '$result'"
         return 0
     fi
-}
-
-env_transform_path_file() {
-    local file_path="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$file_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    if [[ -f "$file_path" ]]; then
-        result="$(realpath "$file_path")"
-    else
-        die 1 environment "配置项 '$conf_key' 的值 '$file_path' 无效: 文件不存在"
-    fi
-}
-
-env_transform_colon_separated_array_to_string() {
-    local value="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    if is_array "$value"; then
-        local array=()
-        parse_array "$value" array
-        local IFS=':'
-        result="${array[*]}"
-    elif [[ -n "$value" ]]; then
-        result="$value"
-    else
-        die 1 environment "配置项 '$conf_key' 的值为空"
-    fi
-}
-
-env_transform_comma_separated_array_to_string() {
-    local value="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    if is_array "$value"; then
-        local array=()
-        parse_array "$value" array
-        local IFS=','
-        result="${array[*]}"
-    elif [[ -n "$value" ]]; then
-        result="$value"
-    else
-        die 1 environment "配置项 '$conf_key' 的值为空"
-    fi
-}
-
-env_transform_semicolon_separated_array_to_string() {
-    local value="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    if is_array "$value"; then
-        local array=()
-        parse_array "$value" array
-        local IFS=';'
-        result="${array[*]}"
-    elif [[ -n "$value" ]]; then
-        result="$value"
-    else
-        die 1 environment "配置项 '$conf_key' 的值为空"
-    fi
-}
-
-env_transform_protonpath() {
-    local proton_path="$1"
-    local -n result="$2"
-    local conf_key="${3:-}"
-    [ -z "$proton_path" ] && die 1 environment "配置项 '$conf_key' 的值为空"
-    if [[ -d "$proton_path" ]]; then
-        result="$(realpath "$proton_path")"
-    else
-        result="$(find_proton_by_name "$proton_path")" || die 1 environment "未找到 Proton: '$proton_path'"
-    fi
-}
-
-env_parse_ld_preload() {
-    local ld_preload_array
-
-    if [[ -n "$LD_PRELOAD" ]] && config_has env.LD_PRELOAD; then
-        log_debug environment "LD_PRELOAD 已在环境变量中设置，env.LD_PRELOAD 配置项将被忽略"
-    fi
-
-    if [[ -n "$LD_PRELOAD" ]] && [[ "${LD_PRELOAD@a}" != *a* ]]; then
-        IFS=':' read -ra ld_preload_array <<< "$LD_PRELOAD"
-        for lib in "${ld_preload_array[@]}"; do
-            env_add_ld_preload "$lib"
-        done
-    fi
-
-    if [ -z "$LD_PRELOAD" ] && config_has env.LD_PRELOAD; then
-        local ld_preload_raw
-        config_read env.LD_PRELOAD ld_preload_raw
-        parse_array "$ld_preload_raw" ld_preload_array || IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
-        for lib in "${ld_preload_array[@]}"; do
-            env_add_ld_preload "$lib"
-        done
-    fi
-}
-env_add_ld_preload() {
-    local lib="$1"
-    if [[ -z "$lib" ]]; then
-        die 1 environment "env_add_ld_preload: 参数不能为空"
-    fi
-    launch_plan_ld_preload_append "$lib"
-    log_debug environment "添加 LD_PRELOAD 库: '$lib'"
-}
-
-env_parse_compile_settings() {
-    env_parse_compile_flags CFLAGS compile.CFLAGS HYPS_CFLAGS
-    env_parse_compile_cc CC compile.CC HYPS_CC
-    env_parse_compile_cc HYPS_WIN_CC compile.mingw.CC HYPS_WIN_CC
-    env_parse_compile_flags MINGW_CFLAGS compile.mingw.CFLAGS HYPS_MINGW_CFLAGS
-}
-
-env_parse_compile_flags() {
-    local env_name="$1"
-    local config_key="$2"
-    local output_name="$3"
-    local env_value="${!env_name:-}"
-    local env_attributes="${!env_name@a}"
-    local config_value
-    local -a flags=()
-
-    unset "$output_name"
-
-    if [[ -n "$env_value" ]] && config_has "$config_key"; then
-        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
-    fi
-
-    if [[ -n "$env_value" ]]; then
-        if [[ "$env_attributes" == *a* ]]; then
-            #shellcheck disable=SC2178
-            local -n env_flags="$env_name"
-            flags=("${env_flags[@]}")
-        else
-            read -ra flags <<< "$env_value"
+    if [[ -n "${ENV_OUTPUT[GAMEID]+exists}" && -n "${ENV_OUTPUT[UMU_ID]+exists}" ]]; then
+        if [[ "${ENV_PRIORITY[GAMEID]}" -eq "${ENV_PRIORITY[UMU_ID]}" ]]; then
+            [[ "${ENV_OUTPUT[GAMEID]}" == "${ENV_OUTPUT[UMU_ID]}" ]] ||
+                die 1 environment "GAMEID 与 UMU_ID 的同级来源不一致 (${ENV_SOURCE[GAMEID]}、${ENV_SOURCE[UMU_ID]})"
+        elif [[ "${ENV_PRIORITY[UMU_ID]}" -gt "${ENV_PRIORITY[GAMEID]}" ]]; then
+            chosen=UMU_ID
         fi
-    elif config_has "$config_key"; then
-        config_read "$config_key" config_value
-        parse_array "$config_value" flags || read -ra flags <<< "$config_value"
-    else
-        return 0
     fi
-
-    #shellcheck disable=SC2178
-    local -n output_flags="$output_name"
-    #shellcheck disable=SC2034
-    output_flags=("${flags[@]}")
-    log_debug environment "应用内 CFLAGS [$config_key]: $(quote_args "${flags[@]}")"
+    [[ -n "${ENV_OUTPUT[$chosen]}" ]] ||
+        die 1 environment "UMU 游戏标识不能为空 (${ENV_SOURCE[$chosen]})"
+    for other in GAMEID UMU_ID; do
+        [[ "$other" != "$chosen" ]] || continue
+        ENV_OUTPUT["$other"]="${ENV_OUTPUT[$chosen]}"
+        ENV_SOURCE["$other"]="统一自 $chosen：${ENV_SOURCE[$chosen]}"
+        ENV_PRIORITY["$other"]="${ENV_PRIORITY[$chosen]}"
+        ENV_CHECK["$other"]=""
+    done
 }
 
-env_parse_compile_cc() {
-    local env_name="$1"
-    local config_key="$2"
-    local output_name="$3"
-    local env_value="${!env_name:-}"
-    local value=""
-
-    unset "$output_name"
-
-    if [[ -n "$env_value" ]] && config_has "$config_key"; then
-        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
-    fi
-
-    if [[ -n "$env_value" ]]; then
-        value="$env_value"
-    elif config_has "$config_key"; then
-        config_read "$config_key" value
-    else
-        return 0
-    fi
-
-    printf -v "$output_name" '%s' "$value"
-    log_debug environment "应用内 CC [$config_key]: '$value'"
-}
+environment_register_provider runner_environment_collect
+environment_register_finalizer runner_environment_finalize

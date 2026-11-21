@@ -16,9 +16,9 @@ toolspec_runtime_resolve() {
     toolspec_load "$dir" || return 1
 
     if [[ "$TOOLSPEC_TOOLCHAIN" == mingw ]]; then
-        toolspec_resolve "${HYPS_WIN_CC:-x86_64-w64-mingw32-gcc}" HYPS_MINGW_CFLAGS "$@"
+        toolspec_resolve "${HYPS_WIN_CC-x86_64-w64-mingw32-gcc}" HYPS_MINGW_CFLAGS "$@"
     else
-        toolspec_resolve "${HYPS_CC:-gcc}" HYPS_CFLAGS "$@"
+        toolspec_resolve "${HYPS_CC-gcc}" HYPS_CFLAGS "$@"
     fi
 }
 

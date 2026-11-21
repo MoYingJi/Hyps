@@ -3,10 +3,12 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+config_declare feat.reg_hostname.enabled bool --default false
+config_declare feat.reg_hostname.hostname string --default STEAMDECK --when feat.reg_hostname.enabled
+
 feat_mod_reg_hostname_load_config() {
     config_is_true feat.reg_hostname.enabled || return 0
 
-    config_default feat.reg_hostname.hostname "STEAMDECK"
     local hostname
     config_read feat.reg_hostname.hostname hostname
 

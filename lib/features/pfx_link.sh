@@ -3,6 +3,8 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+config_declare features.pfx_link bool --default false
+
 feat_pfx_link_prepare() {
     config_is_true features.pfx_link || return 0
 

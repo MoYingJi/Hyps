@@ -3,7 +3,7 @@
 [[ -n "${__CORE_CONSOLE_SH_LOADED:-}" ]] && return 0
 __CORE_CONSOLE_SH_LOADED=1
 
-declare -A _CONSOLE_STYLES=(
+declare -gA _CONSOLE_STYLES=(
     [reset]=$'\033[0m'
 
     [bold]=$'\033[1m'      # 粗体

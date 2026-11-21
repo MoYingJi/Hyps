@@ -7,24 +7,26 @@ __LAUNCH_PLAN_SH_LOADED=1
 
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=../environment.sh
+source "$SCRIPT_DIR/environment.sh"
 
 # --- 容器字段 ---
 
-declare -a LP_ARGS=()              # game.args，追加在游戏 exe 之后的参数
-declare -a LP_RUNNER_WRAPPER=()    # 系统级包装器链 (mangohud/gamescope/systemd-run...)
-declare -a LP_RUNNER_TARGET=()     # runner 的目标命令 (handler 产物或批处理命令)
-declare -a LP_LD_PRELOAD=()        # 需要注入的 LD_PRELOAD 库列表
-declare -a LP_COMMAND=()           # 最终组装好的启动命令
+declare -ga LP_ARGS=()              # game.args，追加在游戏 exe 之后的参数
+declare -ga LP_RUNNER_WRAPPER=()    # 系统级包装器链 (mangohud/gamescope/systemd-run...)
+declare -ga LP_RUNNER_TARGET=()     # runner 的目标命令 (handler 产物或批处理命令)
+declare -ga LP_LD_PRELOAD=()        # 需要注入的 LD_PRELOAD 库列表
+declare -ga LP_COMMAND=()           # 最终组装好的启动命令
 
-declare LP_GAME_HANDLER="launch_plan_default_game_handler"  # 游戏 handler 函数名，契约见 game_handler.sh
+declare -g LP_GAME_HANDLER="launch_plan_default_game_handler"  # 游戏 handler 函数名，契约见 game_handler.sh
 
-declare    LP_PID=""              # 启动的游戏进程 PID
-declare    LP_GAME_EXE=""         # 实际运行的游戏 exe (overlay 开启时为挂载点路径)
-declare    LP_GAME_CWD=""         # 实际运行的游戏工作目录
+declare -g    LP_PID=""              # 启动的游戏进程 PID
+declare -g    LP_GAME_EXE=""         # 实际运行的游戏 exe (overlay 开启时为挂载点路径)
+declare -g    LP_GAME_CWD=""         # 实际运行的游戏工作目录
 
-declare    LP_PREPARE_SNIPPET=""     # 准备片段: 脚本模式下写入整份 .bat，直接模式下单独运行一次
-declare    LP_BEFORE_SNIPPET=""      # 游戏启动前的 .bat 片段: 存在即采用脚本模式
-declare    LP_AFTER_SNIPPET=""       # 游戏退出后的 .bat 片段: 存在即采用脚本模式
+declare -g    LP_PREPARE_SNIPPET=""     # 准备片段: 脚本模式下写入整份 .bat，直接模式下单独运行一次
+declare -g    LP_BEFORE_SNIPPET=""      # 游戏启动前的 .bat 片段: 存在即采用脚本模式
+declare -g    LP_AFTER_SNIPPET=""       # 游戏退出后的 .bat 片段: 存在即采用脚本模式
 
 # --- 游戏参数 (game.args) ---
 
@@ -75,6 +77,40 @@ launch_plan_runner_target_get() {
 }
 
 # --- LD_PRELOAD 库列表 ---
+
+launch_plan_load_preload() {
+    local -a ld_preload_array=()
+    local lib
+    local preload_set=false
+    [[ -v LD_PRELOAD || "${LD_PRELOAD@a}" == *a* ]] && preload_set=true
+
+    if [[ "$preload_set" == true ]] && config_has env.LD_PRELOAD; then
+        log_debug environment "LD_PRELOAD 已在环境变量中设置，env.LD_PRELOAD 配置项将被忽略"
+    fi
+
+    if [[ "$preload_set" == true ]]; then
+        if [[ "${LD_PRELOAD@a}" == *a* ]]; then
+            ld_preload_array=("${LD_PRELOAD[@]}")
+        else
+            IFS=':' read -ra ld_preload_array <<< "$LD_PRELOAD"
+        fi
+        for lib in "${ld_preload_array[@]}"; do
+            [[ -z "$lib" ]] || launch_plan_ld_preload_append "$lib"
+        done
+    fi
+
+    if [[ "$preload_set" != true ]] && config_has env.LD_PRELOAD; then
+        local ld_preload_raw
+        config_read env.LD_PRELOAD ld_preload_raw
+        parse_array "$ld_preload_raw" ld_preload_array || IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
+        for lib in "${ld_preload_array[@]}"; do
+            [[ -z "$lib" ]] || launch_plan_ld_preload_append "$lib"
+        done
+    fi
+}
+
+# 输入库应先于 feature 注入的库进入 Launch Plan，避免改变加载顺序
+register_hook load_config launch_plan_load_preload 10
 
 launch_plan_ld_preload_append() {
     LP_LD_PRELOAD+=("$@")
@@ -141,7 +177,7 @@ launch_plan_runner_prefix_get() {
     local -a runner_args=()
 
     config_read runner.exe runner_exe
-    config_has runner.args && config_read_array runner.args runner_args
+    config_read_array runner.args runner_args
 
     _out=("${LP_RUNNER_WRAPPER[@]}" "$runner_exe" "${runner_args[@]}")
 }
@@ -155,7 +191,9 @@ launch_plan_use_script_mode() {
 
 launch_plan_select_mode() {
     if launch_plan_use_script_mode; then
-        if isy "$UMU_USE_STEAM"; then
+        local umu_use_steam
+        environment_read UMU_USE_STEAM umu_use_steam || true
+        if isy "$umu_use_steam"; then
             log_error launch "使用自定义批处理脚本时，UMU_USE_STEAM=1 时将不起作用。请检查配置中哪里出现了问题！"
         fi
         launch_script_mode
@@ -175,11 +213,12 @@ launch_plan_build_command() {
 
 # 在 LP_GAME_CWD 下启动游戏进程并记录 PID
 launch_plan_run() {
-    local -a cmd=("${LP_COMMAND[@]}")
+    local -a cmd=()
     local ld_preload
     ld_preload="$(launch_plan_ld_preload_join)"
 
-    log_info lifecycle "启动游戏: $(quote_args "${cmd[@]}")"
+    environment_command_get cmd "${LP_COMMAND[@]}" || return $?
+    log_info lifecycle "启动游戏: $(quote_args "${LP_COMMAND[@]}")"
     log_debug lifecycle "工作目录: $LP_GAME_CWD"
     pushd "$LP_GAME_CWD" > /dev/null || die 1 lifecycle "无法切换到游戏工作目录: '$LP_GAME_CWD'"
     LD_PRELOAD="$ld_preload" "${cmd[@]}" &

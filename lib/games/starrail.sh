@@ -52,12 +52,13 @@ game_version_predownload_remote() {
 
 # 注册表解锁帧率
 
+config_declare starrail.reg_fps.enabled bool --default false
+config_declare starrail.reg_fps.val uint --default 120 --when starrail.reg_fps.enabled
+
 starrail_reg_fps_load_config() {
     config_is_true starrail.reg_fps.enabled || return 0
 
     command_exists python3 || die 1 starrail-reg-fps "未安装 python3，无法注册表解锁帧率"
-
-    config_default starrail.reg_fps.val 120
 
     register_hook prepare starrail_reg_fps_prepare
 }

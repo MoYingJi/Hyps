@@ -3,14 +3,30 @@
 [[ -n "${__SHARED_XWIN_WATCH_SH_LOADED:-}" ]] && return 0
 __SHARED_XWIN_WATCH_SH_LOADED=1
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
-
-#shellcheck source=../config/environment.sh
-source "$SCRIPT_DIR/config/environment.sh"
+#shellcheck source=../config/access.sh
+source "$SCRIPT_DIR/config/access.sh"
+#shellcheck source=../core/lifecycle.sh
+source "$SCRIPT_DIR/core/lifecycle.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
+#shellcheck source=../utils/string.sh
+source "$SCRIPT_DIR/utils/string.sh"
+#shellcheck source=../utils/command.sh
+source "$SCRIPT_DIR/utils/command.sh"
+#shellcheck source=../utils/cache.sh
+source "$SCRIPT_DIR/utils/cache.sh"
+#shellcheck source=../utils/toolspec_build.sh
+source "$SCRIPT_DIR/utils/toolspec_build.sh"
 
 XWIN_WATCH_TOOL="$PROJECT_ROOT/tools/xwin-watch"
 XWIN_WATCH_CMD=()
+
+config_declare features.xwin_watch.enabled bool --default false
+config_declare features.xwin_watch.window_name string --required --when features.xwin_watch.enabled
+config_declare features.xwin_watch.timeout uint --default 0 --when features.xwin_watch.enabled
+# 后端开关: x11/wayland 可独立开启关闭 (默认 auto，按 pkg-config 自动检测)
+config_declare features.xwin_watch.x11 enum --choices auto,true,false --default auto --when features.xwin_watch.enabled
+config_declare features.xwin_watch.wayland enum --choices auto,true,false --default auto --when features.xwin_watch.enabled
 
 feat_xwin_watch_load_config() {
     if ! config_is_true features.xwin_watch.enabled; then
@@ -22,27 +38,8 @@ feat_xwin_watch_load_config() {
         return 0
     fi
 
-    config_has features.xwin_watch.window_name || die 1 xwin-watch "'features.xwin_watch.window_name' 未设置"
-
-    local timeout
-
-    config_default features.xwin_watch.timeout 0
-    config_read features.xwin_watch.timeout timeout
-
-    [[ "$timeout" =~ [^0-9] ]] && die 1 xwin-watch "'features.xwin_watch.timeout' 必须是整数"
-
-    # 后端开关: x11/wayland 可独立开启关闭 (默认 auto，按 pkg-config 自动检测)
-    local x11 wayland
-    config_default features.xwin_watch.x11 auto
-    config_default features.xwin_watch.wayland auto
-    config_read features.xwin_watch.x11 x11
-    config_read features.xwin_watch.wayland wayland
-    if [[ "$x11" != auto ]] && ! isy "$x11"; then
-        die 1 xwin-watch "'features.xwin_watch.x11' 必须是 auto/true/false"
-    fi
-    if [[ "$wayland" != auto ]] && ! isy "$wayland"; then
-        die 1 xwin-watch "'features.xwin_watch.wayland' 必须是 auto/true/false"
-    fi
+    config_validate features.xwin_watch
+    config_require features.xwin_watch.window_name
 
     register_hook pre_start feat_xwin_watch_prepare
 }
@@ -68,7 +65,7 @@ feat_xwin_watch_kwin_permission_desktop() {
 feat_xwin_watch_backend_enabled() {
     local backend="$1"
     local cfg
-    config_read "features.xwin_watch.$backend" cfg auto
+    config_read "features.xwin_watch.$backend" cfg
     if [[ "$cfg" == auto ]]; then
         toolspec_load "$XWIN_WATCH_TOOL"
         if toolspec_backend_available "$backend"; then
@@ -102,7 +99,7 @@ feat_xwin_watch_require_backend() {
     local backend cfg hint="请把 features.xwin_watch.<后端> 设为 true 后重试"
     local msg="xwin-watch 没有可用的后端:"
     for backend in "${TOOLSPEC_BACKENDS[@]}"; do
-        config_read "features.xwin_watch.$backend" cfg auto
+        config_read "features.xwin_watch.$backend" cfg
         if [[ "$cfg" == auto ]]; then
             msg+=$'\n'"  $backend: 配置为 auto, 未找到依赖 $(toolspec_backend_pkg "$backend")"
             hint="请安装上述依赖, 或把 features.xwin_watch.<后端> 设为 true 后重试"
@@ -230,9 +227,10 @@ feat_xwin_watch_cleanup() {
 
 
 
-declare -a XWIN_WATCH_CALLBACKS_EXISTS
-declare -a XWIN_WATCH_CALLBACKS_CLOSED
-declare -a XWIN_WATCH_CALLBACKS_FAILED
+# 模块可能在加载函数内 source，回调列表必须在返回后仍然存在
+declare -ga XWIN_WATCH_CALLBACKS_EXISTS
+declare -ga XWIN_WATCH_CALLBACKS_CLOSED
+declare -ga XWIN_WATCH_CALLBACKS_FAILED
 
 xwin_watch_on() {
     local event="$1" # exists | closed | failed

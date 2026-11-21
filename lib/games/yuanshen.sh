@@ -74,21 +74,28 @@ game_version_predownload_remote() {
 
 GI_FPS_UNLOCK_TOOL="$PROJECT_ROOT/tools/fpsunlock"
 
+gi_fps_unlock_default_fifo() {
+    local -n result="$1"
+    result="$TEMP_DIR/fpsunlock_fifo"
+}
+
+gi_fps_unlock_validate_sleep() {
+    [[ "$1" == "-" || "$1" =~ ^[0-9]+$ ]]
+}
+
+config_declare gi.fps_unlock.enabled bool --default false
+config_declare gi.fps_unlock.val uint --default 120 --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.interval uint --default 5000 --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.fifo path --default-fn gi_fps_unlock_default_fifo --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.sleep string --default "-" --validate gi_fps_unlock_validate_sleep --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.prog string --when gi.fps_unlock.enabled
+
 gi_fps_unlock_load_config() {
     config_is_true gi.fps_unlock.enabled || return 0
 
-    config_default gi.fps_unlock.val 120
-    config_default gi.fps_unlock.interval 5000
-    config_default gi.fps_unlock.fifo "$TEMP_DIR/fpsunlock_fifo"
-    config_default gi.fps_unlock.sleep "-"
-
     local sleep
     config_read gi.fps_unlock.sleep sleep
-    if [[ "$sleep" != "-" ]]; then
-        if ! [[ "$sleep" =~ ^[0-9]+$ ]]; then
-            die 1 gi-fps-unlock "gi.fps_unlock.sleep 必须是整数或 '-'"
-        fi
-    else
+    if [[ "$sleep" == "-" ]]; then
         config_set features.xwin_watch.enabled true
     fi
 
@@ -186,11 +193,12 @@ gi_fps_unlock_start() {
 
 # 注册表 HDR
 
+config_declare gi.reg_hdr.enabled bool --default false
+config_declare gi.reg_hdr.path string --default 'HKEY_CURRENT_USER\Software\miHoYo\原神' --when gi.reg_hdr.enabled
+config_declare gi.reg_hdr.key string --default WINDOWS_HDR_ON_h3132281285 --when gi.reg_hdr.enabled
+
 gi_reg_hdr_load_config() {
     config_is_true gi.reg_hdr.enabled || return 0
-
-    config_default gi.reg_hdr.path "HKEY_CURRENT_USER\\Software\\miHoYo\\原神"
-    config_default gi.reg_hdr.key "WINDOWS_HDR_ON_h3132281285"
 
     register_hook prepare gi_reg_hdr_prepare
 }
@@ -246,12 +254,15 @@ gi_reg_hdr_prepare() {
 
 # 强制 D3D12
 
+config_declare gi.patch_d3d12.enabled bool --default false
+config_declare gi.patch_d3d12.impl enum --choices unitypy,bytes --default unitypy --when gi.patch_d3d12.enabled
+
 gi_patch_d3d12_load_config() {
     config_is_true gi.patch_d3d12.enabled || return 0
 
     # unitypy: 使用 UnityPy 重新序列化文件（默认）
     # bytes:   仅标准库，只改写 m_GraphicsAPIs 的 4 字节
-    config_read gi.patch_d3d12.impl GI_PATCH_D3D12_IMPL unitypy
+    config_read gi.patch_d3d12.impl GI_PATCH_D3D12_IMPL
     case "$GI_PATCH_D3D12_IMPL" in
         unitypy) GI_PATCH_D3D12_PATCHER="patch-unitypy.py" ;;
         bytes) GI_PATCH_D3D12_PATCHER="patch-bytes.py" ;;

@@ -3,6 +3,8 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+config_declare prepare.kill_wineserver bool --default false
+
 feat_kill_wineserver_load_config() {
     config_is_true prepare.kill_wineserver || return 0
 

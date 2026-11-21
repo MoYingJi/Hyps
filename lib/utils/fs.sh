@@ -25,7 +25,7 @@ path_dirname() {
 }
 
 # load_config 等阶段只登记目录，由 prepare 阶段的 flush_pending_mkdirs 统一创建
-declare -a PENDING_MKDIRS=()
+declare -ga PENDING_MKDIRS=()
 
 defer_mkdir() {
     PENDING_MKDIRS+=("$1")

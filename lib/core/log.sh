@@ -8,14 +8,14 @@ source "$SCRIPT_DIR/core/console.sh"
 
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
-declare -A _LOG_LEVELS=(
+declare -gA _LOG_LEVELS=(
     [DEBUG]=10
     [INFO]=20
     [WARN]=30
     [ERROR]=40
 )
 
-declare -A _LOG_STYLES=(
+declare -gA _LOG_STYLES=(
     [DEBUG]=bright_black
     [INFO]=reset
     [WARN]=yellow

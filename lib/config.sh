@@ -3,38 +3,40 @@
 [[ -n "${__CONFIG_SH_LOADED:-}" ]] && return 0
 __CONFIG_SH_LOADED=1
 
-declare -A TEMP_CONFIG
-declare -A CONFIG
+#shellcheck source=config/state.sh
+source "$SCRIPT_DIR/config/state.sh"
+#shellcheck source=core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
+#shellcheck source=utils/wine.sh
+source "$SCRIPT_DIR/utils/wine.sh"
 
 #shellcheck source=config/parse.sh
 source "$SCRIPT_DIR/config/parse.sh"
-#shellcheck source=config/using.sh
-source "$SCRIPT_DIR/config/using.sh"
+#shellcheck source=config/access.sh
+source "$SCRIPT_DIR/config/access.sh"
+#shellcheck source=config/core.sh
+source "$SCRIPT_DIR/config/core.sh"
 
 load_common_config() {
-    config_parse_file "$PROJECT_ROOT/config.conf"
+    config_parse_file "$PROJECT_ROOT/config.conf" || return 1
 
-    config_read_realpath_prefer_env path.config CONFIG_DIR "${XDG_CONFIG_HOME:-$HOME/.config}/hypsc"
+    config_bind_path path.config CONFIG_DIR
 
-    config_parse_file "$CONFIG_DIR/config.conf"
+    config_parse_file "$CONFIG_DIR/config.conf" || return 1
 
-    config_read_realpath_prefer_env path.cache CACHE_DIR "${XDG_CACHE_HOME:-$HOME/.cache}/hypsc"
-    config_read_realpath_prefer_env path.data DATA_DIR "${XDG_DATA_HOME:-$HOME/.local/share}/hypsc"
-    config_read_realpath_prefer_env path.state STATE_DIR "${XDG_STATE_HOME:-$HOME/.local/state}/hypsc"
-    config_read_realpath_prefer_env path.temp TEMP_DIR "/tmp/hypsc"
-
-    # XDG_RUNTIME_DIR 未设置时回退到 path.temp
-    local runtime_default="$TEMP_DIR"
-    if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
-        runtime_default="$XDG_RUNTIME_DIR/hypsc"
-    fi
-    config_read_realpath_prefer_env path.runtime RUNTIME_DIR "$runtime_default"
+    config_bind_path path.cache CACHE_DIR
+    config_bind_path path.data DATA_DIR
+    config_bind_path path.state STATE_DIR
+    config_bind_path path.temp TEMP_DIR
+    config_bind_path path.runtime RUNTIME_DIR
 
     config_parse_file "$CONFIG_DIR/games/_common.conf"
 }
 
 load_game_config() {
     local game_name="$1"
+    [[ "$game_name" =~ ^[A-Za-z0-9_-]+$ ]] || die 1 config "无效的游戏名 '$game_name'"
+    CONFIG_GAME_NAME="$game_name"
 
     local game_config_file
     local runner_name
@@ -43,9 +45,9 @@ load_game_config() {
     [ -f "$game_config_file" ] || die 1 config "游戏配置文件不存在：$game_config_file"
 
     # 先确定最终 runner，游戏配置优先，未设置时继承共用配置
-    config_parse_to_temp "$game_config_file"
+    config_parse_to_temp "$game_config_file" || return 1
     if config_has runner.name TEMP_CONFIG; then
-        config_read runner.name runner_name "" TEMP_CONFIG
+        runner_name="${TEMP_CONFIG[runner.name]}"
     else
         config_read runner.name runner_name
     fi
@@ -53,36 +55,40 @@ load_game_config() {
     # 配置覆盖顺序为 共用配置 < runner 配置 < 游戏配置
     # 空名称不加载预设，允许直接配置 runner.exe / runner.protonpath
     if [[ -n "$runner_name" ]]; then
-        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf"
+        [[ "$runner_name" =~ ^[A-Za-z0-9_-]+$ ]] || die 1 config "无效的运行器名称 '$runner_name'"
+        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf" || return 1
     fi
     config_merge_temp
+}
 
+# 查询只合并配置，启动和需要游戏路径的操作显式执行检查
+config_require_game_paths() {
+    if config_has game.exe; then
+        config_require game.exe file
+    fi
+    if config_has game.install_dir; then
+        config_require game.install_dir dir
+    fi
+
+    if config_has game.cwd; then
+        config_require game.cwd dir
+    fi
+}
+
+config_require_launch() {
+    config_validate game runner
     if ! config_has runner.exe && config_has runner.protonpath; then
         local proton_path
         config_read runner.protonpath proton_path
-        [ -z "$proton_path" ] && die 1 config "配置项 'runner.protonpath' 的值为空"
-
+        [[ -n "$proton_path" ]] || die 1 config "配置项 'runner.protonpath' 不能为空"
         if [[ -d "$proton_path" ]]; then
-            proton_path="$(realpath "$proton_path")"
+            proton_path="$(realpath -- "$proton_path")"
         else
-            proton_path="$(find_proton_by_name "$proton_path")" || die 4 config "未找到 Proton: '$proton_path'"
+            proton_path="$(find_proton_by_name "$proton_path")" ||
+                die 4 config "未找到 Proton: '$proton_path'"
         fi
-
-        config_set runner.protonpath "$proton_path"
-        config_set runner.exe "$proton_path/proton"
+        config_set runner.exe "$proton_path/proton" "派生自 runner.protonpath"
     fi
-
-    config_require_realpath_which_exe runner.exe
-    if config_has game.exe; then
-        config_require_realpath_file game.exe
-    fi
-    if config_has game.install_dir; then
-        config_require_realpath_dir game.install_dir
-    fi
-
-    config_realpath game.prefix "$DATA_DIR/prefixes/${game_name}" >/dev/null
-
-    if config_has game.cwd; then
-        config_require_realpath_dir game.cwd
-    fi
+    config_require runner.exe executable
+    config_require_game_paths
 }

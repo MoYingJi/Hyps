@@ -5,10 +5,14 @@ source "$SCRIPT_DIR/libs.sh"
 
 # 此方法已废弃
 
+config_declare feature.jade_patch.enable bool --default false
+config_declare feature.jade_patch.exe path --required --when feature.jade_patch.enable
+config_declare feature.jade_patch.launcher path --when feature.jade_patch.enable
+
 feat_jade_patch_load_config() {
     config_is_true feature.jade_patch.enable || return 0
     log_warn jade-patch "此方法已废弃，推荐寻找其它方法"
-    config_require_realpath_file feature.jade_patch.exe
+    config_require feature.jade_patch.exe file
     launch_plan_register_game_handler jadeite jade_patch_handler
 }
 

@@ -76,12 +76,24 @@ endfield_surrogate_validate_file() {
     fi
 }
 
+endfield_surrogate_validate_exit_after() {
+    [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+config_declare endfield.surrogate.mode enum --choices launcher,hardlink,copy,hardlink-or-copy
+config_declare endfield.surrogate.launcher path
+config_declare endfield.surrogate.keep bool
+config_declare endfield.surrogate.show_info bool
+config_declare endfield.surrogate.exit_after uint --validate endfield_surrogate_validate_exit_after
+for surrogate_key in dir target hardlink_dir hardlink_target copy_dir copy_target; do
+    config_declare "endfield.surrogate.$surrogate_key" path
+done
+unset surrogate_key
+
 endfield_surrogate_add_exit_after() {
     local -n _exit_after_args=$1
     local exit_after
     config_read endfield.surrogate.exit_after exit_after
-    [[ $exit_after =~ ^[1-9][0-9]*$ ]] \
-        || die 1 config "配置项 'endfield.surrogate.exit_after' 必须是正整数秒数：'$exit_after'"
     _exit_after_args+=(--launcher-exit-after "$((exit_after * 1000))")
 }
 

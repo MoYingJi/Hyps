@@ -34,8 +34,8 @@ source "$SCRIPT_DIR/core/log.sh"
 
 # 存储每个阶段的钩子条目，格式: " priority:function_name:depends_on_list "
 # 多个条目以空格分隔，例如 " 10:funcA: 20:funcB:funcA "
-declare -A HOOKS_BY_PHASE
-declare -A HOOK_BEFORE
+declare -gA HOOKS_BY_PHASE
+declare -gA HOOK_BEFORE
 
 # 合法的阶段名称
 readonly LIFECYCLE_PHASES=(

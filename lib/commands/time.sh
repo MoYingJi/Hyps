@@ -13,19 +13,10 @@ help_time_today() {
 command_time_today() {
     [ "$#" -eq 0 ] || die 1 "用法: time today"
 
-    local common_set_reset_time=0
-
     load_common_config
 
     if config_has features.time_record.today.reset; then
         log_warn time-record "不推荐在通用配置中设置 'features.time_record.today.reset'，请在游戏配置中分别设置该项"
-        common_set_reset_time=1
-    fi
-
-    feat_time_record_load_config
-
-    if [ "$common_set_reset_time" -ne 1 ]; then
-        config_unset features.time_record.today.reset
     fi
 
     local dir
@@ -53,7 +44,6 @@ command_time_today() {
                 #shellcheck source=/dev/null
                 [ -f "$game_impl" ] && source "$game_impl"
                 load_game_config "$game_name"
-                feat_time_record_load_config
                 local today_reset
                 config_read features.time_record.today.reset today_reset
                 echo "$today_reset"
@@ -91,7 +81,6 @@ command_time_list() {
     [ "$#" -eq 0 ] || die 1 "用法: time list"
 
     load_common_config
-    feat_time_record_load_config
 
     local dir
     config_read features.time_record.dir dir
@@ -104,6 +93,7 @@ command_time_list() {
             "$(style_table_header "最后一次启动时间")"
 
         for game in "$dir"/*; do
+            [ -d "$game" ] || continue
             game_name="${game##*/}"
 
             start_count="$(time_record_count "$game")"
@@ -134,7 +124,6 @@ command_time_report() {
 
     load_common_config
     load_game_config "$game_name"
-    feat_time_record_load_config
 
     local dir total_dur
     config_read features.time_record.dir dir

@@ -3,24 +3,31 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-TIME_RECORD_TODAY_RESET_DEFAULT="04:00 Asia/Shanghai"
+time_record_default_dir() {
+    local -n result="$1"
+    result="$DATA_DIR/time"
+}
+
+#shellcheck disable=SC2034
+time_record_default_reset() {
+    local -n result="$1"
+    result="${GAME_DAILY_RESET-04:00 Asia/Shanghai}"
+}
+
+time_record_validate_reset() {
+    [[ -z "$1" ]] || isn "$1" || time_day_start "$1" >/dev/null
+}
+
+config_declare features.time_record.enabled bool --default true --description "记录游玩时间"
+config_declare features.time_record.dir path --default-fn time_record_default_dir --description "游玩记录目录"
+config_declare features.time_record.min_sec uint --default 60 --when features.time_record.enabled \
+    --description "单次游玩记录的最短秒数"
+config_declare features.time_record.today.reset string --default-fn time_record_default_reset \
+    --validate time_record_validate_reset --description "日常刷新时间，空值或假值表示不参与"
 
 feat_time_record_load_config() {
-    config_default features.time_record.enabled true
     config_is_true features.time_record.enabled || return 0
-
-    config_realpath features.time_record.dir "$DATA_DIR/time"
-    config_default features.time_record.min_sec 60
-
-    if ! config_has features.time_record.today.reset; then
-        local reset_time="${GAME_DAILY_RESET-$TIME_RECORD_TODAY_RESET_DEFAULT}"
-        [ -z "$reset_time" ] || isn "$reset_time" || time_day_start "$reset_time" >/dev/null || die 1 time-record "无效的重置时间: $reset_time"
-        config_set features.time_record.today.reset "$reset_time"
-    fi
-
-    local min_sec
-    config_read features.time_record.min_sec min_sec
-    [[ "$min_sec" =~ [^0-9] ]] && die 1 time-record "'features.time_record.min_sec' 必须是整数"
+    config_validate features.time_record
 
     register_hook pre_start feat_time_record_start
     register_hook cleanup feat_time_record_end

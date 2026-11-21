@@ -3,8 +3,12 @@
 [[ -n "${__INTEGRATIONS_HYP_SH_LOADED:-}" ]] && return 0
 __INTEGRATIONS_HYP_SH_LOADED=1
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=../core/log.sh
+source "$SCRIPT_DIR/core/log.sh"
+#shellcheck source=../utils/fs.sh
+source "$SCRIPT_DIR/utils/fs.sh"
+#shellcheck source=../utils/command.sh
+source "$SCRIPT_DIR/utils/command.sh"
 
 ini_get() {
     local file="$1"; shift

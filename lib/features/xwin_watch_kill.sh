@@ -6,6 +6,11 @@ source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=../shared/xwin_watch.sh
 source "$SCRIPT_DIR/shared/xwin_watch.sh"
 
+config_declare features.xwin_watch_kill.enabled bool --default false
+config_declare features.xwin_watch_kill.name string --when features.xwin_watch_kill.enabled
+config_declare features.xwin_watch_kill.pgrep_args array --when features.xwin_watch_kill.enabled
+config_declare features.xwin_watch_kill.sleep uint --default 5 --when features.xwin_watch_kill.enabled
+
 feat_xwin_watch_kill_load_config() {
     config_is_true features.xwin_watch_kill.enabled || return 0
 
@@ -14,10 +19,7 @@ feat_xwin_watch_kill_load_config() {
     config_has features.xwin_watch_kill.pgrep_args && count=$((count + 1))
     [[ "$count" -eq 1 ]] || die 1 xwin-watch-kill "必须设置 features.xwin_watch_kill.name 或 features.xwin_watch_kill.pgrep_args 中的一个"
 
-    config_default features.xwin_watch_kill.sleep 5
-    local kill_sleep
-    config_read features.xwin_watch_kill.sleep kill_sleep
-    [[ "$kill_sleep" =~ ^[0-9]+$ ]] || die 1 xwin-watch-kill "features.xwin_watch_kill.sleep 必须是整数"
+    config_validate features.xwin_watch_kill
 
     config_set features.xwin_watch.enabled true
     xwin_watch_on closed feat_xwin_watch_kill_on_closed

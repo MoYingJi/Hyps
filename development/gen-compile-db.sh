@@ -17,6 +17,12 @@ command -v jq >/dev/null 2>&1 || { echo "jq 未安装" >&2; exit 1; }
 
 true > "$TEMP" || { echo "创建或清空临时文件失败: $TEMP" >&2; exit 1; }
 
+cleanup() {
+    rm -f "$TEMP"
+}
+
+trap cleanup EXIT
+
 HYPS_CC="$(type -P "$HYPS_CC")" || { echo "无法找到编译器: '$HYPS_CC'" >&2; exit 1; }
 HYPS_WIN_CC="$(type -P "$HYPS_WIN_CC")" || { echo "无法找到编译器: '$HYPS_WIN_CC'" >&2; exit 1; }
 
@@ -30,6 +36,7 @@ record_compile() {
         '$ARGS.positional as $arguments | {directory: $dir, arguments: $arguments, file: $file}' \
         -- "$@" >> "$TEMP"
 }
+
 output() {
     jq -s '.' "$TEMP" > "$OUTPUT"
 }

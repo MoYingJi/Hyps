@@ -48,6 +48,8 @@ struct wl_surface;
  *
  * Only one client can bind this interface at a time.
  *
+ * This global must be bound with a version at least 17.
+ *
  * Warning! The protocol described in this file is a desktop environment
  * implementation detail. Regular clients must not use this protocol.
  * Backward incompatible changes may be added without bumping the major
@@ -64,6 +66,8 @@ struct wl_surface;
  * use it to manage the window.
  *
  * Only one client can bind this interface at a time.
+ *
+ * This global must be bound with a version at least 17.
  *
  * Warning! The protocol described in this file is a desktop environment
  * implementation detail. Regular clients must not use this protocol.
@@ -189,6 +193,18 @@ enum org_kde_plasma_window_management_state {
 	 * @since 9
 	 */
 	ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_SKIPSWITCHER = 0x40000,
+	/**
+	 * @since 19
+	 */
+	ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_NO_BORDER = 0x80000,
+	/**
+	 * @since 19
+	 */
+	ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_CAN_SET_NO_BORDER = 0x100000,
+	/**
+	 * @since 20
+	 */
+	ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_EXCLUDE_FROM_CAPTURE = 0x200000,
 };
 /**
  * @ingroup iface_org_kde_plasma_window_management
@@ -218,6 +234,18 @@ enum org_kde_plasma_window_management_state {
  * @ingroup iface_org_kde_plasma_window_management
  */
 #define ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_SKIPSWITCHER_SINCE_VERSION 9
+/**
+ * @ingroup iface_org_kde_plasma_window_management
+ */
+#define ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_NO_BORDER_SINCE_VERSION 19
+/**
+ * @ingroup iface_org_kde_plasma_window_management
+ */
+#define ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_CAN_SET_NO_BORDER_SINCE_VERSION 19
+/**
+ * @ingroup iface_org_kde_plasma_window_management
+ */
+#define ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_EXCLUDE_FROM_CAPTURE_SINCE_VERSION 20
 #endif /* ORG_KDE_PLASMA_WINDOW_MANAGEMENT_STATE_ENUM */
 
 #ifndef ORG_KDE_PLASMA_WINDOW_MANAGEMENT_SHOW_DESKTOP_ENUM
@@ -516,9 +544,7 @@ struct org_kde_plasma_window_listener {
 	 * All initial known state is submitted
 	 *
 	 * This event will be sent immediately after all initial state
-	 * been sent to the client. If the Plasma window is already
-	 * unmapped, the unmapped event will be sent before the
-	 * initial_state event.
+	 * been sent to the client.
 	 * @since 4
 	 */
 	void (*initial_state)(void *data,
@@ -574,6 +600,7 @@ struct org_kde_plasma_window_listener {
 	 * process id this window belongs to. This should be set once
 	 * before the initial_state is sent.
 	 * @param pid process id
+	 * @since 8
 	 */
 	void (*pid_changed)(void *data,
 			    struct org_kde_plasma_window *org_kde_plasma_window,
@@ -671,6 +698,16 @@ struct org_kde_plasma_window_listener {
 				int32_t y,
 				uint32_t width,
 				uint32_t height);
+	/**
+	 * ready for painting
+	 *
+	 * Specifies that the window is ready for painting. A window can
+	 * be mapped some time later after getting created. This event may
+	 * be sent before or after the initial_state event.
+	 * @since 21
+	 */
+	void (*mapped)(void *data,
+		       struct org_kde_plasma_window *org_kde_plasma_window);
 };
 
 /**
@@ -743,7 +780,7 @@ org_kde_plasma_window_add_listener(struct org_kde_plasma_window *org_kde_plasma_
 /**
  * @ingroup iface_org_kde_plasma_window
  */
-#define ORG_KDE_PLASMA_WINDOW_PID_CHANGED_SINCE_VERSION 1
+#define ORG_KDE_PLASMA_WINDOW_PID_CHANGED_SINCE_VERSION 8
 /**
  * @ingroup iface_org_kde_plasma_window
  */
@@ -772,6 +809,10 @@ org_kde_plasma_window_add_listener(struct org_kde_plasma_window *org_kde_plasma_
  * @ingroup iface_org_kde_plasma_window
  */
 #define ORG_KDE_PLASMA_WINDOW_CLIENT_GEOMETRY_SINCE_VERSION 18
+/**
+ * @ingroup iface_org_kde_plasma_window
+ */
+#define ORG_KDE_PLASMA_WINDOW_MAPPED_SINCE_VERSION 21
 
 /**
  * @ingroup iface_org_kde_plasma_window

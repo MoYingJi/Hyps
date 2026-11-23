@@ -65,7 +65,7 @@ static const struct wl_message org_kde_plasma_window_management_events[] = {
 };
 
 WL_PRIVATE const struct wl_interface org_kde_plasma_window_management_interface = {
-	"org_kde_plasma_window_management", 18,
+	"org_kde_plasma_window_management", 21,
 	4, org_kde_plasma_window_management_requests,
 	6, org_kde_plasma_window_management_events,
 };
@@ -99,7 +99,7 @@ static const struct wl_message org_kde_plasma_window_events[] = {
 	{ "parent_window", "5?o", plasma_window_management_types + 16 },
 	{ "geometry", "6iiuu", plasma_window_management_types + 0 },
 	{ "icon_changed", "7", plasma_window_management_types + 0 },
-	{ "pid_changed", "u", plasma_window_management_types + 0 },
+	{ "pid_changed", "8u", plasma_window_management_types + 0 },
 	{ "virtual_desktop_entered", "8s", plasma_window_management_types + 0 },
 	{ "virtual_desktop_left", "8s", plasma_window_management_types + 0 },
 	{ "application_menu", "10ss", plasma_window_management_types + 0 },
@@ -107,12 +107,13 @@ static const struct wl_message org_kde_plasma_window_events[] = {
 	{ "activity_left", "14s", plasma_window_management_types + 0 },
 	{ "resource_name_changed", "16s", plasma_window_management_types + 0 },
 	{ "client_geometry", "18iiuu", plasma_window_management_types + 0 },
+	{ "mapped", "21", plasma_window_management_types + 0 },
 };
 
 WL_PRIVATE const struct wl_interface org_kde_plasma_window_interface = {
-	"org_kde_plasma_window", 18,
+	"org_kde_plasma_window", 21,
 	15, org_kde_plasma_window_requests,
-	18, org_kde_plasma_window_events,
+	19, org_kde_plasma_window_events,
 };
 
 static const struct wl_message org_kde_plasma_activation_feedback_requests[] = {
@@ -150,7 +151,7 @@ static const struct wl_message org_kde_plasma_stacking_order_events[] = {
 };
 
 WL_PRIVATE const struct wl_interface org_kde_plasma_stacking_order_interface = {
-	"org_kde_plasma_stacking_order", 17,
+	"org_kde_plasma_stacking_order", 21,
 	0, NULL,
 	2, org_kde_plasma_stacking_order_events,
 };

@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/shared/xwin_watch.sh"
 
 config_declare features.xwin_watch_kill.enabled bool --default false
 config_declare features.xwin_watch_kill.name string --when features.xwin_watch_kill.enabled
-config_declare features.xwin_watch_kill.pgrep_args array --when features.xwin_watch_kill.enabled
+config_declare features.xwin_watch_kill.pgrep_args args --when features.xwin_watch_kill.enabled
 config_declare features.xwin_watch_kill.sleep uint --default 5 --when features.xwin_watch_kill.enabled
 
 feat_xwin_watch_kill_load_config() {

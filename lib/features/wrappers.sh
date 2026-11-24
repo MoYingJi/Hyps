@@ -27,12 +27,12 @@ config_declare mangohud.enabled bool --default false
 config_declare mangohud.exe string --default mangohud --when mangohud.enabled
 config_declare gamescope.enabled bool --default false
 config_declare gamescope.exe string --default gamescope --when gamescope.enabled
-config_declare gamescope.args array --default '[]' --when gamescope.enabled
+config_declare gamescope.args args --default '[]' --when gamescope.enabled
 config_declare obs_vkcapture.wrapper.enabled bool --default false
 config_declare obs_vkcapture.wrapper.exe string --default obs-gamecapture --when obs_vkcapture.wrapper.enabled
 config_declare taskset.enabled bool --default false
 config_declare taskset.exe string --default taskset --when taskset.enabled
-config_declare taskset.args array --when taskset.enabled
+config_declare taskset.args args --when taskset.enabled
 config_declare taskset.cpus array --when taskset.enabled
 config_declare taskset.mask string --when taskset.enabled
 config_declare gamemode.wrapper.enabled bool --default false
@@ -44,11 +44,11 @@ config_declare inhibit.enabled bool --default false
 config_declare inhibit.exe string --default systemd-inhibit --when inhibit.enabled
 config_declare inhibit.what string --default idle:sleep --when inhibit.enabled
 config_declare inhibit.why string --default-fn wrapper_default_inhibit_why --when inhibit.enabled
-config_declare inhibit.args array --default '[]' --when inhibit.enabled
+config_declare inhibit.args args --default '[]' --when inhibit.enabled
 config_declare systemd_run.enabled bool --default false
 config_declare systemd_run.exe string --default systemd-run --when systemd_run.enabled
 config_declare systemd_run.unit string --default-fn wrapper_default_systemd_unit --when systemd_run.enabled
-config_declare systemd_run.args array --default '[]' --when systemd_run.enabled
+config_declare systemd_run.args args --default '[]' --when systemd_run.enabled
 
 wrapper_load_config() {
     local gamescope_args=()

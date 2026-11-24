@@ -60,14 +60,14 @@ config_declare path.runtime path --default-fn _config_default_runtime_dir --desc
 config_declare runner.name string --description "运行器预设名称，空值表示不使用预设"
 config_declare runner.exe string --description "运行器命令，启动时可由 Proton 路径派生"
 config_declare runner.protonpath string --description "Proton 名称或目录"
-config_declare runner.args array --default '[]' --description "运行器参数"
+config_declare runner.args args --default '[]' --description "运行器参数"
 config_declare runner.prefix_var string --default WINEPREFIX --description "接收游戏前缀的环境变量"
 
 config_declare game.exe path --description "游戏主程序"
 config_declare game.install_dir path --description "游戏安装目录"
 config_declare game.cwd path --description "游戏工作目录"
 config_declare game.prefix path --default-fn _config_default_prefix --description "游戏 Wine 前缀"
-config_declare game.args array --default '[]' --description "游戏启动参数"
+config_declare game.args args --default '[]' --description "游戏启动参数"
 config_declare game.umu_id string --description "UMU 游戏标识"
 
 config_declare overlay.enabled bool --default false --description "启用游戏文件系统 overlay"

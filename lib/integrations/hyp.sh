@@ -9,33 +9,8 @@ source "$SCRIPT_DIR/core/log.sh"
 source "$SCRIPT_DIR/utils/fs.sh"
 #shellcheck source=../utils/command.sh
 source "$SCRIPT_DIR/utils/command.sh"
-
-ini_get() {
-    local file="$1"; shift
-    local sep=$'\x1f' keys
-    printf -v keys "%s$sep" "$@"          # 每个 key 后带一个分隔符
-
-    awk -v keys="$keys" -v sep="$sep" '
-        BEGIN {
-            t = split(keys, T, sep)
-            n = 0
-            for (i = 1; i <= t; i++)           # 过滤尾部空串
-                if (T[i] != "") { K[++n] = T[i]; want[T[i]] = n }
-        }
-        /^[ \t]*[;#]/ { next }
-        {
-            line = $0
-            sub(/\r$/, "", line)
-            eq = index(line, "=");  if (!eq) next
-            k = substr(line, 1, eq - 1)
-            v = substr(line, eq + 1)
-            gsub(/^[ \t]+|[ \t]+$/, "", k)
-            gsub(/^[ \t]+|[ \t]+$/, "", v)
-            if (k in want) val[want[k]] = v    # 同名后写覆盖前写，保持原语义
-        }
-        END { for (i = 1; i <= n; i++) print (i in val ? val[i] : "") }
-    ' "$file"
-}
+#shellcheck source=../utils/ini.sh
+source "$SCRIPT_DIR/utils/ini.sh"
 
 integration_hyp_read_server_from_game_config() {
     local config_file="$1" # /path/to/config.ini
@@ -44,7 +19,7 @@ integration_hyp_read_server_from_game_config() {
 
     local channel sub_channel cps game_version
     { read -r channel; read -r sub_channel; read -r cps; read -r game_version; } \
-        < <(ini_get "$config_file" "channel" "sub_channel" "cps" "game_version")
+        < <(ini_get channel sub_channel cps game_version < "$config_file")
 
     _game_version="$game_version"
 

@@ -15,6 +15,8 @@ source "$SCRIPT_DIR/utils/cache.sh"
 source "$SCRIPT_DIR/utils/toolspec_build.sh"
 #shellcheck source=utils/fs.sh
 source "$SCRIPT_DIR/utils/fs.sh"
+#shellcheck source=utils/ini.sh
+source "$SCRIPT_DIR/utils/ini.sh"
 #shellcheck source=utils/wine.sh
 source "$SCRIPT_DIR/utils/wine.sh"
 #shellcheck source=utils/process.sh

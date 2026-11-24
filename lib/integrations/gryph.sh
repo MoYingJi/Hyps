@@ -9,6 +9,8 @@ source "$SCRIPT_DIR/core/log.sh"
 source "$SCRIPT_DIR/utils/fs.sh"
 #shellcheck source=../utils/command.sh
 source "$SCRIPT_DIR/utils/command.sh"
+#shellcheck source=../utils/ini.sh
+source "$SCRIPT_DIR/utils/ini.sh"
 
 # 鹰角启动器（明日方舟 / 终末地）接口与本地配置适配
 # config.ini 用固定 AES-256-CBC 加密，密钥/IV 由反编译启动器得到，两个游戏通用
@@ -49,36 +51,16 @@ integration_gryph_read_launcher_config() {
     local -n _channel="$5"
     local -n _sub_channel="$6"
 
-    local plaintext line key value
+    local plaintext
+    local -a fields
     integration_gryph_decrypt_config "$config_file" plaintext || return 1
 
-    _version=""
-    _appcode=""
-    _region=""
-    _channel=""
-    _sub_channel=""
-
-    while IFS= read -r line; do
-        line="${line%$'\r'}"
-        [[ "$line" =~ ^[[:space:]]*[#\;] ]] && continue
-        [[ "$line" == \[* ]] && continue
-        [[ "$line" == *=* ]] || continue
-
-        key="${line%%=*}"
-        value="${line#*=}"
-        key="${key#"${key%%[![:space:]]*}"}"
-        key="${key%"${key##*[![:space:]]}"}"
-        value="${value#"${value%%[![:space:]]*}"}"
-        value="${value%"${value##*[![:space:]]}"}"
-
-        case "$key" in
-            version)     _version="$value" ;;
-            appcode)     _appcode="$value" ;;
-            region)      _region="$value" ;;
-            channel)     _channel="$value" ;;
-            sub_channel) _sub_channel="$value" ;;
-        esac
-    done <<< "$plaintext"
+    mapfile -t fields < <(ini_get version appcode region channel sub_channel <<< "$plaintext")
+    _version="${fields[0]}"
+    _appcode="${fields[1]}"
+    _region="${fields[2]}"
+    _channel="${fields[3]}"
+    _sub_channel="${fields[4]}"
 
     [ -n "$_version" ] || {
         log_error gryph "配置文件中没有 version: $config_file"

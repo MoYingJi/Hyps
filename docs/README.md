@@ -106,6 +106,7 @@
  - 一些基础的工具，如 `coreutils`、`grep`、`awk`、`sed`、`pkill`、`pgrep`、`sudo` 等
  - 下面列出的 Runner 中的依赖。主要就是一些版本的 Proton 和 umu-launcher
  - `sha256sum`、`md5sum`: 用来校验要编译的小工具，和验证游戏文件完整性
+ - `curl`、`jq`、`openssl`: 查询游戏最新版本（`game outdated`）
  - `gcc`: 两个用 C 写的小工具
     - `tools/fpsunlock/unlocker.c` (还额外需要 `setcap`、`getcap`)
     - `tools/xwin-watch/xwin-watch.c`

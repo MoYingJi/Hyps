@@ -4,6 +4,9 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck source=../integrations/gryph.sh
+source "$SCRIPT_DIR/integrations/gryph.sh"
+
 # 游戏元数据
 
 GAME_DISPLAY_NAME="明日方舟：终末地"
@@ -35,6 +38,24 @@ game_paths() {
             path_plan_declare shader-cache userprofile "AppData/LocalLow/$dir/Endfield/$file"
         done
     done
+}
+
+# 游戏版本
+
+game_version_local() {
+    integration_gryph_get_game_version_local "endfield" "$@"
+}
+
+game_version_variant_human_readable() {
+    integration_gryph_variant_human_readable "$1"
+}
+
+game_version_remote() {
+    integration_gryph_get_game_version_remote "endfield" "$1"
+}
+
+game_version_predownload_remote() {
+    integration_gryph_get_game_predownload_remote "endfield" "$1"
 }
 
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）

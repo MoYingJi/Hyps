@@ -4,6 +4,9 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
+#shellcheck source=../integrations/gryph.sh
+source "$SCRIPT_DIR/integrations/gryph.sh"
+
 # 游戏元数据
 
 GAME_DISPLAY_NAME="明日方舟"
@@ -27,4 +30,22 @@ game_executable() {
 
 game_paths() {
     path_plan_declare userdata:screenshot userprofile "Pictures/Arknights_Screenshots"
+}
+
+# 游戏版本
+
+game_version_local() {
+    integration_gryph_get_game_version_local "arknights" "$@"
+}
+
+game_version_variant_human_readable() {
+    integration_gryph_variant_human_readable "$1"
+}
+
+game_version_remote() {
+    integration_gryph_get_game_version_remote "arknights" "$1"
+}
+
+game_version_predownload_remote() {
+    integration_gryph_get_game_predownload_remote "arknights" "$1"
 }

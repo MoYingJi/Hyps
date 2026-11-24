@@ -47,28 +47,29 @@ env_encode_bytes() {
 _env_encode_join() {
     local -a _env_join_values=()
     local -n _env_join_out="$2"
-    parse_array "$1" _env_join_values ||
+    if [[ "$5" != array ]] || ! parse_array "$1" _env_join_values; then
         die 1 environment "配置项 '$4' 需要数组才能使用分隔符编码"
+    fi
     local IFS="$3"
     _env_join_out="${_env_join_values[*]}"
 }
 
-env_encode_comma() { _env_encode_join "$1" "$2" , "$3"; }
-env_encode_colon() { _env_encode_join "$1" "$2" : "$3"; }
-env_encode_semicolon() { _env_encode_join "$1" "$2" ';' "$3"; }
+env_encode_comma() { _env_encode_join "$1" "$2" , "$3" "$4"; }
+env_encode_colon() { _env_encode_join "$1" "$2" : "$3" "$4"; }
+env_encode_semicolon() { _env_encode_join "$1" "$2" ';' "$3" "$4"; }
 
 # 外部变量允许直接使用已编码字符串，数组输入仍须完整解析
 _env_encode_list() {
-    if is_array "$1"; then
+    if [[ "$5" == array ]]; then
         _env_encode_join "$@"
     else
         env_encode_string "$1" "$2"
     fi
 }
 
-env_encode_comma_list() { _env_encode_list "$1" "$2" , "$3"; }
-env_encode_colon_list() { _env_encode_list "$1" "$2" : "$3"; }
-env_encode_semicolon_list() { _env_encode_list "$1" "$2" ';' "$3"; }
+env_encode_comma_list() { _env_encode_list "$1" "$2" , "$3" "$4"; }
+env_encode_colon_list() { _env_encode_list "$1" "$2" : "$3" "$4"; }
+env_encode_semicolon_list() { _env_encode_list "$1" "$2" ';' "$3" "$4"; }
 
 environment_valid_name() {
     [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
@@ -201,6 +202,7 @@ _environment_candidate() {
     _ENV_CANDIDATES["$id.encode"]="$5"
     _ENV_CANDIDATES["$id.key"]="$6"
     _ENV_CANDIDATES["$id.check"]="$7"
+    _ENV_CANDIDATES["$id.kind"]="$8"
     if [[ -z "${_ENV_TOP_RANK[$name]+exists}" || "$rank" -gt "${_ENV_TOP_RANK[$name]}" ]]; then
         _ENV_TOP_RANK["$name"]="$rank"
         _ENV_TOP_IDS["$name"]="$id"
@@ -212,7 +214,7 @@ _environment_candidate() {
 _environment_collect_binding() {
     local -n _env_collect_fields="$1"
     local _env_collect_key="${_env_collect_fields[key]}" _env_collect_name="${_env_collect_fields[name]}"
-    local _env_collect_value _env_collect_source _env_collect_rc=0 _env_collect_rank=10
+    local _env_collect_value _env_collect_source _env_collect_kind _env_collect_rc=0 _env_collect_rank=10
     [[ -z "${ENV_RESERVED[$_env_collect_name]:-}" ]] || return 0
     _ENV_TARGETS["$_env_collect_name"]=1
     if [[ -n "${_env_collect_fields[when]}" ]]; then
@@ -223,7 +225,7 @@ _environment_collect_binding() {
         config_is_true "${_env_collect_fields[when]}" || return 0
     fi
     _config_schema_active "$_env_collect_key" || return 0
-    _config_resolve "$_env_collect_key" _env_collect_value _env_collect_source || _env_collect_rc=$?
+    _config_resolve "$_env_collect_key" _env_collect_value _env_collect_source _env_collect_kind || _env_collect_rc=$?
     [[ "$_env_collect_rc" -ne 3 ]] || return 0
     [[ "$_env_collect_rc" -eq 0 ]] || return "$_env_collect_rc"
     if config_has "$_env_collect_key"; then
@@ -233,7 +235,7 @@ _environment_collect_binding() {
     [[ "${_env_collect_fields[policy]}" != replace ]] || _env_collect_rank=50
     _environment_candidate "$_env_collect_name" "$_env_collect_value" \
         "$_env_collect_key ($_env_collect_source)" "$_env_collect_rank" \
-        "${_env_collect_fields[encode]}" "$_env_collect_key" "${_env_collect_fields[check]}"
+        "${_env_collect_fields[encode]}" "$_env_collect_key" "${_env_collect_fields[check]}" "$_env_collect_kind"
 }
 
 # 动态绑定由只读 provider 在解析时提供，不修改注册表
@@ -272,7 +274,7 @@ environment_resolve() {
     done
     for name in "${!_ENV_TARGETS[@]}"; do
         [[ -n "${ENV_INPUT[$name]+exists}" ]] || continue
-        _environment_candidate "$name" "${ENV_INPUT[$name]}" "输入环境 $name" 40 string "" ""
+        _environment_candidate "$name" "${ENV_INPUT[$name]}" "输入环境 $name" 40 string "" "" scalar
     done
 
     local -A resolved_values=() resolved_sources=() resolved_checks=()
@@ -283,7 +285,8 @@ environment_resolve() {
             encoder="env_encode_${_ENV_CANDIDATES[$id.encode]}"
             declare -F "$encoder" >/dev/null || die 1 environment "环境编码器 '$encoder' 不存在"
             value=""
-            "$encoder" "${_ENV_CANDIDATES[$id.value]}" value "${_ENV_CANDIDATES[$id.key]}" || return 1
+            "$encoder" "${_ENV_CANDIDATES[$id.value]}" value \
+                "${_ENV_CANDIDATES[$id.key]}" "${_ENV_CANDIDATES[$id.kind]}" || return 1
             source="${_ENV_CANDIDATES[$id.source]}"
             check="${_ENV_CANDIDATES[$id.check]}"
             if [[ -n "${resolved_values[$name]+exists}" ]]; then

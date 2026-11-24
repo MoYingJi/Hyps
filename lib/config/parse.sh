@@ -4,6 +4,8 @@
 source "$SCRIPT_DIR/core/log.sh"
 #shellcheck source=state.sh
 source "$SCRIPT_DIR/config/state.sh"
+#shellcheck source=value.sh
+source "$SCRIPT_DIR/config/value.sh"
 
 # 本文件部分使用 LLM 生成
 
@@ -11,6 +13,7 @@ config_parse_file() {
     local file="$1"
     local target_map="${2:-CONFIG}"
     local source_map="${3:-}"
+    local kind_map="${4:-${target_map}_KIND}"
     if [[ -z "$source_map" ]]; then
         case "$target_map" in
             CONFIG) source_map=CONFIG_SOURCE ;;
@@ -22,6 +25,8 @@ config_parse_file() {
         log_debug config "配置文件不存在，跳过：$file"
         return 0
     }
+    [[ "${!kind_map@a}" == *A* ]] ||
+        die 1 config "配置值结构表 '$kind_map' 必须为关联数组"
 
     local line
     local line_no=0
@@ -81,7 +86,7 @@ config_parse_file() {
                 pending_line="$line_no"
             else
                 # 单行值，直接存储
-                _config_store_value "$target_map" "$key" "$value" "$source_map" "$file:$line_no"
+                _config_store_value "$target_map" "$key" "$value" "$source_map" "$file:$line_no" "$kind_map"
             fi
         elif [[ -n "$pending_key" ]]; then
             # 多行模式：继续累积值
@@ -102,7 +107,7 @@ config_parse_file() {
             if [[ "$pending_type" == "square" && "$pending_value" == *"]" ]] || \
                [[ "$pending_type" == "paren" && "$pending_value" == *")" ]]; then
                 # 闭合，存储
-                _config_store_value "$target_map" "$pending_key" "$pending_value" "$source_map" "$file:$pending_line"
+                _config_store_value "$target_map" "$pending_key" "$pending_value" "$source_map" "$file:$pending_line" "$kind_map"
                 pending_key=""
                 pending_value=""
                 pending_type=""
@@ -167,15 +172,14 @@ _config_store_value() {
     local value="$3"
     local source_map="${4:-}"
     local origin="${5:-}"
-
-    if [[ "$value" == \"* || "$value" == \'* ]]; then
-        [[ ${#value} -ge 2 && "${value: -1}" == "${value:0:1}" ]] ||
-            die 1 config "$origin 配置项 '$key' 的引号未闭合"
-        value="${value:1:-1}"
-    fi
+    local kind
+    local -n kinds_ref="$6"
+    _config_value_parse "$value" value kind "$origin 配置项 '$key'"
 
     #shellcheck disable=SC2034
     map_ref["$key"]="$value"
+    #shellcheck disable=SC2034
+    kinds_ref["$key"]="$kind"
     if [[ -n "$source_map" ]]; then
         local -n origins_ref="$source_map"
         #shellcheck disable=SC2034
@@ -187,6 +191,7 @@ config_parse_to_temp() {
     local file="$1"
     TEMP_CONFIG=()
     TEMP_CONFIG_SOURCE=()
+    TEMP_CONFIG_KIND=()
     config_parse_file "$file" TEMP_CONFIG
 }
 
@@ -196,6 +201,7 @@ config_merge_temp() {
     for key in "${!TEMP_CONFIG[@]}"; do
         CONFIG["$key"]="${TEMP_CONFIG[$key]}"
         CONFIG_SOURCE["$key"]="${TEMP_CONFIG_SOURCE[$key]:-运行时}"
+        CONFIG_KIND["$key"]="${TEMP_CONFIG_KIND[$key]}"
     done
     log_debug config "已合并临时配置到主配置"
 }

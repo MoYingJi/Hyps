@@ -100,9 +100,13 @@ launch_plan_load_preload() {
     fi
 
     if [[ "$preload_set" != true ]] && config_has env.LD_PRELOAD; then
-        local ld_preload_raw
-        config_read env.LD_PRELOAD ld_preload_raw
-        parse_array "$ld_preload_raw" ld_preload_array || IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
+        local ld_preload_raw ld_preload_kind
+        config_read env.LD_PRELOAD ld_preload_raw ld_preload_kind
+        if [[ "$ld_preload_kind" == array ]]; then
+            config_read_array env.LD_PRELOAD ld_preload_array
+        else
+            IFS=':' read -ra ld_preload_array <<< "$ld_preload_raw"
+        fi
         for lib in "${ld_preload_array[@]}"; do
             [[ -z "$lib" ]] || launch_plan_ld_preload_append "$lib"
         done

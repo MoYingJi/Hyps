@@ -48,12 +48,12 @@ local -a args=()
 config_read_array game.args args
 ```
 
-类型：`string`、`bool`、`uint`、`int`、`path`、`array`、`args`、`enum`、`size`。`args` 接受数组或按空白分隔的字符串，通过 `config_read_array` 读取参数数组；`enum` 用 `--choices a,b` 指定可选值，`size` 保留 `10G` 这类表达式。其他声明选项：
+类型：`string`、`bool`、`uint`、`int`、`path`、`array`、`args`、`string|array`、`enum`、`size`。`args` 接受数组或按空白分隔的字符串，通过 `config_read_array` 读取参数数组；`string|array` 接受标量或数组并保留结构；`enum` 用 `--choices a,b` 指定可选值，`size` 保留 `10G` 这类表达式。其他声明选项：
 
 | 选项 | 契约 |
 | --- | --- |
-| `--default <值>` | 只补缺失值，空字符串也可作为默认值 |
-| `--default-fn <函数>` | 与 `--default` 互斥；接受输出变量名，通过 nameref 写回；返回 `3` 表示当前上下文无默认值，其他非零表示失败 |
+| `--default <值>` | 只补缺失值，按配置字面量解析，空字符串也可作为默认值 |
+| `--default-fn <函数>` | 与 `--default` 互斥；接受值与结构的输出变量名，通过 nameref 写回，结构默认 `scalar`；返回 `3` 表示当前上下文无默认值，其他非零表示失败 |
 | `--when <布尔键>` | 控制批量校验和有效值展示的适用范围，直接读取仍校验 |
 | `--required` | 要求值存在且非空 |
 | `--validate <函数>` | 接受规范化后的值，返回 `0` 表示通过 |
@@ -61,14 +61,14 @@ config_read_array game.args args
 
 默认值函数可读取其他配置，循环依赖会报错，结果不缓存。默认值与校验函数不得修改文件、导出环境或注册钩子。相同声明可重复注册，不同内容的重复声明报错。
 
-`CONFIG` / `CONFIG_SOURCE` 只保存显式值与来源，读取不写回默认值或规范化结果：
+`CONFIG` / `CONFIG_SOURCE` / `CONFIG_KIND` 保存显式值、来源与结构，读取不写回默认值或规范化结果：
 
-- `config_read` 对缺失的可选值输出空字符串；`config_has <键>` 只判断显式值，不包含默认值
+- `config_read <键> <输出变量> [结构输出变量]` 对缺失的可选值输出空字符串；`config_has <键>` 只判断显式值，不包含默认值
 - `config_read_array` 每次替换整个输出数组；`config_is_true <键>` 读取布尔值并判断
-- `config_set <键> <值> [来源]` 覆盖显式值，`config_unset <键>` 删除后恢复使用默认值
+- `config_set <键> <值> [来源] [scalar|array]` 覆盖显式值，默认按标量原样保存，数组需显式指定结构；`config_unset <键>` 删除值及元数据后恢复默认值
 - `config_validate [前缀...]` 检查当前适用的已声明配置，多个前缀取并集，无匹配声明时报错
 
-缺失、空字符串、`false`、空数组互不等价。布尔拼写错误会报错，整数按十进制规范化，相对路径以项目根目录为基准。数组支持 `[a, b]` 与 `(a b)`，仅支持一维字符串和方括号末尾逗号，不执行 shell 表达式。配置解析保留文件行号，格式错误或文件不可读时终止。
+缺失、空字符串、`false`、空数组互不等价。标量仍允许转换，如 `"1"` 可用于整数配置；数组不能用于标量类型。引号包裹的内容始终是标量，不根据去掉引号后的内容再次推断数组。布尔拼写错误会报错，整数按十进制规范化，相对路径以项目根目录为基准。数组支持 `[a, b]` 与 `(a b)`，仅支持一维字符串和方括号末尾逗号，不执行 shell 表达式。数组在输入时完整校验，配置解析保留文件行号，格式错误或文件不可读时终止。
 
 ### 开放命名空间
 
@@ -105,7 +105,7 @@ env_bind features.example.cache_size MY_CACHE_BYTES --encode bytes
 
 `env_declare NAME type` 声明 `env.NAME` 并绑定同名输出，接受配置声明和绑定选项。`env_bind <键> <变量名>` 支持 `--encode`、`--when`、`--check file|dir`、`--policy inherit|replace`，绑定与配置自身的条件都必须满足。名称须为合法 shell 变量名；相同绑定可重复注册，不同选项报错。
 
-内置编码器为 `string`、`bool01`、`bytes`、`comma`、`colon`、`semicolon`，后三者要求数组；对应的 `*_list` 还接受已编码字符串。自定义 `env_encode_<名称>` 接受规范化值、输出变量名、来源键，通过 nameref 写回字符串，只能计算输出。`wine.dll_overrides`、`mangohud.config` 是数组，外部的 `env.WINEDLLOVERRIDES` 等可直接用字符串。
+内置编码器为 `string`、`bool01`、`bytes`、`comma`、`colon`、`semicolon`，后三者要求数组；对应的 `*_list` 还接受已编码字符串，按结构选择编码方式。自定义 `env_encode_<名称>` 接受规范化值、输出变量名、来源键、结构，通过 nameref 写回字符串，只能计算输出。`wine.dll_overrides`、`mangohud.config` 是数组，`env.WINEDLLOVERRIDES` 等使用 `string|array`。
 
 候选优先级为 **replace 策略 > 已导出的输入环境（含空值）> 显式 env.NAME > 显式语义配置 > 默认值**。仅对最高优先级候选编码和检查路径，同级不同值报错，配置类型仍独立校验。shader cache 目录用 `replace`，使准备、运行与清理使用同一路径，其余绑定默认遵守输入环境优先。
 

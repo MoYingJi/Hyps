@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/utils/wine.sh"
 
 config_declare_namespace env string --description "环境变量，未单独声明的成员按字符串透传"
 # 跳过导出 在项目内设置
-config_declare env.LD_PRELOAD string
+config_declare env.LD_PRELOAD 'string|array'
 env_reserve LD_PRELOAD
 # Spritz
 env_declare WINE_ENABLE_TIMEOUT_FIX bool --encode bool01
@@ -26,7 +26,7 @@ env_declare DXVK_ASYNC bool --encode bool01
 env_declare DXVK_GPLASYNCCACHE bool --encode bool01
 env_declare DXVK_FRAME_PACE string
 # VKD3D
-env_declare VKD3D_CONFIG string --encode comma_list
+env_declare VKD3D_CONFIG 'string|array' --encode comma_list
 env_declare VKD3D_DEBUG string
 # UMU
 env_declare UMU_LOG string
@@ -39,7 +39,7 @@ env_declare UMU_HTTP_RETRIES uint
 env_declare UMU_USE_STEAM bool --encode bool01
 env_declare UMU_ID string
 env_declare STEAM_COMPAT_CLIENT_INSTALL_PATH path --check dir
-env_declare PRESSURE_VESSEL_FILESYSTEMS_RW string --encode colon_list
+env_declare PRESSURE_VESSEL_FILESYSTEMS_RW 'string|array' --encode colon_list
 env_declare PRESSURE_VESSEL_SYSTEMD_SCOPE bool --encode bool01
 env_declare PROTON_DLSS_INDICATOR bool --encode bool01
 env_declare PROTON_FSR4_INDICATOR bool --encode bool01
@@ -51,14 +51,14 @@ env_declare PROTON_OPTISCALER_NAME string
 env_declare PROTON_DXVK_GPLASYNC bool --encode bool01
 env_declare PROTON_DXVK_LLASYNC bool --encode bool01
 # Wine
-env_declare WINEDLLOVERRIDES string --encode semicolon_list
+env_declare WINEDLLOVERRIDES 'string|array' --encode semicolon_list
 config_declare wine.dll_overrides array
 env_bind wine.dll_overrides WINEDLLOVERRIDES --encode semicolon
 # MangoHud
 env_declare MANGOHUD bool --encode bool01
 config_declare mangohud.config array
 env_bind mangohud.config MANGOHUD_CONFIG --encode comma
-env_declare MANGOHUD_CONFIG string --encode comma_list
+env_declare MANGOHUD_CONFIG 'string|array' --encode comma_list
 config_declare mangohud.configfile path
 env_bind mangohud.configfile MANGOHUD_CONFIGFILE --check file
 env_declare MANGOHUD_CONFIGFILE path --check file

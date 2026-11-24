@@ -11,17 +11,26 @@ source "$SCRIPT_DIR/core/log.sh"
 source "$SCRIPT_DIR/utils/string.sh"
 #shellcheck source=../utils/array.sh
 source "$SCRIPT_DIR/utils/array.sh"
+#shellcheck source=value.sh
+source "$SCRIPT_DIR/config/value.sh"
 
 _config_normalize() {
-    local _cfg_type_key="$1" _cfg_type_origin="$3"
+    local _cfg_type_key="$1" _cfg_type_origin="$3" _cfg_type_kind="$4"
     local -n _cfg_type_value="$2"
     local _cfg_type_schema _cfg_type
     _config_schema_key "$_cfg_type_key" _cfg_type_schema
     _cfg_type="${CONFIG_SCHEMA[$_cfg_type_schema.type]:-string}"
     local _cfg_type_valid=true _cfg_type_choice
-    local -a _cfg_type_array=() _cfg_type_choices=()
+    local -a _cfg_type_choices=()
+    _config_value_validate "$_cfg_type_value" "$_cfg_type_kind" "$_cfg_type_origin 配置项 '$_cfg_type_key'"
+    if [[ "$_cfg_type_kind" == array ]]; then
+        case "$_cfg_type" in
+            array | args | 'string|array') return 0 ;;
+            *) die 1 config "配置项 '$_cfg_type_key' 不接受数组，要求类型 '$_cfg_type' ($_cfg_type_origin)" ;;
+        esac
+    fi
     case "$_cfg_type" in
-        string) ;;
+        string | 'string|array' | args) ;;
         bool)
             if isy "$_cfg_type_value"; then
                 _cfg_type_value=true
@@ -57,12 +66,7 @@ _config_normalize() {
                     die 1 config "无法解析配置项 '$_cfg_type_key' 的路径"
             fi
             ;;
-        array)
-            parse_array "$_cfg_type_value" _cfg_type_array || _cfg_type_valid=false
-            ;;
-        args)
-            parse_args "$_cfg_type_value" _cfg_type_array || _cfg_type_valid=false
-            ;;
+        array) _cfg_type_valid=false ;;
         enum)
             _cfg_type_valid=false
             IFS=',' read -ra _cfg_type_choices <<< "${CONFIG_SCHEMA[$_cfg_type_schema.choices]}"

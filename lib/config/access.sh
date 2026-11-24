@@ -23,6 +23,8 @@ _config_resolve() {
     local _cfg_resolve_key="$1"
     local -n _cfg_resolve_out="$2" _cfg_resolve_source="$3"
     local _cfg_resolve_value="" _cfg_resolve_origin="" _cfg_resolve_fn _cfg_resolve_rc=0
+    local _cfg_resolve_kind=scalar _cfg_resolve_unused_kind
+    local -n _cfg_resolve_kind_out="${4:-_cfg_resolve_unused_kind}"
     local _cfg_resolve_schema
     _config_schema_key "$_cfg_resolve_key" _cfg_resolve_schema
 
@@ -33,14 +35,17 @@ _config_resolve() {
     if [[ -n "${CONFIG[$_cfg_resolve_key]+exists}" ]]; then
         _cfg_resolve_value="${CONFIG[$_cfg_resolve_key]}"
         _cfg_resolve_origin="${CONFIG_SOURCE[$_cfg_resolve_key]:-运行时}"
+        _cfg_resolve_kind="${CONFIG_KIND[$_cfg_resolve_key]}"
     elif [[ -n "${CONFIG_SCHEMA[$_cfg_resolve_schema.default]+exists}" ]]; then
         _cfg_resolve_value="${CONFIG_SCHEMA[$_cfg_resolve_schema.default]}"
         _cfg_resolve_origin="默认值"
+        _config_value_parse "$_cfg_resolve_value" _cfg_resolve_value _cfg_resolve_kind \
+            "$_cfg_resolve_origin 配置项 '$_cfg_resolve_key'"
     elif [[ -n "${CONFIG_SCHEMA[$_cfg_resolve_schema.default-fn]:-}" ]]; then
         _cfg_resolve_fn="${CONFIG_SCHEMA[$_cfg_resolve_schema.default-fn]}"
         declare -F "$_cfg_resolve_fn" >/dev/null ||
             die 1 config "配置项 '$_cfg_resolve_key' 的默认值函数 '$_cfg_resolve_fn' 不存在"
-        "$_cfg_resolve_fn" _cfg_resolve_value || _cfg_resolve_rc=$?
+        "$_cfg_resolve_fn" _cfg_resolve_value _cfg_resolve_kind || _cfg_resolve_rc=$?
         if [[ "$_cfg_resolve_rc" -ne 0 && "$_cfg_resolve_rc" -ne 3 ]]; then
             die 1 config "配置项 '$_cfg_resolve_key' 的默认值计算失败"
         fi
@@ -53,12 +58,13 @@ _config_resolve() {
         unset '_CONFIG_RESOLVING[$_cfg_resolve_key]'
         _cfg_resolve_out=""
         _cfg_resolve_source="未设置"
+        _cfg_resolve_kind_out=""
         [[ "${CONFIG_SCHEMA[$_cfg_resolve_schema.required]:-}" != true ]] ||
             die 1 config "配置项 '$_cfg_resolve_key' 未设置"
         return 3
     fi
 
-    _config_normalize "$_cfg_resolve_key" _cfg_resolve_value "$_cfg_resolve_origin"
+    _config_normalize "$_cfg_resolve_key" _cfg_resolve_value "$_cfg_resolve_origin" "$_cfg_resolve_kind"
     if [[ "${CONFIG_SCHEMA[$_cfg_resolve_schema.required]:-}" == true && -z "$_cfg_resolve_value" ]]; then
         die 1 config "配置项 '$_cfg_resolve_key' 不能为空 ($_cfg_resolve_origin)"
     fi
@@ -73,6 +79,7 @@ _config_resolve() {
     unset '_CONFIG_RESOLVING[$_cfg_resolve_key]'
     _cfg_resolve_out="$_cfg_resolve_value"
     _cfg_resolve_source="$_cfg_resolve_origin"
+    _cfg_resolve_kind_out="$_cfg_resolve_kind"
 }
 
 _config_schema_active() {
@@ -128,12 +135,16 @@ config_validate() {
 # 读取并校验有效值，不写回原始配置，也不创建子 shell
 # 可选项缺失时输出空字符串，缺失与显式空值可通过 config_has 区分
 config_read() {
-    [[ $# -eq 2 ]] || die 1 config "config_read 用法为 <配置键> <输出变量>"
-    local _cfg_read_value _cfg_read_source _cfg_read_rc=0
-    _config_resolve "$1" _cfg_read_value _cfg_read_source || _cfg_read_rc=$?
+    [[ $# -eq 2 || $# -eq 3 ]] || die 1 config "config_read 用法为 <配置键> <输出变量> [结构输出变量]"
+    local _cfg_read_value _cfg_read_source _cfg_read_kind _cfg_read_rc=0
+    _config_resolve "$1" _cfg_read_value _cfg_read_source _cfg_read_kind || _cfg_read_rc=$?
     [[ "$_cfg_read_rc" -eq 0 || "$_cfg_read_rc" -eq 3 ]] || return "$_cfg_read_rc"
     local -n _cfg_read_out="$2"
     _cfg_read_out="$_cfg_read_value"
+    if [[ $# -eq 3 ]]; then
+        local -n _cfg_read_kind_out="$3"
+        _cfg_read_kind_out="$_cfg_read_kind"
+    fi
 }
 
 config_is_true() {
@@ -151,26 +162,33 @@ config_has() {
 
 #shellcheck disable=SC2034
 config_set() {
+    [[ $# -ge 2 && $# -le 4 ]] || die 1 config "config_set 用法为 <配置键> <值> [来源] [scalar|array]"
+    _config_value_validate "$2" "${4:-scalar}" "${3:-运行时} 配置项 '$1'"
     CONFIG["$1"]="$2"
     CONFIG_SOURCE["$1"]="${3:-运行时}"
+    CONFIG_KIND["$1"]="${4:-scalar}"
 }
 
 config_unset() {
-    unset 'CONFIG[$1]' 'CONFIG_SOURCE[$1]'
+    unset 'CONFIG[$1]' 'CONFIG_SOURCE[$1]' 'CONFIG_KIND[$1]'
 }
 
 # 每次读取替换整个输出数组，不继承调用方的旧内容
 config_read_array() {
     [[ $# -eq 2 ]] || die 1 config "config_read_array 用法为 <配置键> <输出数组>"
-    local _cfg_array_value _cfg_array_source _cfg_array_rc=0
+    local _cfg_array_value _cfg_array_source _cfg_array_kind _cfg_array_rc=0
     local -n _cfg_array_out="$2"
-    _config_resolve "$1" _cfg_array_value _cfg_array_source || _cfg_array_rc=$?
+    _config_resolve "$1" _cfg_array_value _cfg_array_source _cfg_array_kind || _cfg_array_rc=$?
     _cfg_array_out=()
     [[ "$_cfg_array_rc" -ne 3 ]] || return 0
     [[ "$_cfg_array_rc" -eq 0 ]] || return "$_cfg_array_rc"
     local _cfg_array_schema _cfg_array_parser=parse_array
     _config_schema_key "$1" _cfg_array_schema
-    [[ "${CONFIG_SCHEMA[$_cfg_array_schema.type]:-}" != args ]] || _cfg_array_parser=parse_args
+    if [[ "$_cfg_array_kind" == scalar ]]; then
+        [[ "${CONFIG_SCHEMA[$_cfg_array_schema.type]:-}" == args ]] ||
+            die 1 config "配置项 '$1' 不是数组 ($_cfg_array_source)"
+        _cfg_array_parser=split_args
+    fi
     "$_cfg_array_parser" "$_cfg_array_value" "$2" ||
         die 1 config "配置项 '$1' 的值 '$_cfg_array_value' 无法解析为数组 ($_cfg_array_source)"
 }

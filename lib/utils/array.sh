@@ -5,12 +5,12 @@ __UTILS_ARRAY_SH_LOADED=1
 
 # 本文件部分使用 LLM 生成
 
-is_array() {
+# 识别数组语法的起始，合法性由 parse_array 完整检查
+array_syntax_started() {
     local string="$1"
-    # 去除字符串首尾空白
+    # 去除字符串前导空白
     string="${string#"${string%%[![:space:]]*}"}"
-    string="${string%"${string##*[![:space:]]}"}"
-    [[ "$string" == \[*\] || "$string" == \(*\) ]]
+    [[ "$string" == \[* || "$string" == \(* ]]
 }
 
 parse_array() {
@@ -33,12 +33,11 @@ split_args() {
 
 # 参数列表接受数组或按空白分隔的字符串
 parse_args() {
-    local _args_text="$1"
-    _args_text="${_args_text#"${_args_text%%[![:space:]]*}"}"
-    case "$_args_text" in
-        \[* | \(*) parse_array "$_args_text" "$2" ;;
-        *) split_args "$_args_text" "$2" ;;
-    esac
+    if array_syntax_started "$1"; then
+        parse_array "$1" "$2"
+    else
+        split_args "$1" "$2"
+    fi
 }
 
 # 按顺序读取首个已设置的环境输入

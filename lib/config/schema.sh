@@ -26,7 +26,7 @@ _config_declare() {
     shift 3
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] || die 1 config "非法配置键 '$key'"
     case "$type" in
-        string | bool | uint | int | path | array | args | enum | size) ;;
+        string | 'string|array' | bool | uint | int | path | array | args | enum | size) ;;
         *) die 1 config "配置项 '$key' 使用了未知类型 '$type'" ;;
     esac
 

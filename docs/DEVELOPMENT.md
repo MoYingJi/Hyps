@@ -22,8 +22,6 @@
 
 source 保证 API 已定义，钩子的 `before`、`after` 保证同一阶段的执行顺序，两者需要分别声明。例如窗口计时依赖 xwin-watch，并需要在它的配置钩子之前注册监控需求。新增模块先明确依赖、状态所有者和执行阶段，没有独立职责时留在已有模块中。
 
-目前 `launch/* → libs.sh → launch/*` 及 feature 的宽泛导入仍待清理，加载 guard 只避免重复执行，不能消除结构依赖。
-
 ## 配置系统
 
 ### 声明与读取
@@ -145,9 +143,9 @@ runner 将 `game.prefix` 绑定到 `runner.prefix_var`，`GAMEID` / `UMU_ID` 按
 | `BUILD_MINGW_CC` | `HYPS_MINGW_CC` | `compile.mingw.CC`，默认 `x86_64-w64-mingw32-gcc` |
 | `BUILD_MINGW_CFLAGS` | `HYPS_MINGW_CFLAGS` | `compile.mingw.CFLAGS`，默认空数组 |
 
-四个 `compile.*` 配置项和选中的环境字符串都按 `args` 类型解析，例如 `compile.CC = "ccache gcc"` 或 `HYPS_CC='["ccache", "gcc"]'`。外部输入原样保留，内部 `BUILD_*` 数组每次加载重新生成，不作为环境覆盖输入。当前 Bash 中的索引数组也可作为输入，关联数组会报错。
+四个 `compile.*` 配置项和选中的环境字符串都按 `args` 类型解析，例如 `compile.CC = "ccache gcc"` 或 `HYPS_CC='["ccache", "gcc"]'`。`BUILD_*` 是每次加载重新生成的内部数组，不能作为输入。
 
-优先级按是否设置判断，显式空字符串和空数组覆盖低优先级来源。选中的输入格式错误时直接报错，不尝试低优先级来源。字符串中的引号、反斜杠和 shell 表达式不作求值，含空格的单个参数应使用数组，如 `HYPS_CFLAGS='["-DNAME=hello world", "-O2"]'`。空编译器在实际构建时报错，不回退到默认编译器。
+显式空值覆盖低优先级来源；选中的来源格式错误时直接报错，不回退到低优先级来源。引号、反斜杠和 shell 表达式不求值，含空格的参数应使用数组，如 `HYPS_CFLAGS='["-DNAME=hello world", "-O2"]'`。空编译器在构建时报错，不回退到默认编译器。
 
 MinGW 构建只接受 `HYPS_MINGW_CC`、`HYPS_MINGW_CFLAGS` 环境覆盖，不继承宿主的 `CC`、`CFLAGS`。
 
@@ -274,11 +272,11 @@ GAME_DAILY_RESET="04:00 Asia/Shanghai"
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
  - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
  - `game_paths`: 不接受参数，声明游戏路径角色；使用 `path_plan_declare <role> <scope> <rel> [label]` 和 `path_plan_note <role> [text]`，不直接执行任何操作。角色目前有 `userdata:screenshot` 和 `shader-cache`
- - `game_version_local`: 接受游戏可执行文件路径和三个 nameref 变量名，将本地版本、变体标识和远程查询上下文写入变量。本地版本只包含游戏本体已安装的版本。预下载内容不会安装到游戏本体，因此本函数不应返回预下载版本；远程预下载版本由 `game_version_remote` 一并返回。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准。上下文是不透明的字符串，由 `game_version_local` 生成并原样交给 `game_version_remote`，调用方不应解析它；不需要上下文的游戏可以忽略该参数
+ - `game_version_local`: 接受游戏可执行文件路径和三个 nameref 变量名，写入本地版本、变体标识和远程查询上下文。本地版本只含游戏本体已安装的版本，不返回预下载版本。变体是游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，允许为空。上下文是不透明字符串，原样交给 `game_version_remote`
  - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身
  - `game_version_remote`: 接受变体标识、上下文 (即 `game_version_local` 写入的内容，必填，可为空字符串) 和两个 nameref 变量名，将远程版本与预下载版本写入变量。无预下载时预下载写为空字符串，预下载版本可能高于远程版本
 
-游戏实现中也可以直接注册生命周期钩子。游戏目录内的路径应通过 `game_fs_path` / `game_fs_write_path` 获取，不要直接读 `game.exe` 拼路径
+游戏目录内的路径应通过 `game_fs_path` / `game_fs_write_path` 获取，不要直接读 `game.exe` 拼路径
 
 ## Launch Plan
 
@@ -290,7 +288,7 @@ Game Handler 负责 wine 侧的组装，接受一个 nameref 参数，自行获�
 
 > [!NOTE]
 >
-> 不像在 Linux 侧 Launch Plan 会提供 Runner Wrapper 这种允许共存的修改，在 Wine 侧只有一个独占的 Game Handler，这是有意为之，因为 Wine 侧的 Wrapper 通常直接与游戏接触，它们本来就互斥
+> Wine 侧的 Game Handler 同时只能有一个，与 Linux 侧可共存的 Runner Wrapper 不同。Wine 侧 Wrapper 直接与游戏接触，本来就互斥
 
 ## 工具开发
 

@@ -168,7 +168,10 @@ config_read_array() {
     _cfg_array_out=()
     [[ "$_cfg_array_rc" -ne 3 ]] || return 0
     [[ "$_cfg_array_rc" -eq 0 ]] || return "$_cfg_array_rc"
-    parse_array "$_cfg_array_value" "$2" ||
+    local _cfg_array_schema _cfg_array_parser=parse_array
+    _config_schema_key "$1" _cfg_array_schema
+    [[ "${CONFIG_SCHEMA[$_cfg_array_schema.type]:-}" != args ]] || _cfg_array_parser=parse_args
+    "$_cfg_array_parser" "$_cfg_array_value" "$2" ||
         die 1 config "配置项 '$1' 的值 '$_cfg_array_value' 无法解析为数组 ($_cfg_array_source)"
 }
 

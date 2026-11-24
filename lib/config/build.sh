@@ -13,77 +13,46 @@ source "$SCRIPT_DIR/core/lifecycle.sh"
 source "$SCRIPT_DIR/core/log.sh"
 #shellcheck source=../utils/string.sh
 source "$SCRIPT_DIR/utils/string.sh"
+#shellcheck source=../utils/array.sh
+source "$SCRIPT_DIR/utils/array.sh"
 
-config_declare compile.CC string --default gcc
-config_declare compile.CFLAGS array --default '[]'
-config_declare compile.mingw.CC string --default x86_64-w64-mingw32-gcc
-config_declare compile.mingw.CFLAGS array --default '[]'
+config_declare compile.CC args --default gcc
+config_declare compile.CFLAGS args --default '[]'
+config_declare compile.mingw.CC args --default x86_64-w64-mingw32-gcc
+config_declare compile.mingw.CFLAGS args --default '[]'
 
 build_load_config() {
-    build_read_flags CFLAGS compile.CFLAGS HYPS_CFLAGS
-    build_read_cc CC compile.CC HYPS_CC
-    build_read_cc HYPS_WIN_CC compile.mingw.CC HYPS_WIN_CC
-    build_read_flags MINGW_CFLAGS compile.mingw.CFLAGS HYPS_MINGW_CFLAGS
+    build_read_args compile.CC BUILD_CC HYPS_CC CC || return $?
+    build_read_args compile.CFLAGS BUILD_CFLAGS HYPS_CFLAGS CFLAGS || return $?
+    build_read_args compile.mingw.CC BUILD_MINGW_CC HYPS_MINGW_CC || return $?
+    build_read_args compile.mingw.CFLAGS BUILD_MINGW_CFLAGS HYPS_MINGW_CFLAGS
 }
 
-build_read_flags() {
-    local env_name="$1"
-    local config_key="$2"
-    local output_name="$3"
-    local env_value="${!env_name:-}"
-    local env_attributes="${!env_name@a}"
-    local env_present=false
-    [[ -v "$env_name" || "$env_attributes" == *a* ]] && env_present=true
-    local -a flags=()
+# 构建结果与外部输入分开保存，重复加载时重新读取输入与配置
+# build_read_args <配置键> <输出数组> [按优先级排列的环境变量...]
+build_read_args() {
+    local config_key="$1" output_name="$2"
+    shift 2
+    local input_source status=0
+    local -a args=()
+
+    read_env_args args input_source "$@" || status=$?
+    case "$status" in
+        0)
+            if config_has "$config_key"; then
+                log_debug build "$input_source 已设置，$config_key 配置项将被忽略"
+            fi
+            ;;
+        1) config_read_array "$config_key" args ;;
+        *) die 1 build "环境变量 '$input_source' 格式无效，请使用 args 字符串或 Bash 索引数组" ;;
+    esac
 
     unset "$output_name"
-
-    if [[ "$env_present" == true ]] && config_has "$config_key"; then
-        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
-    fi
-
-    if [[ "$env_present" == true ]]; then
-        if [[ "$env_attributes" == *a* ]]; then
-            #shellcheck disable=SC2178
-            local -n env_flags="$env_name"
-            flags=("${env_flags[@]}")
-        else
-            read -ra flags <<< "$env_value"
-        fi
-    else
-        config_read_array "$config_key" flags
-    fi
-
     #shellcheck disable=SC2178
-    local -n output_flags="$output_name"
+    local -n output_args="$output_name"
     #shellcheck disable=SC2034
-    output_flags=("${flags[@]}")
-    log_debug environment "应用内 CFLAGS [$config_key]: $(quote_args "${flags[@]}")"
-}
-
-build_read_cc() {
-    local env_name="$1"
-    local config_key="$2"
-    local output_name="$3"
-    local env_value="${!env_name:-}"
-    local value=""
-    local env_present=false
-    [[ -v "$env_name" ]] && env_present=true
-
-    unset "$output_name"
-
-    if [[ "$env_present" == true ]] && config_has "$config_key"; then
-        log_debug environment "$env_name 已在环境变量中设置，$config_key 配置项将被忽略"
-    fi
-
-    if [[ "$env_present" == true ]]; then
-        value="$env_value"
-    else
-        config_read "$config_key" value
-    fi
-
-    printf -v "$output_name" '%s' "$value"
-    log_debug environment "应用内 CC [$config_key]: '$value'"
+    output_args=("${args[@]}")
+    log_debug build "应用内构建参数 [$config_key，来源 ${input_source:-配置}]: $(quote_args "${args[@]}")"
 }
 
 register_hook load_config build_load_config

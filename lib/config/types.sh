@@ -60,6 +60,9 @@ _config_normalize() {
         array)
             parse_array "$_cfg_type_value" _cfg_type_array || _cfg_type_valid=false
             ;;
+        args)
+            parse_args "$_cfg_type_value" _cfg_type_array || _cfg_type_valid=false
+            ;;
         enum)
             _cfg_type_valid=false
             IFS=',' read -ra _cfg_type_choices <<< "${CONFIG_SCHEMA[$_cfg_type_schema.choices]}"

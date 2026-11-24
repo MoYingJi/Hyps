@@ -64,11 +64,10 @@ _toolspec_add_backend() {
     _out_libs+=("${_blibs[@]}")
 }
 
-# toolspec_resolve <cc> <用户 CFLAGS 数组名> [backend...]
+# toolspec_resolve <CC 数组名> <用户 CFLAGS 数组名> [backend...]
 # 结果: TOOLSPEC_RESULT_CC / _CFLAGS / _SOURCES / _LIBS / _INPUTS
 toolspec_resolve() {
-    local cc="$1"
-    local -n _user_cflags="$2"
+    local -n _user_cc="$1" _user_cflags="$2"
     shift 2
 
     local -a sources=() defines=() libs=() deps=()
@@ -89,7 +88,7 @@ toolspec_resolve() {
         _toolspec_add_backend "$b" sources defines libs
     done
 
-    TOOLSPEC_RESULT_CC="$cc"
+    TOOLSPEC_RESULT_CC=("${_user_cc[@]}")
     TOOLSPEC_RESULT_CFLAGS=("${_user_cflags[@]}" -std=gnu23 "${TOOLSPEC_CFLAGS[@]}")
     for d in "${TOOLSPEC_INCLUDES[@]}"; do
         if [[ "$d" == . ]]; then
@@ -114,6 +113,7 @@ toolspec_fingerprint() {
         cat -- "$f"
     done
     printf '### argv\n'
-    printf '%s\n' "$TOOLSPEC_RESULT_CC" "${TOOLSPEC_RESULT_CFLAGS[@]}" \
+    # 转义参数中的空白和换行，保留空参数与参数边界
+    printf '%q\n' "${TOOLSPEC_RESULT_CC[@]}" "${TOOLSPEC_RESULT_CFLAGS[@]}" \
         "${TOOLSPEC_RESULT_SOURCES[@]}" "${TOOLSPEC_RESULT_LIBS[@]}"
 }

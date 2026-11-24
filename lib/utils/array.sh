@@ -25,6 +25,46 @@ parse_array() {
     esac
 }
 
+# 字符串按空白分隔，引号和反斜杠按字面保留
+split_args() {
+    local -n _split_args_out="$2"
+    IFS=$' \t\n' read -ra _split_args_out <<< "${1//$'\n'/ }"
+}
+
+# 参数列表接受数组或按空白分隔的字符串
+parse_args() {
+    local _args_text="$1"
+    _args_text="${_args_text#"${_args_text%%[![:space:]]*}"}"
+    case "$_args_text" in
+        \[* | \(*) parse_array "$_args_text" "$2" ;;
+        *) split_args "$_args_text" "$2" ;;
+    esac
+}
+
+# 按顺序读取首个已设置的环境输入
+# 返回 1 表示均未设置，返回 2 表示选中的输入格式无效
+read_env_args() {
+    local -n _env_args_out="$1" _env_args_source="$2"
+    shift 2
+    local _env_args_name _env_args_attributes
+    _env_args_out=()
+    _env_args_source=""
+    for _env_args_name in "$@"; do
+        _env_args_attributes="${!_env_args_name@a}"
+        [[ -v "$_env_args_name" || "$_env_args_attributes" == *[aA]* ]] || continue
+        _env_args_source="$_env_args_name"
+        [[ "$_env_args_attributes" != *A* ]] || return 2
+        if [[ "$_env_args_attributes" == *a* ]]; then
+            local -n _env_args_input="$_env_args_name"
+            _env_args_out=("${_env_args_input[@]}")
+        else
+            parse_args "${!_env_args_name}" _env_args_out || return 2
+        fi
+        return 0
+    done
+    return 1
+}
+
 parse_json_array() {
     local json="$1"
     # 去除字符串首尾空白

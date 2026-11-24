@@ -48,7 +48,7 @@ local -a args=()
 config_read_array game.args args
 ```
 
-类型：`string`、`bool`、`uint`、`int`、`path`、`array`、`enum`、`size`。`enum` 用 `--choices a,b` 指定可选值，`size` 保留 `10G` 这类表达式。其他声明选项：
+类型：`string`、`bool`、`uint`、`int`、`path`、`array`、`args`、`enum`、`size`。`args` 接受数组或按空白分隔的字符串，通过 `config_read_array` 读取参数数组；`enum` 用 `--choices a,b` 指定可选值，`size` 保留 `10G` 这类表达式。其他声明选项：
 
 | 选项 | 契约 |
 | --- | --- |
@@ -136,7 +136,22 @@ local pid="$!"
 
 runner 将 `game.prefix` 绑定到 `runner.prefix_var`，`GAMEID` / `UMU_ID` 按最终优先级统一，同级冲突或最终为空时报错。预设的兜底 ID 应写 `game.umu_id = "umu-default"`，以供游戏覆盖；`env.UMU_ID` 表达优先级更高的环境覆盖。`LD_PRELOAD` 由 Launch Plan 独占管理。
 
-构建配置由 `config/build.sh` 独立处理：`CC`、`CFLAGS`、`HYPS_WIN_CC`、`MINGW_CFLAGS` 优先于对应配置，在 `load_config` 生成构建输入，支持 Bash flags 数组。显式空 flags 表示不用配置中的 flags，空编译器在实际构建时报错。
+构建配置由 `config/build.sh` 独立处理，在 `load_config` 通过 `build_read_args` 按以下优先级生成参数数组：
+
+| 内部结果 | 环境覆盖，从高到低 | 配置与默认值 |
+| --- | --- | --- |
+| `BUILD_CC` | `HYPS_CC` > `CC` | `compile.CC`，默认 `gcc` |
+| `BUILD_CFLAGS` | `HYPS_CFLAGS` > `CFLAGS` | `compile.CFLAGS`，默认空数组 |
+| `BUILD_MINGW_CC` | `HYPS_MINGW_CC` | `compile.mingw.CC`，默认 `x86_64-w64-mingw32-gcc` |
+| `BUILD_MINGW_CFLAGS` | `HYPS_MINGW_CFLAGS` | `compile.mingw.CFLAGS`，默认空数组 |
+
+四个 `compile.*` 配置项和选中的环境字符串都按 `args` 类型解析，例如 `compile.CC = "ccache gcc"` 或 `HYPS_CC='["ccache", "gcc"]'`。外部输入原样保留，内部 `BUILD_*` 数组每次加载重新生成，不作为环境覆盖输入。当前 Bash 中的索引数组也可作为输入，关联数组会报错。
+
+优先级按是否设置判断，显式空字符串和空数组覆盖低优先级来源。选中的输入格式错误时直接报错，不尝试低优先级来源。字符串中的引号、反斜杠和 shell 表达式不作求值，含空格的单个参数应使用数组，如 `HYPS_CFLAGS='["-DNAME=hello world", "-O2"]'`。空编译器在实际构建时报错，不回退到默认编译器。
+
+MinGW 构建只接受 `HYPS_MINGW_CC`、`HYPS_MINGW_CFLAGS` 环境覆盖，不继承宿主的 `CC`、`CFLAGS`。
+
+ToolSpec 的编译器结果也使用数组，执行、缓存指纹和编译数据库均保留完整编译器命令及参数。`development/gen-compile-db.sh` 使用相同的环境覆盖优先级和解析规则，不读取配置文件，未设置的 flags 默认使用 `-Wall -Wextra`。
 
 ## 生命周期
 

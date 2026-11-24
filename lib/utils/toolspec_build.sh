@@ -15,11 +15,16 @@ toolspec_runtime_resolve() {
     shift
     toolspec_load "$dir" || return 1
 
+    local cc_name=BUILD_CC flags_name=BUILD_CFLAGS
+    local -a default_cc=(gcc)
     if [[ "$TOOLSPEC_TOOLCHAIN" == mingw ]]; then
-        toolspec_resolve "${HYPS_WIN_CC-x86_64-w64-mingw32-gcc}" HYPS_MINGW_CFLAGS "$@"
-    else
-        toolspec_resolve "${HYPS_CC-gcc}" HYPS_CFLAGS "$@"
+        cc_name=BUILD_MINGW_CC
+        flags_name=BUILD_MINGW_CFLAGS
+        # shellcheck disable=SC2034 # 通过 toolspec_resolve 的 nameref 读取
+        default_cc=(x86_64-w64-mingw32-gcc)
     fi
+    [[ -v "$cc_name" || "${!cc_name@a}" == *a* ]] || cc_name=default_cc
+    toolspec_resolve "$cc_name" "$flags_name" "$@"
 }
 
 # toolspec_runtime_fingerprint <工具目录> [backend...]
@@ -33,14 +38,14 @@ toolspec_runtime_build() {
     shift 2
     toolspec_runtime_resolve "$dir" "$@" || return 1
 
-    if ! command_exists "$TOOLSPEC_RESULT_CC"; then
-        log_error "$TOOLSPEC_NAME" "未找到编译器 '$TOOLSPEC_RESULT_CC'，请检查 compile 相关配置或安装对应工具链"
+    if [[ -z "${TOOLSPEC_RESULT_CC[0]:-}" ]] || ! command_exists "${TOOLSPEC_RESULT_CC[0]}"; then
+        log_error "$TOOLSPEC_NAME" "未找到编译器 '${TOOLSPEC_RESULT_CC[0]:-}'，请检查 compile 相关配置或安装对应工具链"
         return 1
     fi
 
     mkdir -p "$(dirname "$output")" || return 1
     run_and_log DEBUG "$TOOLSPEC_NAME" "编译命令" \
-        "$TOOLSPEC_RESULT_CC" "${TOOLSPEC_RESULT_CFLAGS[@]}" \
+        "${TOOLSPEC_RESULT_CC[@]}" "${TOOLSPEC_RESULT_CFLAGS[@]}" \
         "${TOOLSPEC_RESULT_SOURCES[@]}" "${TOOLSPEC_RESULT_LIBS[@]}" \
         -o "$output"
 }

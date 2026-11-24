@@ -51,11 +51,7 @@ game_version_variant_human_readable() {
 }
 
 game_version_remote() {
-    integration_gryph_get_game_version_remote "endfield" "$1"
-}
-
-game_version_predownload_remote() {
-    integration_gryph_get_game_predownload_remote "endfield" "$1"
+    integration_gryph_get_game_version_remote "endfield" "$1" "$2" "$3"
 }
 
 # 鹰角通用替身父进程工具（详见 tools/gryph-surrogate/gryph-surrogate.c 头部注释）

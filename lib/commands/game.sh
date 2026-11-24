@@ -129,16 +129,15 @@ _game_outdated_collect() (
     #shellcheck source=/dev/null
     source "$game_impl" || return 1
 
-    local has_local=0 has_remote=0 has_predownload=0
+    local has_local=0 has_remote=0
     [ "$(type -t game_version_local)" = "function" ] && has_local=1
     [ "$(type -t game_version_remote)" = "function" ] && has_remote=1
-    [ "$(type -t game_version_predownload_remote)" = "function" ] && has_predownload=1
 
     # 列表模式需要 local+remote 双实现 (无法比较则无列表意义)，report 有什么报什么
     if [[ "$mode" != "report" ]]; then
         [ "$has_local" -eq 1 ] && [ "$has_remote" -eq 1 ] || return 2
     else
-        [ "$has_local" -eq 1 ] || [ "$has_remote" -eq 1 ] || [ "$has_predownload" -eq 1 ] || return 2
+        [ "$has_local" -eq 1 ] || [ "$has_remote" -eq 1 ] || return 2
     fi
 
     load_game_config "$game_name"
@@ -162,22 +161,15 @@ _game_outdated_collect() (
     fi
 
     if [ "$has_remote" -eq 1 ]; then
-        local queried_version
-        if queried_version="$(game_version_remote "${gameinfo[variant]}")" \
-            && [ -n "$queried_version" ]; then
+        local fetched_remote="" fetched_pre=""
+        if game_version_remote "${gameinfo[variant]}" fetched_remote fetched_pre \
+            && [ -n "$fetched_remote" ]; then
             gameinfo[remote_ok]=1
-            gameinfo[remote_version]="$queried_version"
+            gameinfo[remote_version]="$fetched_remote"
+            gameinfo[pre_ok]=1
+            gameinfo[pre_version]="$fetched_pre"
         else
             log_error game-outdated "无法获取 $game_name 的远程版本"
-        fi
-    fi
-
-    # 预下载与远程版本同源，远程失败时不再重复请求
-    if [ "$has_predownload" -eq 1 ] && [ "${gameinfo[remote_ok]}" -eq 1 ]; then
-        local pre_tag
-        if pre_tag="$(game_version_predownload_remote "${gameinfo[variant]}")"; then
-            gameinfo[pre_ok]=1
-            gameinfo[pre_version]="$pre_tag"
         fi
     fi
 
@@ -227,24 +219,20 @@ _game_outdated_render() {
     # 本地版本颜色跟随比较结论，无本地版本时保持默认蓝
     [ "${_info[local_ok]}" -eq 1 ] && local_style="$status_style"
 
-    # 未定义对应函数显示 "-"，定义了但请求失败显示红字标记
+    # 未定义版本检查时显示 "-"，请求失败显示红字标记
     local remote_display pre_display
     if [ "$(type -t game_version_remote)" != "function" ]; then
         remote_display="-"
+        pre_display="-"
     elif [ "${_info[remote_ok]}" -eq 1 ]; then
         remote_display="${_info[remote_version]}"
-    else
-        remote_display="$(style_quote red "✗ 请求失败")"
-    fi
-    if [ "$(type -t game_version_predownload_remote)" != "function" ]; then
-        pre_display="-"
-    elif [ "${_info[pre_ok]}" -eq 1 ]; then
         if [ -n "${_info[pre_version]}" ]; then
             pre_display="$(style_quote bright_cyan "⇣ 可预下载 ${_info[pre_version]}")"
         else
             pre_display="$(style_quote bright_black "未开放")"
         fi
     else
+        remote_display="$(style_quote red "✗ 请求失败")"
         pre_display="$(style_quote red "✗ 请求失败")"
     fi
 

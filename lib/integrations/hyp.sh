@@ -191,32 +191,24 @@ _integration_hyp_game_biz() {
     esac
 }
 
-# 返回远程版本；无版本时输出空行并返回 1
+# 返回远程版本与预下载版本；无预下载时预下载为空
+# 用法: integration_hyp_get_game_version_remote <game> <variant> <remote_nameref> <predownload_nameref>
 integration_hyp_get_game_version_remote() {
     local game="$1"
     local variant="${2:-cn}"
+    local -n _remote_version="$3"
+    local -n _predownload_version="$4"
     local game_biz
 
     _integration_hyp_game_biz game_biz "$game" "$variant" || return 1
     _integration_hyp_load_branches "$game" "$variant" || return 1
 
-    local version="${_HYP_BRANCH_VERSION[$game_biz]:-}"
-    [ -n "$version" ] || {
+    _remote_version="${_HYP_BRANCH_VERSION[$game_biz]:-}"
+    [ -n "$_remote_version" ] || {
         log_error hyp "API 未返回 $game ($game_biz, variant=$variant) 的版本"
         return 1
     }
-    printf "%s\n" "$version"
-}
-
-# 返回预下载版本；无预下载时输出空行
-integration_hyp_get_game_predownload_remote() {
-    local game="$1"
-    local variant="${2:-cn}"
-    local game_biz
-
-    _integration_hyp_game_biz game_biz "$game" "$variant" || return 1
-    _integration_hyp_load_branches "$game" "$variant" || return 1
-    printf "%s\n" "${_HYP_BRANCH_PREDOWNLOAD[$game_biz]:-}"
+    _predownload_version="${_HYP_BRANCH_PREDOWNLOAD[$game_biz]:-}"
 }
 
 integration_hyp_extract_pkg_version() {

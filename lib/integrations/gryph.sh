@@ -15,7 +15,7 @@ source "$SCRIPT_DIR/utils/command.sh"
 GRYPH_LAUNCHER_AES_KEY="c0f30e1ce763bbc21cc355a34303ac50399444bff68c4a22af398c0a166ee143"
 GRYPH_LAUNCHER_AES_IV="33467861192750649501937264608400"
 
-# 本地读取的查询参数由 game_version_local 写入，remote / predownload 在同一子 shell 内复用
+# 本地读取的查询参数由 game_version_local 写入，game_version_remote 在同一子 shell 内复用
 declare -gA _GRYPH_LOCAL_VERSION _GRYPH_APPCODE _GRYPH_CHANNEL _GRYPH_SUB_CHANNEL
 
 # 解密游戏根目录的 config.ini，输出明文
@@ -199,29 +199,23 @@ integration_gryph_get_game_version_local() {
     _GRYPH_SUB_CHANNEL["$game:$variant"]="$sub_channel"
 }
 
+# 返回远程版本与预下载版本；无预下载时预下载为空
+# 用法: integration_gryph_get_game_version_remote <game> <variant> <remote_nameref> <predownload_nameref>
 integration_gryph_get_game_version_remote() {
     local game="$1"
     local variant="${2-cn}"
+    local -n _remote_version="$3"
+    local -n _predownload_version="$4"
 
-    local raw version
-    _integration_gryph_get_latest_raw raw "$game" "$variant" || return 1
-
-    version="$(jq -r '.version // empty' <<< "$raw" 2>/dev/null)"
-    if [ -z "$version" ]; then
-        log_error gryph "接口未返回 $game ($variant) 的版本"
-        return 1
-    fi
-    printf '%s\n' "$version"
-}
-
-integration_gryph_get_game_predownload_remote() {
-    local game="$1"
-    local variant="${2-cn}"
-
+    # 带上本地版本，一次请求同时拿到最新版本与预下载信息
     local local_version="${_GRYPH_LOCAL_VERSION["$game:$variant"]:-}"
     local raw
     _integration_gryph_get_latest_raw raw "$game" "$variant" "$local_version" || return 1
 
-    # 未开启预下载时 pre_patch 为 null，输出空行
-    jq -r '.pre_patch.version // empty' <<< "$raw" 2>/dev/null
+    _remote_version="$(jq -r '.version // empty' <<< "$raw" 2>/dev/null)"
+    [ -n "$_remote_version" ] || {
+        log_error gryph "接口未返回 $game ($variant) 的版本"
+        return 1
+    }
+    _predownload_version="$(jq -r '.pre_patch.version // empty' <<< "$raw" 2>/dev/null)"
 }

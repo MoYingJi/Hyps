@@ -44,9 +44,5 @@ game_version_variant_human_readable() {
 }
 
 game_version_remote() {
-    integration_hyp_get_game_version_remote "honkai3" "${1:-cn}"
-}
-
-game_version_predownload_remote() {
-    integration_hyp_get_game_predownload_remote "honkai3" "${1:-cn}"
+    integration_hyp_get_game_version_remote "honkai3" "${1:-cn}" "$2" "$3"
 }

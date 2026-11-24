@@ -110,7 +110,7 @@ _game_outdated_collect() (
     local game_impl="$SCRIPT_DIR/games/$game_name.sh"
     local -A gameinfo=(
         [name]="$game_name"
-        [exe]="" [variant]=""
+        [exe]="" [variant]="" [local_context]=""
         [local_version]="" [remote_version]="" [pre_version]=""
         [local_ok]=0 [remote_ok]=0 [pre_ok]=0
     )
@@ -151,7 +151,7 @@ _game_outdated_collect() (
 
     if [ "$has_local" -eq 1 ]; then
         local local_variant=""
-        if ! game_version_local "$game_exe" "gameinfo[local_version]" local_variant \
+        if ! game_version_local "$game_exe" "gameinfo[local_version]" local_variant "gameinfo[local_context]" \
             || [ -z "${gameinfo[local_version]}" ]; then
             log_error game-outdated "无法读取 $game_name 的本地版本"
             return 1
@@ -162,7 +162,7 @@ _game_outdated_collect() (
 
     if [ "$has_remote" -eq 1 ]; then
         local fetched_remote="" fetched_pre=""
-        if game_version_remote "${gameinfo[variant]}" fetched_remote fetched_pre \
+        if game_version_remote "${gameinfo[variant]}" "${gameinfo[local_context]}" fetched_remote fetched_pre \
             && [ -n "$fetched_remote" ]; then
             gameinfo[remote_ok]=1
             gameinfo[remote_version]="$fetched_remote"

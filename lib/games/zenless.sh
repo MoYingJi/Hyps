@@ -47,5 +47,5 @@ game_version_variant_human_readable() {
 }
 
 game_version_remote() {
-    integration_hyp_get_game_version_remote "zenless" "${1:-cn}" "$2" "$3"
+    integration_hyp_get_game_version_remote "zenless" "${1:-cn}" "$2" "$3" "$4"
 }

@@ -17,9 +17,6 @@ source "$SCRIPT_DIR/utils/ini.sh"
 GRYPH_LAUNCHER_AES_KEY="c0f30e1ce763bbc21cc355a34303ac50399444bff68c4a22af398c0a166ee143"
 GRYPH_LAUNCHER_AES_IV="33467861192750649501937264608400"
 
-# 本地读取的查询参数由 game_version_local 写入，game_version_remote 在同一子 shell 内复用
-declare -gA _GRYPH_LOCAL_VERSION _GRYPH_APPCODE _GRYPH_CHANNEL _GRYPH_SUB_CHANNEL
-
 # 解密游戏根目录的 config.ini，输出明文
 integration_gryph_decrypt_config() {
     local config_file="$1"
@@ -35,7 +32,7 @@ integration_gryph_decrypt_config() {
     fi
     if ! _plaintext="$(openssl enc -d -aes-256-cbc \
         -K "$GRYPH_LAUNCHER_AES_KEY" -iv "$GRYPH_LAUNCHER_AES_IV" \
-        -in "$config_file" 2>/dev/null)"; then
+        -in "$config_file")"; then
         log_error gryph "无法解密游戏配置文件: $config_file"
         return 1
     fi
@@ -92,42 +89,33 @@ integration_gryph_variant_human_readable() {
     esac
 }
 
-# 变体对应的接口域名与 channel / sub_channel，后两者取自本地 config.ini
-_integration_gryph_get_endpoint() {
-    local -n _base="$1"
-    local -n _channel="$2"
-    local -n _sub_channel="$3"
-    local game="$4"
-    local variant="$5"
-
-    case "$variant" in
-        cn | bilibili) _base="https://launcher.hypergryph.com/api" ;;
-        global)        _base="https://launcher.gryphline.com/api" ;;
-        *) return 1 ;;
-    esac
-
-    _channel="${_GRYPH_CHANNEL["$game:$variant"]:-}"
-    _sub_channel="${_GRYPH_SUB_CHANNEL["$game:$variant"]:-}"
-    [ -n "$_channel" ] || return 1
-    _sub_channel="${_sub_channel:-$_channel}"
-}
-
 # 请求 get_latest，输出原始 JSON
-# local_version 非空时带上 version 参数，接口会据此返回 patch / pre_patch
+# context 为 integration_gryph_get_game_version_local 输出的 ini 文本 (appcode / channel / sub_channel / version)
+# version 非空时带上 version 参数，接口会据此返回 patch / pre_patch
 _integration_gryph_get_latest_raw() {
     local -n _raw="$1"
     local game="$2"
     local variant="$3"
-    local local_version="${4:-}"
+    local context="$4"
 
-    local base channel sub_channel appcode url
-    if ! _integration_gryph_get_endpoint base channel sub_channel "$game" "$variant"; then
-        log_error gryph "无法确定 $game ($variant) 的接口参数"
-        return 1
-    fi
-    appcode="${_GRYPH_APPCODE["$game:$variant"]:-}"
-    if [ -z "$appcode" ]; then
-        log_error gryph "缺少 $game ($variant) 的 appCode"
+    local base appcode channel sub_channel version url
+    local -a fields
+    case "$variant" in
+        cn | bilibili) base="https://launcher.hypergryph.com/api" ;;
+        global)        base="https://launcher.gryphline.com/api" ;;
+        *)
+            log_error gryph "无法确定 $game ($variant) 的接口地址"
+            return 1 ;;
+    esac
+
+    mapfile -t fields < <(ini_get appcode channel sub_channel version <<< "$context")
+    appcode="${fields[0]}"
+    channel="${fields[1]}"
+    sub_channel="${fields[2]:-$channel}"
+    version="${fields[3]}"
+
+    if [ -z "$appcode" ] || [ -z "$channel" ]; then
+        log_error gryph "缺少 $game ($variant) 的 appCode 或 channel"
         return 1
     fi
     if ! command_exists curl || ! command_exists jq; then
@@ -136,29 +124,23 @@ _integration_gryph_get_latest_raw() {
     fi
 
     url="$base/game/get_latest?appcode=$appcode&channel=$channel&sub_channel=$sub_channel"
-    [ -n "$local_version" ] && url="$url&version=$local_version"
+    [ -n "$version" ] && url="$url&version=$version"
 
-    if ! _raw="$(curl -fsS "$url" 2>&1)"; then
+    # curl 的错误信息直接输出到 stderr，不经过捕获，失败时再补充上下文
+    if ! _raw="$(curl -fsS "$url")"; then
         log_error gryph "无法请求版本接口: $url"
-        return 1
-    fi
-
-    local code
-    if ! code="$(jq -r '.code // 0' <<< "$_raw" 2>/dev/null)"; then
-        log_error gryph "版本接口返回了无法解析的内容"
-        return 1
-    fi
-    if [ "$code" != "0" ]; then
-        log_error gryph "版本接口错误 [$code]: $(jq -r '.message // "unknown"' <<< "$_raw" 2>/dev/null)"
         return 1
     fi
 }
 
+# 本地版本、变体标识，以及远程查询所需的 context (ini 文本) 通过 nameref 输出
+# 用法: integration_gryph_get_game_version_local <game> <game_exe> <version_nameref> <variant_nameref> <context_nameref>
 integration_gryph_get_game_version_local() {
     local game="$1"
     local game_exe="$2"
     local -n _local_version="$3"
     local -n _local_variant="$4"
+    local -n _local_context="$5"
 
     local game_dir config_file version appcode region channel sub_channel variant
     path_dirname "$game_exe" game_dir
@@ -168,36 +150,46 @@ integration_gryph_get_game_version_local() {
         version appcode region channel sub_channel || return 1
 
     _local_version="$version"
+    _local_context="$(printf 'appcode=%s\nchannel=%s\nsub_channel=%s\nversion=%s\n' \
+        "$appcode" "$channel" "$sub_channel" "$version")"
 
     if ! integration_gryph_variant_from_config variant "$region" "$channel"; then
-        log_warn gryph "无法识别的区服/渠道: region='$region' channel='$channel'"
+        log_warn gryph "$game: 无法识别的区服/渠道: region='$region' channel='$channel'"
         _local_variant=""
         return 0
     fi
     _local_variant="$variant"
-    _GRYPH_LOCAL_VERSION["$game:$variant"]="$version"
-    _GRYPH_APPCODE["$game:$variant"]="$appcode"
-    _GRYPH_CHANNEL["$game:$variant"]="$channel"
-    _GRYPH_SUB_CHANNEL["$game:$variant"]="$sub_channel"
 }
 
 # 返回远程版本与预下载版本；无预下载时预下载为空
-# 用法: integration_gryph_get_game_version_remote <game> <variant> <remote_nameref> <predownload_nameref>
+# 用法: integration_gryph_get_game_version_remote <game> <variant> <context> <remote_nameref> <predownload_nameref>
+# context 为 integration_gryph_get_game_version_local 输出的内容，不可为空
 integration_gryph_get_game_version_remote() {
     local game="$1"
     local variant="${2-cn}"
-    local -n _remote_version="$3"
-    local -n _predownload_version="$4"
+    local context="$3"
+    local -n _remote_version="$4"
+    local -n _predownload_version="$5"
 
-    # 带上本地版本，一次请求同时拿到最新版本与预下载信息
-    local local_version="${_GRYPH_LOCAL_VERSION["$game:$variant"]:-}"
-    local raw
-    _integration_gryph_get_latest_raw raw "$game" "$variant" "$local_version" || return 1
+    # 同一次请求同时返回最新版本与预下载信息，用一次 jq 解析全部字段
+    local raw fields code message version predownload
+    _integration_gryph_get_latest_raw raw "$game" "$variant" "$context" || return 1
 
-    _remote_version="$(jq -r '.version // empty' <<< "$raw" 2>/dev/null)"
-    [ -n "$_remote_version" ] || {
+    if ! fields="$(jq -r '[(.code // 0 | tostring), (.message // "unknown"), (.version // ""), (.pre_patch.version // "")] | join("\u001f")' <<< "$raw")"; then
+        log_error gryph "版本接口返回了无法解析的内容"
+        return 1
+    fi
+    # \x1f 为非空白分隔符，空字段 (如无预下载) 不会被 read 合并
+    IFS=$'\x1f' read -r code message version predownload <<< "$fields"
+
+    if [ "$code" != "0" ]; then
+        log_error gryph "版本接口错误 [$code]: $message"
+        return 1
+    fi
+    if [ -z "$version" ]; then
         log_error gryph "接口未返回 $game ($variant) 的版本"
         return 1
-    }
-    _predownload_version="$(jq -r '.pre_patch.version // empty' <<< "$raw" 2>/dev/null)"
+    fi
+    _remote_version="$version"
+    _predownload_version="$predownload"
 }

@@ -112,24 +112,29 @@ _integration_hyp_load_branches() {
     _integration_hyp_branches_cache_key cache_key "$variant" "$game" || return 1
     [[ -n "${_HYP_BRANCH_LOADED[$cache_key]:-}" ]] && return 0
 
-    local domain launcher_id raw
+    local domain launcher_id body raw
     _integration_hyp_get_api_domain domain "$variant" || return 1
     _integration_hyp_get_launcher_id launcher_id "$variant" "$game" || return 1
 
-    raw="$(curl -fsS "https://$domain/hyp/hyp-connect/api/getGameBranches?launcher_id=$launcher_id" \
-        | jq -r '
+    # curl 与 jq 的错误都直接输出到 stderr (jq 的 API 错误来自 halt_error)，不经过捕获
+    if ! body="$(curl -fsS "https://$domain/hyp/hyp-connect/api/getGameBranches?launcher_id=$launcher_id")"; then
+        log_error hyp "无法请求游戏分支信息 (variant=$variant)"
+        return 1
+    fi
+
+    # 本函数可能在 command substitution 中被调用，用 log_error + return 1 报错
+    if ! raw="$(jq -r '
             if .retcode != 0 then
-                "API error [\(.retcode)]: \(.message // "unknown")" | halt_error(1)
+                "API error [\(.retcode)]: \(.message // "unknown")\n" | halt_error(1)
             else
                 .data.game_branches[]
                 | [.game.biz, (.main.tag // ""), (.pre_download.tag // "")]
                 | join("\u001f")
             end
-        ' 2>&1)" || {
-        # 本函数可能在 command substitution 中被调用，用 log_error + return 1 报错
-        log_error hyp "无法获取游戏分支信息 (variant=$variant): $raw"
+        ' <<< "$body")"; then
+        log_error hyp "无法获取游戏分支信息 (variant=$variant)"
         return 1
-    }
+    fi
 
     # \x1f 分隔: bash read 会折叠连续的空白 IFS 字符，空字段 (如无预下载的 pre_download.tag) 会被吞掉
     local sep=$'\x1f'
@@ -167,12 +172,13 @@ _integration_hyp_game_biz() {
 }
 
 # 返回远程版本与预下载版本；无预下载时预下载为空
-# 用法: integration_hyp_get_game_version_remote <game> <variant> <remote_nameref> <predownload_nameref>
+# 用法: integration_hyp_get_game_version_remote <game> <variant> <context> <remote_nameref> <predownload_nameref>
+# context 不参与查询 (hyp 的 getGameBranches 只需 game 与 variant)，保留位置与 gryph 一致
 integration_hyp_get_game_version_remote() {
     local game="$1"
     local variant="${2:-cn}"
-    local -n _remote_version="$3"
-    local -n _predownload_version="$4"
+    local -n _remote_version="$4"
+    local -n _predownload_version="$5"
     local game_biz
 
     _integration_hyp_game_biz game_biz "$game" "$variant" || return 1

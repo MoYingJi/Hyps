@@ -43,5 +43,5 @@ game_version_variant_human_readable() {
 }
 
 game_version_remote() {
-    integration_gryph_get_game_version_remote "arknights" "$1" "$2" "$3"
+    integration_gryph_get_game_version_remote "arknights" "$1" "$2" "$3" "$4"
 }

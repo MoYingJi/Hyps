@@ -274,9 +274,9 @@ GAME_DAILY_RESET="04:00 Asia/Shanghai"
  - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
  - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
  - `game_paths`: 不接受参数，声明游戏路径角色；使用 `path_plan_declare <role> <scope> <rel> [label]` 和 `path_plan_note <role> [text]`，不直接执行任何操作。角色目前有 `userdata:screenshot` 和 `shader-cache`
- - `game_version_local`: 接受游戏可执行文件路径和两个 nameref 变量名，将本地版本和变体标识写入变量。本地版本只包含游戏本体已安装的版本。预下载内容不会安装到游戏本体，因此本函数不应返回预下载版本；远程预下载版本由 `game_version_remote` 一并返回。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准
+ - `game_version_local`: 接受游戏可执行文件路径和三个 nameref 变量名，将本地版本、变体标识和远程查询上下文写入变量。本地版本只包含游戏本体已安装的版本。预下载内容不会安装到游戏本体，因此本函数不应返回预下载版本；远程预下载版本由 `game_version_remote` 一并返回。变体标识允许为空。变体指游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，版本判断以本地文件对应的分发变体为准。上下文是不透明的字符串，由 `game_version_local` 生成并原样交给 `game_version_remote`，调用方不应解析它；不需要上下文的游戏可以忽略该参数
  - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身
- - `game_version_remote`: 接受变体标识和两个 nameref 变量名，将远程版本与预下载版本写入变量。无预下载时预下载写为空字符串，预下载版本可能高于远程版本
+ - `game_version_remote`: 接受变体标识、上下文 (即 `game_version_local` 写入的内容，必填，可为空字符串) 和两个 nameref 变量名，将远程版本与预下载版本写入变量。无预下载时预下载写为空字符串，预下载版本可能高于远程版本
 
 游戏实现中也可以直接注册生命周期钩子。游戏目录内的路径应通过 `game_fs_path` / `game_fs_write_path` 获取，不要直接读 `game.exe` 拼路径
 

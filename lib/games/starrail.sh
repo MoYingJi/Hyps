@@ -43,7 +43,7 @@ game_version_variant_human_readable() {
 }
 
 game_version_remote() {
-    integration_hyp_get_game_version_remote "starrail" "${1:-cn}" "$2" "$3" "$4"
+    integration_hyp_get_game_version_remote "starrail" "$@"
 }
 
 # 注册表解锁帧率

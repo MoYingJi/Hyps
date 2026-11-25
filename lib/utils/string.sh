@@ -89,15 +89,16 @@ size_string_to_bytes_uint() {
         return 1
     fi
 
+    # 用 2 ** N 而不是 1 << N，避免 VSCode 的 shell 语法把 << 误判成 heredoc
     local multiplier
     case "${unit,,}" in
         "" | b)          multiplier=1 ;;
-        k | kb | kib)    multiplier=$(( 1 << 10 )) ;;
-        m | mb | mib)    multiplier=$(( 1 << 20 )) ;;
-        g | gb | gib)    multiplier=$(( 1 << 30 )) ;;
-        t | tb | tib)    multiplier=$(( 1 << 40 )) ;;
-        p | pb | pib)    multiplier=$(( 1 << 50 )) ;;
-        e | eb | eib)    multiplier=$(( 1 << 60 )) ;;
+        k | kb | kib)    multiplier=$(( 2 ** 10 )) ;;
+        m | mb | mib)    multiplier=$(( 2 ** 20 )) ;;
+        g | gb | gib)    multiplier=$(( 2 ** 30 )) ;;
+        t | tb | tib)    multiplier=$(( 2 ** 40 )) ;;
+        p | pb | pib)    multiplier=$(( 2 ** 50 )) ;;
+        e | eb | eib)    multiplier=$(( 2 ** 60 )) ;;
         *) return 1 ;;
     esac
 
@@ -110,11 +111,11 @@ size_string_to_bytes_uint() {
     fi
     int_part="${int_part:-0}"
 
-    local result=$(( 10#$int_part * multiplier ))
+    local result=$(( 10#${int_part} * multiplier ))
 
     if [[ -n $frac_part ]]; then
         local flen=${#frac_part}
-        local fnum=$(( 10#$frac_part ))
+        local fnum=$(( 10#${frac_part} ))
         local denom=$(( 10 ** flen ))
         result=$(( result + fnum * multiplier / denom ))
     fi

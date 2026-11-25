@@ -65,15 +65,6 @@ wuwa_sdk_config_path() {
     return 1
 }
 
-wuwa_variant_human_readable() {
-    case "$1" in
-        cn)       printf '%s\n' "国服" ;;
-        bilibili) printf '%s\n' "Bilibili" ;;
-        global)   printf '%s\n' "国际服" ;;
-        *)        printf '%s\n' "未知" ;;
-    esac
-}
-
 # 用法: game_version_local <game_exe> <version_nameref> <variant_nameref> <context_nameref>
 game_version_local() {
     local game_exe="$1"
@@ -185,5 +176,10 @@ game_version_remote() {
 }
 
 game_version_variant_human_readable() {
-    wuwa_variant_human_readable "$1"
+    case "$1" in
+        cn)       printf '%s\n' "国服" ;;
+        bilibili) printf '%s\n' "Bilibili" ;;
+        global)   printf '%s\n' "国际服" ;;
+        *)        printf '%s\n' "未知" ;;
+    esac
 }

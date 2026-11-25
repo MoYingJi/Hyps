@@ -8,10 +8,11 @@ time_record_default_dir() {
     result="$DATA_DIR/time"
 }
 
+# 未声明日常刷新时间时留空，表示不显示日常，可由 features.time_record.today.reset 覆盖
 #shellcheck disable=SC2034
 time_record_default_reset() {
     local -n result="$1"
-    result="${GAME_DAILY_RESET-04:00 Asia/Shanghai}"
+    result="${GAME_DAILY_RESET-}"
 }
 
 time_record_validate_reset() {

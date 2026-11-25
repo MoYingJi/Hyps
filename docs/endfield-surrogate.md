@@ -23,6 +23,7 @@ game.umu_id = "umu-endfield"
 endfield.surrogate.mode = "launcher"
 endfield.surrogate.launcher = "/path/to/Hypergryph Launcher"
 endfield.surrogate.exit_after = 30
+game.umu_id = "umu-endfield"
 ```
 
 ## 方式一：替身父进程

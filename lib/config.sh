@@ -9,6 +9,8 @@ source "$SCRIPT_DIR/config/state.sh"
 source "$SCRIPT_DIR/core/log.sh"
 #shellcheck source=utils/wine.sh
 source "$SCRIPT_DIR/utils/wine.sh"
+#shellcheck source=utils/game_script.sh
+source "$SCRIPT_DIR/utils/game_script.sh"
 
 #shellcheck source=config/parse.sh
 source "$SCRIPT_DIR/config/parse.sh"
@@ -35,7 +37,7 @@ load_common_config() {
 
 load_game_config() {
     local game_name="$1"
-    [[ "$game_name" =~ ^[A-Za-z0-9_-]+$ ]] || die 1 config "无效的游戏名 '$game_name'"
+    game_name_valid "$game_name" || die 1 config "无效的游戏名 '$game_name'"
     CONFIG_GAME_NAME="$game_name"
 
     local game_config_file

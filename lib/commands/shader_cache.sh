@@ -17,18 +17,18 @@ help_shader_cache_invalidate() {
 _shader_cache_load_game() {
     local game_name="$1"
 
+    game_name_valid "$game_name" || die 1 "无效的游戏名: $game_name"
     GAME_NAME="$game_name"
-    [[ "$GAME_NAME" =~ ^[[:alnum:]_-]+$ ]] || die 1 "无效的游戏名: $GAME_NAME"
 
     local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"
     if [ -f "$game_impl" ]; then
         #shellcheck source=/dev/null
-        source "$game_impl"
+        source "$game_impl" || return $?
     fi
 
-    load_common_config
-    load_game_config "$GAME_NAME"
-    config_require_game_paths
+    load_common_config || return $?
+    load_game_config "$GAME_NAME" || return $?
+    config_require_game_paths || return $?
 
     game_fs_init || die 1 shader-cache "初始化游戏环境失败"
     game_fs_set_phase offline || die 1 shader-cache "设置离线阶段失败"
@@ -89,14 +89,14 @@ _shader_cache_apply_plan() {
 command_shader_cache_list() {
     [ "$#" -eq 1 ] || die 1 "用法: shader-cache list <游戏名>"
 
-    _shader_cache_load_game "$1"
+    _shader_cache_load_game "$1" || return $?
     _shader_cache_render_plan || log_warn shader-cache "游戏缓存预览不完整"
 }
 
 command_shader_cache_invalidate() {
     [ "$#" -eq 1 ] || die 1 "用法: shader-cache invalidate <游戏名>"
 
-    _shader_cache_load_game "$1"
+    _shader_cache_load_game "$1" || return $?
 
     # 本命令是离线操作
     game_fs_require_offline || die 1 shader-cache "overlay 挂载期间不能清除着色器缓存"

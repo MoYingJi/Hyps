@@ -80,6 +80,7 @@ command_init() {
             -*)         die 2 init "未知选项: '$1'（使用 -h 查看用法）" ;;
             *)
                 [[ -z "$game" ]] || die 2 init "一次只能指定一个游戏名（多余: '$1'）"
+                game_name_valid "$1" || die 2 init "无效的游戏名 '$1'"
                 game="$1"
                 ;;
         esac
@@ -185,6 +186,7 @@ command_init_game() {
             -*)         die 2 init "未知选项: '$1'" ;;
             *)
                 [[ -z "$game" ]] || die 2 init "一次只能指定一个游戏名（多余: '$1'）"
+                game_name_valid "$1" || die 2 init "无效的游戏名 '$1'"
                 game="$1"
                 ;;
         esac

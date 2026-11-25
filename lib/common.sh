@@ -1,31 +1,27 @@
 #!/hint/bash
 
 [[ -n "${__COMMON_SH_LOADED:-}" ]] && return 0
-__COMMON_SH_LOADED=1
 
-[ "$UID" -ne 0 ] || { echo "你个小天才是怎么想到用 root 运行的（"; exit 1; }
-[ -n "$GAME_NAME" ] || { echo "请在运行前设置环境变量 GAME_NAME"; exit 1; }
+#shellcheck source=bootstrap.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/bootstrap.sh" || return $?
+#shellcheck source=utils/game_script.sh
+source "$SCRIPT_DIR/utils/game_script.sh" || return $?
 
-SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
-[[ "$SCRIPT_DIR" == "${BASH_SOURCE[0]}" ]] && SCRIPT_DIR="."
-SCRIPT_DIR="$(cd -- "$SCRIPT_DIR" &> /dev/null && pwd)"
-PROJECT_ROOT="${SCRIPT_DIR%/*}"
-[[ "$PROJECT_ROOT" == "$SCRIPT_DIR" ]] && PROJECT_ROOT="/"
-
-cd "$PROJECT_ROOT" || { echo "找不到或无法切换到项目根目录"; exit 1; }
+if ! game_name_valid "${GAME_NAME:-}"; then
+    printf '无效的游戏名: %s\n' "${GAME_NAME:-}" >&2
+    return 1
+fi
 
 #shellcheck disable=SC2034
 SCRIPT_START_NANOSECONDS="$(date +%s%N)"
 
-
-#shellcheck source=libs.sh
-source "$SCRIPT_DIR/libs.sh"
 #shellcheck source=modules.sh
-source "$SCRIPT_DIR/modules.sh"
+source "$SCRIPT_DIR/modules.sh" || return $?
 #shellcheck source=environment.sh
-source "$SCRIPT_DIR/environment.sh"
+source "$SCRIPT_DIR/environment.sh" || return $?
 
 hyps_load_modules || return $?
+__COMMON_SH_LOADED=1
 
 hyps_main() {
     # defer_mkdir 在 prepare 创建，游戏目录内的目录会落到 upper

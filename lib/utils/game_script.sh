@@ -3,14 +3,23 @@
 [[ -n "${__UTILS_GAME_SCRIPT_SH_LOADED:-}" ]] && return 0
 __UTILS_GAME_SCRIPT_SH_LOADED=1
 
+game_name_valid() {
+    local LC_ALL=C
+    # test 的字符串比较不受 nocasematch 影响
+    [ "$1" = "${1,,}" ] && [[ "$1" =~ ^[a-z][a-z0-9-]*$ ]]
+}
+
 game_script_name() {
     local -n gsn_out="$2"
     local gsn_line
     gsn_out=""
     while IFS= read -r gsn_line || [[ -n $gsn_line ]]; do
         if [[ $gsn_line == 'GAME_NAME="'*'"' ]]; then
-            gsn_out="${gsn_line#GAME_NAME=\"}"
-            gsn_out="${gsn_out%\"}"
+            gsn_line="${gsn_line#GAME_NAME=\"}"
+            gsn_line="${gsn_line%\"}"
+            game_name_valid "$gsn_line" || return 1
+            #shellcheck disable=SC2034 # nameref 输出参数
+            gsn_out="$gsn_line"
             return 0
         fi
     done < "$1"

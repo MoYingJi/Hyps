@@ -442,8 +442,9 @@ init_check_config() {
     for game_file in "$CONFIG_DIR/games"/*.conf; do
         [[ -f "$game_file" ]] || continue
         game_name="${game_file##*/}"
-        [[ "$game_name" == "_common.conf" ]] && continue
-        games+=("${game_name%.conf}")
+        game_name="${game_name%.conf}"
+        game_name_valid "$game_name" || continue
+        games+=("$game_name")
     done
     if [[ "${#games[@]}" -gt 0 ]]; then
         init_check_add config ok "已配置游戏" "${#games[@]} 个: $(_init_join ', ' "${games[@]}")"

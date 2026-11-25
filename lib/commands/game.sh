@@ -267,7 +267,7 @@ command_game_outdated() {
     if [ "$#" -eq 1 ]; then
         local game_name
         game_name="$1"
-        [[ "$game_name" =~ ^[[:alnum:]_-]+$ ]] || die 1 "无效的游戏名: $game_name"
+        game_name_valid "$game_name" || die 1 "无效的游戏名: $game_name"
 
         local report
         report="$(_game_outdated_collect "$game_name" report)"
@@ -282,7 +282,7 @@ command_game_outdated() {
             [ -f "$game_config" ] || continue
             game_name="${game_config##*/}"
             game_name="${game_name%.conf}"
-            [ "$game_name" != "_common" ] || continue
+            game_name_valid "$game_name" || continue
 
             row="$(_game_outdated_collect "$game_name")"
             case $? in

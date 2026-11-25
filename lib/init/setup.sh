@@ -69,7 +69,7 @@ init_list_example_games() {
         [[ -f "$file" ]] || continue
         slug="${file##*/}"
         slug="${slug%.example.conf}"
-        [[ "$slug" == "_common" ]] && continue
+        game_name_valid "$slug" || continue
         printf '%s\n' "$slug"
     done
 }
@@ -242,7 +242,7 @@ init_setup_game() {
     local force="${2:-0}"
     local src dst backup
 
-    [[ "$slug" =~ ^[a-z0-9_]+$ ]] || die 1 init "非法的游戏名: '$slug'"
+    game_name_valid "$slug" || die 1 init "无效的游戏名 '$slug'"
     src="$(init_example_path "$slug")" || die 1 init "未知游戏 '$slug'：找不到 $slug.example.conf"
     dst="$CONFIG_DIR/games/$slug.conf"
 
@@ -294,7 +294,7 @@ _init_print_game_next_steps() {
     if launcher="$(init_find_launcher_script "$slug")"; then
         printf '  配置完成后运行: %s\n' "$(_init_short_path "$launcher")"
     else
-        printf '  [警告] 未找到 %s 对应的启动脚本\n' "$slug"
+        printf '  配置完成后运行: ./scripts/_Hyps run %s\n' "$slug"
     fi
     printf '  查看状态: ./scripts/_Hyps game list\n'
 }

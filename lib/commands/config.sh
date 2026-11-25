@@ -40,6 +40,7 @@ _config_command_prepare() {
             -*) die 2 config "未知选项 '$1'" ;;
             *)
                 [[ -z "$game" ]] || die 2 config "一次只能指定一个游戏名"
+                game_name_valid "$1" || die 2 config "无效的游戏名 '$1'"
                 game="$1"
                 shift
                 ;;
@@ -48,7 +49,6 @@ _config_command_prepare() {
 
     hyps_load_modules || return $?
     if [[ -n "$game" ]]; then
-        [[ "$game" =~ ^[A-Za-z0-9_-]+$ ]] || die 2 config "无效的游戏名 '$game'"
         #shellcheck disable=SC2034
         GAME_NAME="$game"
         impl="$SCRIPT_DIR/games/$game.sh"

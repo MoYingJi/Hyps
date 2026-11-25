@@ -36,16 +36,19 @@ command_time_today() {
             fi
 
             game_name="${game##*/}"
+            game_name_valid "$game_name" || continue
 
             reset_time="$(
                 # shellcheck disable=SC2034 # 供 source 的游戏实现使用
                 GAME_NAME="$game_name"
                 local game_impl="$SCRIPT_DIR/games/$game_name.sh"
-                #shellcheck source=/dev/null
-                [ -f "$game_impl" ] && source "$game_impl"
-                load_game_config "$game_name"
+                if [ -f "$game_impl" ]; then
+                    #shellcheck source=/dev/null
+                    source "$game_impl" || return $?
+                fi
+                load_game_config "$game_name" || return $?
                 local today_reset
-                config_read features.time_record.today.reset today_reset
+                config_read features.time_record.today.reset today_reset || return $?
                 echo "$today_reset"
             )" || {
                 log_error "无法加载游戏配置: $game_name"
@@ -95,6 +98,7 @@ command_time_list() {
         for game in "$dir"/*; do
             [ -d "$game" ] || continue
             game_name="${game##*/}"
+            game_name_valid "$game_name" || continue
 
             start_count="$(time_record_count "$game")"
 

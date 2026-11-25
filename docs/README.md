@@ -60,7 +60,9 @@
 
 4. 到配置文件夹的 `games.examples` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `runner.name` 和一些路径
 
-5. 运行 `scripts` 文件夹下对应游戏的脚本
+5. 运行 `./scripts/_Hyps run <游戏名>` 启动游戏，例如 `games/endfield.conf` 对应 `./scripts/_Hyps run endfield`。也可以运行 `scripts` 文件夹下对应游戏的脚本
+
+游戏名须以 ASCII 小写字母开头，后续可用 ASCII 小写字母、数字和连字符（`^[a-z][a-z0-9-]*$`）。该规则也适用于自定义游戏配置。
 
 或者直接运行 `./init.sh` 自动完成第 3～4 步（见下文「初始化」）
 
@@ -79,7 +81,7 @@
 ./init.sh --no-game        # 只初始化基础配置
 ```
 
-初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后仍需要按提示修改游戏配置里的 `game.exe` 和 `runner.name`，然后运行 `scripts` 下对应的脚本。
+初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后按提示修改游戏配置里的 `game.exe` 和 `runner.name`，即可启动游戏。
 
 ### 查看和检查配置
 

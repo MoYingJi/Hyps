@@ -1,29 +1,11 @@
 #!/usr/bin/bash
 
-# 一个工具脚本
+# Hyps 命令行入口
 
-[ "$UID" -ne 0 ] || { echo "你个小天才是怎么想到用 root 运行的（"; exit 1; }
-
-SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
-SCRIPT_DIR="$PROJECT_ROOT/lib"
-
-#shellcheck source=../lib/libs.sh
-source "$SCRIPT_DIR/libs.sh"
-
-register_hook() { return; }
-hyps_main() { return; }
-__COMMON_SH_LOADED=1
-
-cd "$PROJECT_ROOT" || die 1 "无法切换到项目根目录: $PROJECT_ROOT"
-
-trap cleanup EXIT
-
-cleanup() {
-    cd "$SCRIPTS_DIR" || die 1 "无法切换到脚本目录: $SCRIPTS_DIR"
-}
+#shellcheck source=../lib/bootstrap.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/../lib/bootstrap.sh" || exit $?
 
 #shellcheck source=../lib/commands/_dispatch.sh
-source "$SCRIPT_DIR/commands/_dispatch.sh"
+source "$SCRIPT_DIR/commands/_dispatch.sh" || exit $?
 
 dispatch "$@"

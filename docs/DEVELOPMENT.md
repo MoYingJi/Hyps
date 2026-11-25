@@ -11,8 +11,11 @@
 | `integrations/` | 外部产品的数据格式、API 和协议适配，如 HoYoPlay，不接管启动流程 |
 | `features/` | 可组合的具体功能，消费启动能力或共享能力 |
 | `games/`、`commands/` | 游戏行为与命令用例 |
+| `bootstrap.sh` | 入口路径、运行用户检查与工作目录 |
 | `libs.sh` | 基础库聚合入口 |
 | `modules.sh`、`common.sh` | 应用组装与主流程 |
+
+`scripts/<游戏>.sh` 将游戏名交给 `_Hyps run`，由 `commands/run.sh` 加载 `common.sh` 并执行 `hyps_main`。`game list` 和 `init` 通过读取入口脚本里的 `GAME_NAME` 识别游戏。
 
 - 调用其他模块的函数时，显式 `source` 并提供 `#shellcheck source=...` 指令。共享能力不反向加载其消费者，也不通过另一个 feature 获取隐含依赖
 - 启动与配置查询共用 `hyps_load_modules` 的模块清单，feature 发现集中于此。基础模块和共享模块直接声明依赖，避免通过 `libs.sh` 加载整个应用
@@ -88,7 +91,7 @@ config_declare plugin.limits.special.count uint --default 1
 
 `config_require <键> [value|file|dir|executable]` 只检查本次操作的存在性要求。启动调用 `config_require_launch`，仅提供 `runner.protonpath` 时由它查找 Proton 并派生 `runner.exe`；离线命令可单独调用 `config_require_game_paths`，无需 runner。
 
-启动先校验配置，再运行 `load_config` 钩子以激活功能。查询直接读取配置，不运行激活钩子；关闭时间记录不影响查询历史，缓存预览不创建目录。组合选项的互斥和操作条件由功能自己检查。CLI 用法见 [使用文档](README.md#查看和检查配置)，未声明的键在 `config check` 中警告。
+配置查询和启动共用游戏实现的配置声明。加载时在内存中注册钩子，启动在配置校验后运行 `load_config` 钩子以激活功能。批量查询把每个游戏的配置声明、函数和钩子表隔离在独立子 shell 中。关闭时间记录不影响查询历史，缓存预览不创建目录。组合选项的互斥和操作条件由功能自己检查。CLI 用法见 [使用文档](README.md#查看和检查配置)，未声明的键在 `config check` 中警告。
 
 ### 环境与构建设置
 

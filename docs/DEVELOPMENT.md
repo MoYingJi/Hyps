@@ -247,36 +247,7 @@ game_paths() {
 
 ## 游戏实现
 
-游戏实现放在 `lib/games/<GAME_NAME>.sh` 下，文件名必须与 `GAME_NAME` 一致
-
-单次启动只加载一个游戏实现。批量查询从未加载具体游戏实现的公共环境出发，每个游戏在独立子 shell 中完成加载、查询和结果整理，父级只接收输出和退出状态，不通过 `unset` 切换游戏
-
-加载游戏文件只定义函数、初始化内存状态和注册钩子。启动外部程序、挂载和文件修改放在明确调用的函数或生命周期钩子中，子 shell 不会撤销这些操作
-
-游戏文件只写游戏特有的声明和逻辑，固定属性用变量，需要计算或执行行为的接口用函数。`GAME_NAME` 同时是游戏 ID、配置文件/脚本标识，显示名和路径名由游戏实现单独声明
-
-下面的变量都是可选声明：
-
-```bash
-GAME_DISPLAY_NAME="原神"
-GAME_PATH_NAME="YuanShen"
-GAME_DAILY_RESET="04:00 Asia/Shanghai"
-```
-
-- `GAME_DISPLAY_NAME`：人类可读的游戏名（当前使用中文），用于 init 和 UI，未设置或为空时回退到 `GAME_NAME`
-- `GAME_PATH_NAME`：路径友好的游戏名，只允许 `[A-Za-z0-9._-]+`，且不能是 `.` 或 `..`，未设置或为空时回退到 `GAME_NAME`。只用于截图等用户可见目录，不用于内部数据目录
-- `GAME_DAILY_RESET`：日常刷新时间，未设置时使用 `04:00 Asia/Shanghai`，空值或假值表示不参与日常状态判断。用户配置 `features.time_record.today.reset` 优先于游戏声明
-
-下面的函数都是可选实现，通过 `type -t` 检测，不存在时不会报错：
-
- - `game_install_dir`: 接受一个参数代表游戏本体 exe，即 `game.exe` 配置。在 stdout 输出游戏安装根目录 (通常是游戏文件夹本身)，这个根同时用于 overlay 的 lower 和 GameFS 的 install 视图。替代旧的 `overlay_auto_lower`；未实现时 install 视图留空，overlay 和依赖 install 的功能会报错，可以用 `game.install_dir` 显式指定根
- - `game_executable`: 接受 install 根，在 stdout 输出一个主 exe。只填 `game.install_dir` 时用它派生 `game.exe`；必须绝对路径、存在、位于 install 下。不同变体的 exe 名称由游戏实现自行判断（如原神国服/国际服）
- - `game_paths`: 不接受参数，声明游戏路径角色；使用 `path_plan_declare <role> <scope> <rel> [label]` 和 `path_plan_note <role> [text]`，不直接执行任何操作。角色目前有 `userdata:screenshot` 和 `shader-cache`
- - `game_version_local`: 接受游戏可执行文件路径和三个 nameref 变量名，写入本地版本、变体标识和远程查询上下文。本地版本只含游戏本体已安装的版本，不返回预下载版本。变体是游戏文件本身的分发变体 (如不同渠道的客户端)，而非区服，允许为空。上下文是不透明字符串，原样交给 `game_version_remote`
- - `game_version_variant_human_readable`: 接受变体标识，在 stdout 输出适合显示的名称。仅当 `game_version_local` 返回了非空变体标识时才会被调用，未实现时直接显示变体标识本身
- - `game_version_remote`: 接受变体标识、上下文 (即 `game_version_local` 写入的内容，必填，可为空字符串) 和两个 nameref 变量名，将远程版本与预下载版本写入变量。无预下载时预下载写为空字符串，预下载版本可能高于远程版本
-
-游戏目录内的路径应通过 `game_fs_path` / `game_fs_write_path` 获取，不要直接读 `game.exe` 拼路径
+游戏实现放在 `lib/games/<GAME_NAME>.sh` 下，文件名必须与 `GAME_NAME` 一致。变量、接口语义和生命周期约束都写在 `lib/games/_game.example.sh` 的注释里，复制它作为骨架即可（该文件本身不会被加载）
 
 ## Launch Plan
 

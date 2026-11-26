@@ -59,6 +59,17 @@ _config_normalize() {
             ;;
         path)
             if [[ -n "$_cfg_type_value" ]]; then
+                # 只展开开头的 ~ 和 ~/，其余位置的 ~ 属于路径本身
+                case "$_cfg_type_value" in
+                    \~ | \~/*)
+                        [[ -n "${HOME:-}" ]] ||
+                            die 1 config "配置项 '$_cfg_type_key' 无法展开 '~'：HOME 未设置 ($_cfg_type_origin)"
+                        _cfg_type_value="$HOME${_cfg_type_value#\~}"
+                        ;;
+                    \~*)
+                        die 1 config "配置项 '$_cfg_type_key' 不支持 '~user' 形式：'$_cfg_type_value' ($_cfg_type_origin)"
+                        ;;
+                esac
                 # 相对路径固定以项目根目录为基准，不受命令当前目录影响
                 [[ "$_cfg_type_value" == /* ]] ||
                     _cfg_type_value="$PROJECT_ROOT/$_cfg_type_value"

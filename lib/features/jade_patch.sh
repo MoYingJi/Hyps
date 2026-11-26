@@ -5,9 +5,9 @@ source "$SCRIPT_DIR/libs.sh"
 
 # 此方法已废弃
 
-config_declare feature.jade_patch.enable bool --default false
-config_declare feature.jade_patch.exe path --required --when feature.jade_patch.enable
-config_declare feature.jade_patch.launcher path --when feature.jade_patch.enable
+config_declare feature.jade_patch.enable bool --in game-instance --default false
+config_declare feature.jade_patch.exe path --in game-instance --required --when feature.jade_patch.enable
+config_declare feature.jade_patch.launcher path --in game-instance --when feature.jade_patch.enable
 
 feat_jade_patch_load_config() {
     config_is_true feature.jade_patch.enable || return 0

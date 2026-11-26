@@ -93,7 +93,7 @@ cleanup() {
 }
 
 load_config() {
-    load_common_config || return $?
+    load_global_config || return $?
     load_game_config "$GAME_NAME" || return $?
     config_require_launch || return $?
     config_validate || return $?

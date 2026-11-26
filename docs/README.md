@@ -56,7 +56,7 @@
 
 2. 你可以选择在本项目的 `config.conf` 中修改配置文件的路径，默认路径就是本项目的 `./config` 文件夹，所以你也可以选择不改
 
-3. 到配置文件夹的 `games.examples` 目录下，找到 `_common.example.conf`，复制文件到配置文件夹的 `games` 下，重命名为 `_common.conf` 并修改里面的配置。很多功能默认都被注释掉了，如有需要可以将其打开
+3. 将配置目录中的 `config.example.conf` 复制为同目录下的 `config.conf`。在这里设置全局选项和游戏默认值，例如 `path.data` 或默认 `runner.name`
 
 4. 到配置文件夹的 `games.examples` 目录下，选个你想玩的游戏，复制一个 `<name>.example.conf` 文件到配置文件夹的 `games` 下，重命名为 `<name>.conf`，并修改里面的配置，比如 `runner.name` 和一些路径
 
@@ -81,7 +81,9 @@
 ./init.sh --no-game        # 只初始化基础配置
 ```
 
-初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后按提示修改游戏配置里的 `game.exe`（或 `game.install_dir`）与 `runner.name`，即可启动游戏。
+初始化会创建配置目录，从 `config.example.conf` 复制全局配置，从 `games.examples` 复制所选的游戏配置，并把 `runners/*.conf` 同步到自定义配置目录。复制后按提示修改游戏配置里的 `game.exe`（或 `game.install_dir`）与 `runner.name`，即可启动游戏。
+
+**旧配置迁移**　将 `games/_common.conf` 的设置合并到配置目录下的 `config.conf`，再移走旧文件。两份文件都有同一个键时，游戏默认值通常以旧 `_common.conf` 为准，`path.data`、`path.cache` 等目录以原先实际使用的路径为准。项目根的 `config.conf` 用于引导，请把其他设置移到配置目录下的 `config.conf`。`features.time_record.dir` 现在只接受全局配置，如果以前按游戏指定了目录，请把旧记录归入选定的全局历史根目录。用 `config schema` 可以查到每个键允许放在哪一层。
 
 ### 查看游戏信息
 
@@ -101,10 +103,10 @@
 ./scripts/_Hyps config schema yuanshen                 # 查看该游戏及通用模块的配置声明
 ./scripts/_Hyps config show endfield                   # 查看当前启用项的有效值及来源
 ./scripts/_Hyps config show --prefix features.time_record
-./scripts/_Hyps config check endfield                  # 按声明检查类型、必需项和自定义约束
+./scripts/_Hyps config check endfield                  # 按声明检查放置位置、类型和约束
 ```
 
-省略游戏名时使用共用配置。`schema` 可以在初始化配置之前使用，`show` 和 `check` 只解析配置，游戏和 runner 的安装检查在启动时执行。涉及多个选项的组合约束仍会由对应功能检查。
+省略游戏名时加载引导和全局配置。`schema` 可以在初始化配置之前使用，`show` 和 `check` 只解析配置，游戏和 runner 的安装检查在启动时执行。位置错误会指出原文件、行号和允许的层级。涉及多个选项的组合约束仍会由对应功能检查。
 
 默认值只补缺失的配置，显式空值、`false` 和空数组不会被默认值覆盖。布尔值拼写错误、未闭合数组等会报错，路径中的相对路径以项目根目录为基准。
 

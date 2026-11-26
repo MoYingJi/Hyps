@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=../modules.sh
+source "$SCRIPT_DIR/modules.sh"
 
 # 单个游戏的通用环境加载
 # 会 source 游戏实现并写入 CONFIG / GAME_FS，批量查询时必须放进子 shell
@@ -155,7 +155,8 @@ command_game_list() {
         shift
     done
 
-    load_common_config
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     # 游戏集合取启动脚本与配置文件的并集，避免只有配置的游戏消失
     local -a games=()
@@ -176,7 +177,6 @@ command_game_list() {
         [ -f "$conf" ] || continue
         name="${conf##*/}"
         name="${name%.conf}"
-        [ "$name" = "_common" ] && continue
         game_name_valid "$name" || continue
         [ -n "${seen[$name]:-}" ] && continue
         seen[$name]=1
@@ -277,13 +277,8 @@ command_game_info() {
     [ -n "$game_name" ] || die 2 game "用法: game info <游戏名> [--size|--no-size] [--remote]"
     game_name_valid "$game_name" || die 1 game "无效的游戏名: $game_name"
 
-    # 每日刷新需要时间记录功能的声明和用户覆盖，按需加载
-    if [ "$(type -t feat_time_record_load_config)" != "function" ]; then
-        #shellcheck source=../features/time_record.sh
-        source "$SCRIPT_DIR/features/time_record.sh"
-    fi
-
-    load_common_config
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     local rc=0
     _game_context_load "$game_name" || rc=$?
@@ -492,7 +487,7 @@ _game_outdated_collect() (
         [ "$has_local" -eq 1 ] || [ "$has_remote" -eq 1 ] || return 2
     fi
 
-    load_game_config "$game_name"
+    load_game_config "$game_name" || return 1
     game_fs_resolve_paths || {
         log_error game-outdated "无法解析 $game_name 的游戏路径"
         return 1
@@ -614,7 +609,8 @@ _game_outdated_render() {
 command_game_outdated() {
     [ "$#" -le 1 ] || die 1 "用法: game outdated [<游戏名>]"
 
-    load_common_config
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     if [ "$#" -eq 1 ]; then
         local game_name

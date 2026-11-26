@@ -19,20 +19,45 @@ source "$SCRIPT_DIR/config/access.sh"
 #shellcheck source=config/core.sh
 source "$SCRIPT_DIR/config/core.sh"
 
-load_common_config() {
-    config_parse_file "$PROJECT_ROOT/config.conf" || return 1
+declare -gA _CONFIG_BOOTSTRAP_SOURCE=() _CONFIG_GLOBAL_SOURCE=()
+_CONFIG_BOOTSTRAP_LAYERS=bootstrap
 
-    config_bind_path path.config CONFIG_DIR
+load_global_config() {
+    local bootstrap_file="$PROJECT_ROOT/config.conf" global_file legacy_file
+    #shellcheck disable=SC2034 # 通过 nameref 接收解析结果
+    local -A bootstrap_config=() bootstrap_kind=() global_config=() global_kind=()
+    _CONFIG_BOOTSTRAP_SOURCE=() _CONFIG_GLOBAL_SOURCE=()
+    _CONFIG_BOOTSTRAP_LAYERS=bootstrap
 
-    config_parse_file "$CONFIG_DIR/config.conf" || return 1
+    config_parse_file "$bootstrap_file" bootstrap_config _CONFIG_BOOTSTRAP_SOURCE bootstrap_kind || return 1
+    config_merge bootstrap_config _CONFIG_BOOTSTRAP_SOURCE bootstrap_kind
+    config_bind_path path.config CONFIG_DIR || return 1
 
-    config_bind_path path.cache CACHE_DIR
-    config_bind_path path.data DATA_DIR
-    config_bind_path path.state STATE_DIR
-    config_bind_path path.temp TEMP_DIR
+    global_file="$CONFIG_DIR/config.conf"
+    if [[ "$global_file" -ef "$bootstrap_file" ]]; then
+        _CONFIG_BOOTSTRAP_LAYERS=bootstrap,global
+    else
+        config_parse_file "$global_file" global_config _CONFIG_GLOBAL_SOURCE global_kind || return 1
+    fi
+    _config_check_global_placement || return 1
+
+    legacy_file="$CONFIG_DIR/games/_common.conf"
+    if [[ -e "$legacy_file" || -L "$legacy_file" ]]; then
+        log_error config "旧配置 '$legacy_file' 已停用。请将设置合并到 '$global_file'，再移走旧文件"
+        return 1
+    fi
+
+    config_merge global_config _CONFIG_GLOBAL_SOURCE global_kind
+    config_bind_path path.cache CACHE_DIR || return 1
+    config_bind_path path.data DATA_DIR || return 1
+    config_bind_path path.state STATE_DIR || return 1
+    config_bind_path path.temp TEMP_DIR || return 1
     config_bind_path path.runtime RUNTIME_DIR
+}
 
-    config_parse_file "$CONFIG_DIR/games/_common.conf"
+_config_check_global_placement() {
+    config_check_placement "$_CONFIG_BOOTSTRAP_LAYERS" _CONFIG_BOOTSTRAP_SOURCE || return 1
+    config_check_placement global _CONFIG_GLOBAL_SOURCE
 }
 
 load_game_config() {
@@ -41,26 +66,34 @@ load_game_config() {
     CONFIG_GAME_NAME="$game_name"
 
     local game_config_file
-    local runner_name
+    local runner_name runner_file
+    #shellcheck disable=SC2034 # 通过 nameref 接收解析结果
+    local -A instance_config=() instance_source=() instance_kind=()
 
     game_config_file="$CONFIG_DIR/games/${game_name}.conf"
     [ -f "$game_config_file" ] || die 1 config "游戏配置文件不存在：$game_config_file"
 
-    # 先确定最终 runner，游戏配置优先，未设置时继承共用配置
-    config_parse_to_temp "$game_config_file" || return 1
-    if config_has runner.name TEMP_CONFIG; then
-        runner_name="${TEMP_CONFIG[runner.name]}"
+    # 查询命令可能先加载全局配置，再注册游戏专属声明
+    _config_check_global_placement || return 1
+    config_parse_file "$game_config_file" instance_config instance_source instance_kind || return 1
+    config_check_placement game-instance instance_source || return 1
+
+    if config_has runner.name instance_config; then
+        runner_name="${instance_config[runner.name]}"
     else
         config_read runner.name runner_name
     fi
 
-    # 配置覆盖顺序为 共用配置 < runner 配置 < 游戏配置
+    # 配置覆盖顺序为 全局配置 < runner 配置 < 游戏配置
     # 空名称不加载预设，允许直接配置 runner.exe / runner.protonpath
     if [[ -n "$runner_name" ]]; then
         [[ "$runner_name" =~ ^[A-Za-z0-9_-]+$ ]] || die 1 config "无效的运行器名称 '$runner_name'"
-        config_parse_file "$CONFIG_DIR/runners/${runner_name}.conf" || return 1
+        runner_file="$CONFIG_DIR/runners/${runner_name}.conf"
+        config_parse_to_temp "$runner_file" || return 1
+        config_check_placement runner TEMP_CONFIG_SOURCE || return 1
+        config_merge TEMP_CONFIG TEMP_CONFIG_SOURCE TEMP_CONFIG_KIND
     fi
-    config_merge_temp
+    config_merge instance_config instance_source instance_kind
 }
 
 # 查询只合并配置，启动和需要游戏路径的操作显式执行检查

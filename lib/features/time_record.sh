@@ -20,10 +20,10 @@ time_record_validate_reset() {
 }
 
 config_declare features.time_record.enabled bool --default true --description "记录游玩时间"
-config_declare features.time_record.dir path --default-fn time_record_default_dir --description "游玩记录目录"
+config_declare features.time_record.dir path --in global --default-fn time_record_default_dir --description "游玩记录目录"
 config_declare features.time_record.min_sec uint --default 60 --when features.time_record.enabled \
     --description "单次游玩记录的最短秒数"
-config_declare features.time_record.today.reset string --default-fn time_record_default_reset \
+config_declare features.time_record.today.reset string --in game-instance --default-fn time_record_default_reset \
     --validate time_record_validate_reset --description "日常刷新时间，空值或假值表示不参与"
 
 feat_time_record_load_config() {

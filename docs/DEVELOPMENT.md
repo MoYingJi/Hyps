@@ -38,7 +38,7 @@ time_record_default_dir() {
 }
 
 config_declare features.time_record.enabled bool --default true
-config_declare features.time_record.dir path --default-fn time_record_default_dir
+config_declare features.time_record.dir path --in global --default-fn time_record_default_dir
 config_declare features.time_record.min_sec uint --default 60 \
     --when features.time_record.enabled
 
@@ -55,6 +55,7 @@ config_read_array game.args args
 | --- | --- |
 | `--default <值>` | 只补缺失值，按配置字面量解析，空字符串也可作为默认值 |
 | `--default-fn <函数>` | 与 `--default` 互斥；接受值与结构的输出变量名，通过 nameref 写回，结构默认 `scalar`；返回 `3` 表示当前上下文无默认值，其他非零表示失败 |
+| `--in <层级列表>` | 允许写入的配置层，逗号分隔，默认 `global,game-instance` |
 | `--when <布尔键>` | 控制批量校验和有效值展示的适用范围，直接读取仍校验 |
 | `--required` | 要求值存在且非空 |
 | `--validate <函数>` | 接受规范化后的值，返回 `0` 表示通过 |
@@ -81,13 +82,22 @@ config_declare plugin.limits.special.count uint --default 1
 
 具体键完整覆盖命名空间约束，否则按点分隔匹配最长前缀：`plugin.limits.workers` 为 uint，`plugin.limits.special.enabled` 为 bool。命名空间不包含前缀自身，不继承父级条件或校验。
 
-命名空间支持 `--choices`、`--when`、`--validate`、`--description`，不支持默认值或 `--required`，只约束实际出现的成员。`config_is_declared` 同时识别具体键和命名空间，`config_validate <前缀>` 接受尚无成员的已声明命名空间。`env.*` 的环境输出与 `nvapi.drs.*` 的聚合仍由所属模块负责。
+命名空间支持 `--choices`、`--when`、`--validate`、`--description` 和 `--in`，只约束实际出现的成员。`config_is_declared` 同时识别具体键和命名空间，`config_validate <前缀>` 接受尚无成员的已声明命名空间。`env.*` 的环境输出与 `nvapi.drs.*` 的聚合仍由所属模块负责。
 
 ### 加载与操作检查
 
-字段优先级从低到高为 **schema 默认值 < 共用配置 < 选中的 runner 预设 < 游戏配置**。runner 名称优先取游戏配置，否则继承共用配置；显式空名称跳过预设。
+配置文件按下面的优先级从低到高合并，schema 默认值只补缺失值。
 
-`load_common_config` 读取 bootstrap 与共用配置、解析目录变量，目录仍允许环境覆盖。`load_game_config <游戏名>` 选择 runner 并合并配置。这两步不创建目录、不检查游戏或 runner 是否安装。
+| 层级 | 文件 |
+| --- | --- |
+| `bootstrap` | `$PROJECT_ROOT/config.conf` |
+| `global` | `$CONFIG_DIR/config.conf` |
+| `runner` | `$CONFIG_DIR/runners/<名称>.conf` |
+| `game-instance` | `$CONFIG_DIR/games/<游戏名>.conf` |
+
+`load_global_config` 先读引导配置确定 `CONFIG_DIR`，再读全局配置并解析目录变量。目录仍允许环境覆盖。`load_game_config <游戏名>` 优先从游戏实例取 `runner.name`，否则继承全局值。显式空名称跳过预设。加载过程只读取配置，安装检查由具体命令发起。
+
+位置检查使用每层原始键和行号，覆盖或 `--when` 条件不会隐藏放错层的键。游戏实现注册新声明之后，加载器会复查引导和全局配置。`--in` 约束文件来源，默认值、环境覆盖和 `config_set` 的程序派生值按各自规则处理。
 
 `config_require <键> [value|file|dir|executable]` 只检查本次操作的存在性要求。启动调用 `config_require_launch`，仅提供 `runner.protonpath` 时由它查找 Proton 并派生 `runner.exe`；离线命令可单独调用 `config_require_game_paths`，无需 runner。
 
@@ -104,7 +114,7 @@ config_declare features.example.cache_size size --default 2G
 env_bind features.example.cache_size MY_CACHE_BYTES --encode bytes
 ```
 
-`env_declare NAME type` 声明 `env.NAME` 并绑定同名输出，接受配置声明和绑定选项。`env_bind <键> <变量名>` 支持 `--encode`、`--when`、`--check file|dir`、`--policy inherit|replace`，绑定与配置自身的条件都必须满足。名称须为合法 shell 变量名；相同绑定可重复注册，不同选项报错。
+`env_declare NAME type` 声明 `env.NAME` 并绑定同名输出，接受配置声明和绑定选项。`env.*` 默认允许写在 `global,runner,game-instance`。`env_bind <键> <变量名>` 支持 `--encode`、`--when`、`--check file|dir`、`--policy inherit|replace`，绑定与配置自身的条件都必须满足。名称须为合法 shell 变量名；相同绑定可重复注册，不同选项报错。
 
 内置编码器为 `string`、`bool01`、`bytes`、`comma`、`colon`、`semicolon`，后三者要求数组；对应的 `*_list` 还接受已编码字符串，按结构选择编码方式。自定义 `env_encode_<名称>` 接受规范化值、输出变量名、来源键、结构，通过 nameref 写回字符串，只能计算输出。`wine.dll_overrides`、`mangohud.config` 是数组，`env.WINEDLLOVERRIDES` 等使用 `string|array`。
 

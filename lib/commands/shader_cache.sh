@@ -1,10 +1,7 @@
 #!/usr/bin/bash
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
-
-#shellcheck source=../features/program_cache.sh
-source "$SCRIPT_DIR/features/program_cache.sh"
+#shellcheck source=../modules.sh
+source "$SCRIPT_DIR/modules.sh"
 
 help_shader_cache_list() {
     echo "  shader-cache list <游戏名>      列出游戏声明的着色器缓存，以及 Hyps 提供的 program cache"
@@ -19,6 +16,7 @@ _shader_cache_load_game() {
 
     game_name_valid "$game_name" || die 1 "无效的游戏名: $game_name"
     GAME_NAME="$game_name"
+    hyps_load_modules || return $?
 
     local game_impl="$SCRIPT_DIR/games/$GAME_NAME.sh"
     if [ -f "$game_impl" ]; then
@@ -26,7 +24,7 @@ _shader_cache_load_game() {
         source "$game_impl" || return $?
     fi
 
-    load_common_config || return $?
+    load_global_config || return $?
     load_game_config "$GAME_NAME" || return $?
     config_require_game_paths || return $?
 

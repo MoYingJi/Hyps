@@ -10,9 +10,9 @@ source "$SCRIPT_DIR/config/core.sh"
 #shellcheck source=../utils/wine.sh
 source "$SCRIPT_DIR/utils/wine.sh"
 
-config_declare_namespace env string --description "环境变量，未单独声明的成员按字符串透传"
+config_declare_namespace env string --in global,runner,game-instance --description "环境变量，未单独声明的成员按字符串透传"
 # 跳过导出 在项目内设置
-config_declare env.LD_PRELOAD 'string|array'
+config_declare env.LD_PRELOAD 'string|array' --in global,runner,game-instance
 env_reserve LD_PRELOAD
 # Spritz
 env_declare WINE_ENABLE_TIMEOUT_FIX bool --encode bool01
@@ -52,7 +52,7 @@ env_declare PROTON_DXVK_GPLASYNC bool --encode bool01
 env_declare PROTON_DXVK_LLASYNC bool --encode bool01
 # Wine
 env_declare WINEDLLOVERRIDES 'string|array' --encode semicolon_list
-config_declare wine.dll_overrides array
+config_declare wine.dll_overrides array --in global,runner,game-instance
 env_bind wine.dll_overrides WINEDLLOVERRIDES --encode semicolon
 # MangoHud
 env_declare MANGOHUD bool --encode bool01

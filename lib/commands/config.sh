@@ -20,9 +20,9 @@ help_config() {
 用法:
   config schema [游戏名] [--prefix 前缀]  查看声明，不读取用户配置
   config show   [游戏名] [--prefix 前缀]  查看有效值及来源
-  config check  [游戏名] [--prefix 前缀]  检查当前启用的配置项
+  config check  [游戏名] [--prefix 前缀]  检查配置放置位置和当前启用的配置项
 
-省略游戏名时只使用共用配置，不检查游戏和运行器是否已安装
+省略游戏名时加载引导和全局配置，不检查游戏和运行器是否已安装
 EOF
 }
 
@@ -59,7 +59,7 @@ _config_command_prepare() {
     fi
 
     if [[ "$mode" != schema ]]; then
-        load_common_config || return $?
+        load_global_config || return $?
         if [[ -n "$game" ]]; then
             load_game_config "$game" || return $?
         fi
@@ -89,6 +89,7 @@ command_config_schema() {
         else
             printf '  %s %s\n' "$(style_quote bright_black '默认值:')" "$default_value"
         fi
+        printf '  %s %s\n' "$(style_quote bright_black '允许的位置:')" "${CONFIG_SCHEMA[$key.in]}"
         [[ -z "${CONFIG_SCHEMA[$key.choices]:-}" ]] ||
             printf '  %s %s\n' "$(style_quote bright_black '可选值:')" "${CONFIG_SCHEMA[$key.choices]}"
         [[ -z "${CONFIG_SCHEMA[$key.when]:-}" ]] ||

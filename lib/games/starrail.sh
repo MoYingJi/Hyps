@@ -48,8 +48,8 @@ game_version_remote() {
 
 # 注册表解锁帧率
 
-config_declare starrail.reg_fps.enabled bool --default false
-config_declare starrail.reg_fps.val uint --default 120 --when starrail.reg_fps.enabled
+config_declare starrail.reg_fps.enabled bool --in game-instance --default false
+config_declare starrail.reg_fps.val uint --in game-instance --default 120 --when starrail.reg_fps.enabled
 
 starrail_reg_fps_load_config() {
     config_is_true starrail.reg_fps.enabled || return 0

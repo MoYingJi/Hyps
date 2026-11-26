@@ -1,10 +1,7 @@
 #!/usr/bin/bash
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
-
-#shellcheck source=../features/time_record.sh
-source "$SCRIPT_DIR/features/time_record.sh"
+#shellcheck source=../modules.sh
+source "$SCRIPT_DIR/modules.sh"
 
 help_time_today() {
     echo "  time today  列出所有游戏的最后一次启动时间与今日日常启动状态"
@@ -13,11 +10,8 @@ help_time_today() {
 command_time_today() {
     [ "$#" -eq 0 ] || die 1 "用法: time today"
 
-    load_common_config
-
-    if config_has features.time_record.today.reset; then
-        log_warn time-record "不推荐在通用配置中设置 'features.time_record.today.reset'，请在游戏配置中分别设置该项"
-    fi
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     local dir
     config_read features.time_record.dir dir
@@ -83,7 +77,8 @@ help_time_list() {
 command_time_list() {
     [ "$#" -eq 0 ] || die 1 "用法: time list"
 
-    load_common_config
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     local dir
     config_read features.time_record.dir dir
@@ -301,7 +296,8 @@ command_time_report() {
     local game_name="$1"
     game_name_valid "$game_name" || die 1 "无效的游戏名: $game_name"
 
-    load_common_config
+    hyps_load_modules || return $?
+    load_global_config || return $?
 
     local dir
     config_read features.time_record.dir dir

@@ -187,6 +187,7 @@ _config_store_value() {
     fi
 }
 
+#shellcheck disable=SC2034 # 解析结果由调用方通过临时表读取
 config_parse_to_temp() {
     local file="$1"
     TEMP_CONFIG=()
@@ -196,12 +197,12 @@ config_parse_to_temp() {
 }
 
 #shellcheck disable=SC2034
-config_merge_temp() {
+config_merge() {
+    local -n values="$1" origins="$2" kinds="$3"
     local key
-    for key in "${!TEMP_CONFIG[@]}"; do
-        CONFIG["$key"]="${TEMP_CONFIG[$key]}"
-        CONFIG_SOURCE["$key"]="${TEMP_CONFIG_SOURCE[$key]:-运行时}"
-        CONFIG_KIND["$key"]="${TEMP_CONFIG_KIND[$key]}"
+    for key in "${!values[@]}"; do
+        CONFIG["$key"]="${values[$key]}"
+        CONFIG_SOURCE["$key"]="${origins[$key]}"
+        CONFIG_KIND["$key"]="${kinds[$key]}"
     done
-    log_debug config "已合并临时配置到主配置"
 }

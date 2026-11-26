@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
-#shellcheck source=../libs.sh
-source "$SCRIPT_DIR/libs.sh"
+#shellcheck source=../modules.sh
+source "$SCRIPT_DIR/modules.sh"
 
 #shellcheck source=../init/check.sh
 source "$SCRIPT_DIR/init/check.sh"
@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/init/check.sh"
 #shellcheck source=../init/setup.sh
 source "$SCRIPT_DIR/init/setup.sh"
 
-INIT_COMMON_LOADED=0
+INIT_GLOBAL_LOADED=0
 
 help_init() {
     cat << 'EOF'
@@ -19,7 +19,7 @@ help_init() {
   init [选项] [游戏名]
   init check            仅检测环境，不写入文件
   init list             列出游戏示例配置与当前配置状态
-  init config           只初始化基础配置（目录、_common.conf、runners）
+  init config           只初始化基础配置（目录、全局 config.conf、runners）
   init game <游戏名>     初始化基础配置并复制指定游戏的示例配置
 
 选项:
@@ -36,10 +36,11 @@ help_init() {
 EOF
 }
 
-_init_load_common_config() {
-    [[ "$INIT_COMMON_LOADED" -eq 1 ]] && return 0
-    load_common_config
-    INIT_COMMON_LOADED=1
+_init_load_global_config() {
+    [[ "$INIT_GLOBAL_LOADED" -eq 1 ]] && return 0
+    hyps_load_modules || return $?
+    load_global_config || return $?
+    INIT_GLOBAL_LOADED=1
 }
 
 _init_run_check() {
@@ -97,7 +98,7 @@ command_init() {
         die 2 init "游戏名与 --no-game 不能同时使用"
     fi
 
-    _init_load_common_config
+    _init_load_global_config || return $?
 
     if [[ "$do_list" -eq 1 ]]; then
         command_init_list "$@"
@@ -138,14 +139,14 @@ command_init() {
 command_init_check() {
     [[ "$#" -eq 0 ]] || die 1 init "init check 不接受参数"
 
-    _init_load_common_config
+    _init_load_global_config || return $?
     _init_run_check
 }
 
 command_init_list() {
     [[ "$#" -eq 0 ]] || die 1 init "init list 不接受参数"
 
-    _init_load_common_config
+    _init_load_global_config || return $?
 
     local -a games=()
     mapfile -t games < <(init_list_example_games)
@@ -171,7 +172,7 @@ command_init_list() {
 command_init_config() {
     [[ "$#" -eq 0 ]] || die 1 init "init config 不接受参数"
 
-    _init_load_common_config
+    _init_load_global_config || return $?
     init_setup_all
 }
 
@@ -195,7 +196,7 @@ command_init_game() {
 
     [[ -n "$game" ]] || die 2 init "用法: init game <游戏名> [--force]"
 
-    _init_load_common_config
+    _init_load_global_config || return $?
     init_setup_all
     init_setup_game "$game" "$force"
 }

@@ -49,7 +49,7 @@ init_example_dir() {
     return 1
 }
 
-# 用法: init_example_path <游戏名|_common>
+# 用法: init_example_path <游戏名>
 init_example_path() {
     local slug="$1"
     local dir
@@ -92,7 +92,7 @@ init_find_launcher_script() {
 
 # 只读解析游戏配置，输出状态（不修改任何配置）
 # runner.name 不是必需的：与 lib/config.sh 一致，runner.exe 或 runner.protonpath 有任意其一即可
-init_game_config_state() {
+init_game_config_state() (
     local slug="$1"
     local file="$CONFIG_DIR/games/$slug.conf"
 
@@ -101,13 +101,24 @@ init_game_config_state() {
         return 0
     fi
 
-    config_parse_to_temp "$file"
+    local impl="$SCRIPT_DIR/games/$slug.sh"
+    #shellcheck disable=SC2034 # 供加载的游戏实现使用
+    GAME_NAME="$slug"
+    if [[ -f "$impl" ]]; then
+        #shellcheck source=/dev/null
+        source "$impl" || return 1
+    fi
+    load_game_config "$slug" || {
+        printf '配置错误\n'
+        return 0
+    }
 
-    local exe="${TEMP_CONFIG[game.exe]:-}"
-    local install="${TEMP_CONFIG[game.install_dir]:-}"
-    local runner="${TEMP_CONFIG[runner.name]:-}"
-    local runner_exe="${TEMP_CONFIG[runner.exe]:-}"
-    local runner_proton="${TEMP_CONFIG[runner.protonpath]:-}"
+    local exe install runner runner_exe runner_proton
+    config_read game.exe exe
+    config_read game.install_dir install
+    config_read runner.name runner
+    config_read runner.exe runner_exe
+    config_read runner.protonpath runner_proton
 
     if [[ -z "$exe" && -z "$install" ]]; then
         printf '缺少 game.exe 或 game.install_dir\n'
@@ -130,18 +141,11 @@ init_game_config_state() {
         return 0
     fi
 
-    # install-only 配置需要游戏实现能派生 exe；在子 shell 中读取，避免副作用
+    # install-only 配置需要游戏实现能派生 exe
     if [[ -z "$exe" && -n "$install" ]]; then
         local derived=""
-        local impl="$SCRIPT_DIR/games/$slug.sh"
-        if [[ -f "$impl" ]]; then
-            derived="$(
-                # shellcheck disable=SC2034 # 供 source 的游戏实现使用
-                GAME_NAME="$slug"
-                #shellcheck source=/dev/null
-                source "$impl" >/dev/null 2>&1
-                game_executable "$install"
-            )" || derived=""
+        if declare -F game_executable >/dev/null; then
+            derived="$(game_executable "$install")" || derived=""
         fi
         if [[ -z "$derived" ]]; then
             printf '缺少 game.exe（该游戏不支持从 game.install_dir 派生）\n'
@@ -150,16 +154,6 @@ init_game_config_state() {
         if [[ ! -f "$derived" ]]; then
             printf 'game.install_dir 无法派生有效 game.exe\n'
             return 0
-        fi
-    fi
-
-    # 游戏配置里没有直接给出运行器时，从 runner.name 指向的配置补齐
-    if [[ -z "$runner_exe" && -z "$runner_proton" && -n "$runner" ]]; then
-        local runner_conf="$CONFIG_DIR/runners/$runner.conf"
-        if [[ -f "$runner_conf" ]]; then
-            config_parse_file "$runner_conf" TEMP_CONFIG
-            runner_exe="${TEMP_CONFIG[runner.exe]:-}"
-            runner_proton="${TEMP_CONFIG[runner.protonpath]:-}"
         fi
     fi
 
@@ -173,7 +167,7 @@ init_game_config_state() {
     fi
 
     printf '已配置\n'
-}
+)
 
 init_setup_dirs() {
     local dir
@@ -187,18 +181,18 @@ init_setup_dirs() {
     done
 }
 
-init_setup_common() {
-    local dst="$CONFIG_DIR/games/_common.conf"
-    local src
+init_setup_global() {
+    local dst="$CONFIG_DIR/config.conf"
+    local src="$CONFIG_DIR/config.example.conf"
 
-    if [[ -f "$dst" ]]; then
-        printf '  [跳过] _common.conf 已存在\n'
+    if [[ -e "$dst" || -L "$dst" ]]; then
+        printf '  [跳过] 全局配置已存在: %s\n' "$dst"
         return 0
     fi
 
-    src="$(init_example_path _common)" || die 1 init "找不到 _common.example.conf，仓库可能不完整"
-    cp -- "$src" "$dst" || die 1 init "复制失败: '$src' -> '$dst'"
-    printf '  [创建] _common.conf（来自 %s）\n' "$(_init_short_path "$src")"
+    [[ -f "$src" ]] || src="$PROJECT_ROOT/config/config.example.conf"
+    cp --no-clobber -- "$src" "$dst" || die 1 init "复制失败: '$src' -> '$dst'"
+    printf '  [创建] 全局配置: %s（来自 %s）\n' "$dst" "$(_init_short_path "$src")"
 }
 
 init_setup_runners() {
@@ -232,7 +226,7 @@ init_setup_runners() {
 init_setup_all() {
     printf '\n%s\n' "$(style_quote bold "[Hyps] 初始化配置")"
     init_setup_dirs
-    init_setup_common
+    init_setup_global
     init_setup_runners
 }
 

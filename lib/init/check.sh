@@ -243,6 +243,10 @@ init_check_runner_file() {
     name="${name%.conf}"
 
     config_parse_to_temp "$file"
+    if ! config_check_placement runner TEMP_CONFIG_SOURCE; then
+        init_check_add runner fail "$name" "存在放置位置不合法的配置项"
+        return 0
+    fi
 
     local exe="${TEMP_CONFIG[runner.exe]:-}"
     local proton="${TEMP_CONFIG[runner.protonpath]:-}"
@@ -405,15 +409,15 @@ init_check_config() {
     fi
 
     if [[ -f "$PROJECT_ROOT/config.conf" ]]; then
-        init_check_add config info "config.conf" "$PROJECT_ROOT/config.conf"
+        init_check_add config info "引导配置" "$PROJECT_ROOT/config.conf"
     else
-        init_check_add config warn "config.conf" "缺少 $PROJECT_ROOT/config.conf"
+        init_check_add config warn "引导配置" "缺少 $PROJECT_ROOT/config.conf"
     fi
 
-    if [[ -f "$CONFIG_DIR/games/_common.conf" ]]; then
-        init_check_add config ok "_common.conf" "$CONFIG_DIR/games/_common.conf"
+    if [[ -f "$CONFIG_DIR/config.conf" ]]; then
+        init_check_add config ok "全局配置" "$CONFIG_DIR/config.conf"
     else
-        init_check_add config warn "_common.conf" "不存在（初始化时复制示例）"
+        init_check_add config info "全局配置" "不存在（初始化时复制示例）"
     fi
 
     if [[ -d "$CONFIG_DIR/games" ]]; then

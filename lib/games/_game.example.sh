@@ -107,8 +107,10 @@ game_version_remote() {
 
 # eg.* (Example Game 首字母做配置前缀简写，可按需随意取，保持唯一即可)
 config_declare eg.hello_world_before_game.enabled bool \
+    --in game-instance \
     --description "在游戏启动前显示 Hello World"
 config_declare eg.hello_world_before_game.message string \
+    --in game-instance \
     --when eg.hello_world_before_game.enabled \
     --default "Hello World" \
     --description "在游戏启动前显示的消息"

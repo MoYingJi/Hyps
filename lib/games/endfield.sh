@@ -97,13 +97,13 @@ endfield_surrogate_validate_exit_after() {
     [[ "$1" =~ ^[1-9][0-9]*$ ]]
 }
 
-config_declare endfield.surrogate.mode enum --choices launcher,hardlink,copy,hardlink-or-copy
-config_declare endfield.surrogate.launcher path
-config_declare endfield.surrogate.keep bool
-config_declare endfield.surrogate.show_info bool
-config_declare endfield.surrogate.exit_after uint --validate endfield_surrogate_validate_exit_after
+config_declare endfield.surrogate.mode enum --in game-instance --choices launcher,hardlink,copy,hardlink-or-copy
+config_declare endfield.surrogate.launcher path --in game-instance
+config_declare endfield.surrogate.keep bool --in game-instance
+config_declare endfield.surrogate.show_info bool --in game-instance
+config_declare endfield.surrogate.exit_after uint --in game-instance --validate endfield_surrogate_validate_exit_after
 for surrogate_key in dir target hardlink_dir hardlink_target copy_dir copy_target; do
-    config_declare "endfield.surrogate.$surrogate_key" path
+    config_declare "endfield.surrogate.$surrogate_key" path --in game-instance
 done
 unset surrogate_key
 

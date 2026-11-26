@@ -79,12 +79,12 @@ gi_fps_unlock_validate_sleep() {
     [[ "$1" == "-" || "$1" =~ ^[0-9]+$ ]]
 }
 
-config_declare gi.fps_unlock.enabled bool --default false
-config_declare gi.fps_unlock.val uint --default 120 --when gi.fps_unlock.enabled
-config_declare gi.fps_unlock.interval uint --default 5000 --when gi.fps_unlock.enabled
-config_declare gi.fps_unlock.fifo path --default-fn gi_fps_unlock_default_fifo --when gi.fps_unlock.enabled
-config_declare gi.fps_unlock.sleep string --default "-" --validate gi_fps_unlock_validate_sleep --when gi.fps_unlock.enabled
-config_declare gi.fps_unlock.prog string --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.enabled bool --in game-instance --default false
+config_declare gi.fps_unlock.val uint --in game-instance --default 120 --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.interval uint --in game-instance --default 5000 --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.fifo path --in game-instance --default-fn gi_fps_unlock_default_fifo --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.sleep string --in game-instance --default "-" --validate gi_fps_unlock_validate_sleep --when gi.fps_unlock.enabled
+config_declare gi.fps_unlock.prog string --in game-instance --when gi.fps_unlock.enabled
 
 gi_fps_unlock_load_config() {
     config_is_true gi.fps_unlock.enabled || return 0
@@ -189,9 +189,9 @@ gi_fps_unlock_start() {
 
 # 注册表 HDR
 
-config_declare gi.reg_hdr.enabled bool --default false
-config_declare gi.reg_hdr.path string --default 'HKEY_CURRENT_USER\Software\miHoYo\原神' --when gi.reg_hdr.enabled
-config_declare gi.reg_hdr.key string --default WINDOWS_HDR_ON_h3132281285 --when gi.reg_hdr.enabled
+config_declare gi.reg_hdr.enabled bool --in game-instance --default false
+config_declare gi.reg_hdr.path string --in game-instance --default 'HKEY_CURRENT_USER\Software\miHoYo\原神' --when gi.reg_hdr.enabled
+config_declare gi.reg_hdr.key string --in game-instance --default WINDOWS_HDR_ON_h3132281285 --when gi.reg_hdr.enabled
 
 gi_reg_hdr_load_config() {
     config_is_true gi.reg_hdr.enabled || return 0
@@ -250,8 +250,8 @@ gi_reg_hdr_prepare() {
 
 # 强制 D3D12
 
-config_declare gi.patch_d3d12.enabled bool --default false
-config_declare gi.patch_d3d12.impl enum --choices unitypy,bytes --default unitypy --when gi.patch_d3d12.enabled
+config_declare gi.patch_d3d12.enabled bool --in game-instance --default false
+config_declare gi.patch_d3d12.impl enum --in game-instance --choices unitypy,bytes --default unitypy --when gi.patch_d3d12.enabled
 
 gi_patch_d3d12_load_config() {
     config_is_true gi.patch_d3d12.enabled || return 0

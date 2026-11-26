@@ -34,7 +34,7 @@ _config_declare() {
     local field
     while (( $# )); do
         case "$1" in
-            --default | --default-fn | --choices | --when | --validate | --description)
+            --default | --default-fn | --choices | --when | --validate | --description | --in)
                 [[ $# -ge 2 ]] || die 1 config "配置声明 '$key' 的 '$1' 缺少参数"
                 field="${1#--}"
                 if [[ "$kind" == namespace && ( "$field" == default || "$field" == default-fn ) ]]; then
@@ -60,9 +60,19 @@ _config_declare() {
         die 1 config "枚举配置 '$key' 缺少 --choices"
     fi
 
+    local layers="${fields[in]-global,game-instance}" layer
+    local layer_pattern='(bootstrap|global|runner|game-instance)'
+    [[ "$layers" =~ ^$layer_pattern(,$layer_pattern)*$ ]] ||
+        die 1 config "配置项 '$key' 的层级列表无效：'$layers'"
+    fields[in]=""
+    for layer in bootstrap global runner game-instance; do
+        [[ ",$layers," == *",$layer,"* ]] || continue
+        fields[in]+="${fields[in]:+,}$layer"
+    done
+
     [[ "$kind" != namespace ]] || key+=".*"
     if [[ -n "${CONFIG_SCHEMA[$key.type]+exists}" ]]; then
-        for field in type default default-fn choices when validate description required; do
+        for field in type default default-fn choices when validate description required in; do
             [[ "${CONFIG_SCHEMA[$key.$field]+exists}" == "${fields[$field]+exists}" &&
                "${CONFIG_SCHEMA[$key.$field]:-}" == "${fields[$field]:-}" ]] ||
                 die 1 config "配置项 '$key' 的声明冲突"
@@ -100,4 +110,23 @@ config_is_declared() {
     local _cfg_declared_key
     _config_schema_key "$1" _cfg_declared_key
     [[ -n "${CONFIG_SCHEMA[$_cfg_declared_key.type]:-}" ]]
+}
+
+# 检查单个文件的原始键和来源，同一文件可兼作引导和全局配置
+config_check_placement() {
+    local -n origins="$2"
+    local -a layers=()
+    local key schema allowed layer status=0
+    IFS=, read -r -a layers <<< "$1"
+    for key in "${!origins[@]}"; do
+        _config_schema_key "$key" schema
+        allowed="${CONFIG_SCHEMA[$schema.in]:-}"
+        [[ -n "$allowed" ]] || continue
+        for layer in "${layers[@]}"; do
+            [[ ",$allowed," != *",$layer,"* ]] || continue 2
+        done
+        log_error config "${origins[$key]} 配置项 '$key' 位于 $1，允许的位置为 $allowed"
+        status=1
+    done
+    return "$status"
 }

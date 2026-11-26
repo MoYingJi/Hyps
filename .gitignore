@@ -4,6 +4,7 @@
 compile_commands.json
 
 /config/*
+!/config/config.example.conf
 
 !/config/games/
 /config/games/*

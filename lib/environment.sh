@@ -135,7 +135,7 @@ env_bind() {
 # 声明同名 env 配置并绑定输出，配置类型不再从编码器反推
 env_declare() {
     [[ $# -ge 2 ]] || die 1 environment "环境声明需要变量名和配置类型"
-    local name="$1" type="$2"
+    local name="$1" type="$2" has_layers=false
     shift 2
     local -a schema_options=() binding_options=()
     while (( $# )); do
@@ -145,8 +145,9 @@ env_declare() {
                 binding_options+=("$1" "$2")
                 shift 2
                 ;;
-            --default | --default-fn | --choices | --when | --validate | --description)
+            --default | --default-fn | --choices | --when | --validate | --description | --in)
                 [[ $# -ge 2 ]] || die 1 environment "配置声明 '$1' 缺少参数"
+                [[ "$1" != --in ]] || has_layers=true
                 schema_options+=("$1" "$2")
                 shift 2
                 ;;
@@ -155,6 +156,7 @@ env_declare() {
         esac
     done
     environment_valid_name "$name" || die 1 environment "无效的环境变量名 '$name'"
+    [[ "$has_layers" == true ]] || schema_options+=(--in "global,runner,game-instance")
     config_declare "env.$name" "$type" "${schema_options[@]}"
     env_bind "env.$name" "$name" "${binding_options[@]}"
 }

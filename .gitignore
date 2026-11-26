@@ -39,10 +39,11 @@ compile_commands.json
 !/tools/nvidia-env.sh
 !/tools/starrail-fps.py
 
-!/tools/endfield-launcher/endfield-launcher.c
+!/tools/dll-injector/dll-injector.c
 !/tools/fpsunlock/unlocker.c
 !/tools/genshin-d3d12/patch-unitypy.py
 !/tools/genshin-d3d12/patch-bytes.py
+!/tools/gryph-surrogate/gryph-surrogate.c
 !/tools/xwin-watch/*.c
 !/tools/xwin-watch/*.h
 !/tools/xwin-watch/protocols/

@@ -139,4 +139,4 @@ Game Handler 负责 wine 侧的组装，接受一个 nameref 参数，自行获�
 
 ## 工具开发
 
-`development/gen-compile-db.sh` 为 clangd 生成编译数据库；`gryph-surrogate` 需要 mingw-w64 交叉编译。修改 xwin-watch 的 `protocols/` XML 后运行 `development/gen-wayland-protocols.sh`，生成的 `generated/` 文件也需要提交。
+`development/gen-compile-db.sh` 为 clangd 生成编译数据库；`gryph-surrogate` 与 `dll-injector` 需要 mingw-w64 交叉编译。修改 xwin-watch 的 `protocols/` XML 后运行 `development/gen-wayland-protocols.sh`，生成的 `generated/` 文件也需要提交。

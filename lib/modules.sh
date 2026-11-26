@@ -16,6 +16,8 @@ hyps_load_modules() {
     source "$SCRIPT_DIR/config/build.sh" || return $?
     #shellcheck source=shared/xwin_watch.sh
     source "$SCRIPT_DIR/shared/xwin_watch.sh" || return $?
+    #shellcheck source=shared/dll_injector.sh
+    source "$SCRIPT_DIR/shared/dll_injector.sh" || return $?
 
     local feature_script
     for feature_script in "$SCRIPT_DIR"/features/*.sh; do

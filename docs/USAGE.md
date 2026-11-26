@@ -131,6 +131,18 @@ _Hyps time report <GAME_NAME> # 每日刷新、今日状态与时长、下次刷
 
 `time report` 的每日刷新时间来自游戏声明或 `features.time_record.today.reset`，未设置时按本地 00:00 统计且不显示日常相关项。热力图每格一个游戏日，按当天时长分 5 档；有颜色时用方块深浅区分，重定向到文件时退回字符密度。
 
+### DLL 注入
+
+把指定 DLL 注入游戏进程，适合需要主动加载的模组或插件。启用后由 `tools/dll-injector` 以挂起方式启动游戏、注入完成后再恢复，因此它会接管游戏启动（Game Handler），不能和终末地的父进程替身同时使用。
+
+```ini
+features.dll_inject.enabled = true
+features.dll_inject.dlls = ["${game.install_dir}/mods/loader.dll"]
+#features.dll_inject.no_wait = true
+```
+
+DLL 按数组顺序依次注入，必须与游戏同位数；任一 DLL 失败会终止本次启动。默认等待游戏退出并透传退出码。`no_wait` 注入后立即退出、不等待游戏，只在 `umu-run` 这类跟随 prefix 生命周期的 runner 下安全；wine 和裸 proton 下会导致 Hyps 提前收尾。注入在线游戏可能触发反作弊，请自行评估风险。
+
 ### 游戏版本
 
 ```bash

@@ -122,3 +122,31 @@ size_string_to_bytes_uint() {
 
     echo "$result"
 }
+
+# 把字节数格式化为便于阅读的二进制单位（1 KiB = 1024 B）
+# 非法输入输出 "-"，供表格展示用
+format_size() {
+    local bytes="$1"
+
+    [[ "$bytes" =~ ^[0-9]+$ ]] || {
+        printf '%s\n' "-"
+        return 0
+    }
+
+    local -a units=(B KiB MiB GiB TiB PiB)
+    local idx=0 divisor=1
+    while [ "$idx" -lt 5 ] && [ "$bytes" -ge $(( divisor * 1024 )) ]; do
+        divisor=$(( divisor * 1024 ))
+        idx=$(( idx + 1 ))
+    done
+
+    if [ "$idx" -eq 0 ]; then
+        printf '%s B\n' "$bytes"
+        return 0
+    fi
+
+    printf '%d.%d %s\n' \
+        "$(( bytes / divisor ))" \
+        "$(( (bytes % divisor) * 10 / divisor ))" \
+        "${units[$idx]}"
+}

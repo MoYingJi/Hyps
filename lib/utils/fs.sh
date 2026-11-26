@@ -101,3 +101,40 @@ try_link_dir() {
     mkdir -p "$dst_dir"
     ln -sn "$src" "$dst"
 }
+
+# 输出目录占用的磁盘字节数，目录不存在时输出 0
+# 不跨文件系统，避免把挂载点内容算进来
+path_size() {
+    local path="$1"
+    local bytes
+
+    [ -n "$path" ] && [ "$path" != "/" ] && [ -d "$path" ] || {
+        printf '0\n'
+        return 0
+    }
+
+    bytes="$(du -s --block-size=1 --one-file-system -- "$path" 2>/dev/null | cut -f1)"
+    printf '%s\n' "${bytes:-0}"
+}
+
+# 路径展示缩写：家目录替换为 ~，超过最大长度时保留首尾并中间省略
+# 用法: path_shorten <路径> [最大字符数]
+path_shorten() {
+    local path="$1"
+    local max="${2:-0}"
+    local home="${HOME:-}"
+
+    if [ -n "$home" ]; then
+        case "$path" in
+            "$home") path="~" ;;
+            "$home"/*) path="~${path#"$home"}" ;;
+        esac
+    fi
+
+    if [ "$max" -gt 0 ] && [ "${#path}" -gt "$max" ]; then
+        local keep=$(( (max - 1) / 2 ))
+        path="${path:0:keep}…${path: -keep}"
+    fi
+
+    printf '%s\n' "$path"
+}

@@ -81,7 +81,19 @@
 ./init.sh --no-game        # 只初始化基础配置
 ```
 
-初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后按提示修改游戏配置里的 `game.exe` 和 `runner.name`，即可启动游戏。
+初始化会创建配置目录、从 `games.examples` 复制 `_common.conf` 和 `<游戏名>.conf`（已有配置不会被覆盖），并把 `runners/*.conf` 同步到自定义配置目录。复制后按提示修改游戏配置里的 `game.exe`（或 `game.install_dir`）与 `runner.name`，即可启动游戏。
+
+### 查看游戏信息
+
+```bash
+./scripts/_Hyps game list                    # 已配置的游戏：显示名、状态、安装目录
+./scripts/_Hyps game list --all              # 包含未配置的游戏
+./scripts/_Hyps game list --size --version   # 额外显示安装占用与本地版本
+./scripts/_Hyps game info arknights          # 单个游戏：路径、占用、版本、游玩记录
+./scripts/_Hyps game info arknights --remote # 额外查询最新版本与预下载
+```
+
+`game list` 只显示一眼能判断的信息，占用和版本默认不查。`game info` 展开完整路径、占用和游玩记录，状态异常时给出原因；占用会遍历安装目录，慢时可用 `--no-size` 跳过。列表只区分“就绪 / 配置错误 / 未配置”，游戏实现整体可选。
 
 ### 查看和检查配置
 

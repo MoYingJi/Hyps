@@ -3,7 +3,9 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-# 单个游戏的通用环境加载，必须在子 shell 中调用
+# 单个游戏的通用环境加载
+# 会 source 游戏实现并写入 CONFIG / GAME_FS，批量查询时必须放进子 shell
+# 单游戏命令（game info）在进程内直接调用即可，进程随后退出
 # 游戏实现整体可选，没有实现时仍可用显式配置启动
 # 返回: 0 就绪 / 2 未配置 / 1 配置错误，具体原因见 _GAME_REASON
 _game_context_load() {

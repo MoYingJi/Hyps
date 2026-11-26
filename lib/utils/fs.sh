@@ -131,9 +131,14 @@ path_shorten() {
         esac
     fi
 
+    # max 太小时省略号本身就占满，退化成只显示省略号
     if [ "$max" -gt 0 ] && [ "${#path}" -gt "$max" ]; then
         local keep=$(( (max - 1) / 2 ))
-        path="${path:0:keep}…${path: -keep}"
+        if [ "$keep" -gt 0 ]; then
+            path="${path:0:keep}…${path: -keep}"
+        else
+            path="…"
+        fi
     fi
 
     printf '%s\n' "$path"

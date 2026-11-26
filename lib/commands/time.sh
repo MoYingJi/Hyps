@@ -198,9 +198,8 @@ _time_report_heatmap() {
         fi
     fi
 
-    # 月份标尺：每列占 cell_width 个显示列，只在月份变化时写数字
-    local cell_width=2
-    [ "$color_mode" = 256 ] && cell_width=3
+    # 月份标尺：每列占 3 个显示列（2 宽格子 + 1 分隔），只在月份变化时写数字
+    local cell_width=3
     local header="" prev_month="" ts month pad
     for ((col = 0; col < total_cols; col++)); do
         month=""
@@ -273,7 +272,11 @@ _time_report_heatmap() {
                 continue
             fi
             level="${cell_level["$row,$col"]}"
-            line+="${cell_style[$level]}${cell_glyph}${creset}"
+            if [ "$color_mode" = 256 ]; then
+                line+="${cell_style[$level]}${cell_glyph}${creset}"
+            else
+                line+="${level_char[$level]}"
+            fi
         done
         printf '  %s %s\n' "$(style_quote bright_black "$label")" "$line"
     done

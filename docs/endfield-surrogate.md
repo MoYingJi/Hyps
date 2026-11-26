@@ -70,8 +70,10 @@ game.umu_id = "umu-endfield"
 | `endfield.surrogate.launcher` | 替身源文件，默认为游戏 exe 自身 |
 | `endfield.surrogate.keep` | 游戏退出后保留替身文件和本次新建的目录 |
 | `endfield.surrogate.show_info` | 通过信息框显示工具的 info 日志 |
-| `endfield.surrogate.exit_after` | 游戏启动后等待 N 秒，结束挂起的父进程并退出，游戏继续运行 |
+| `endfield.surrogate.exit_after` | 游戏启动后等待 N 秒，结束挂起的父进程并退出，游戏继续运行；仅 `umu-run` 可用 |
 | `game.umu_id` | 标记实际游戏，用于匹配 ProtonFixes |
+
+`endfield.surrogate.exit_after` 依赖 runner 跟随整个 wine prefix / 容器生命周期，而不是只等直接进程。目前只有 `umu-run`（如 `umu-dwproton` 预设）满足：替身提前退出后 runner 仍在运行，Hyps 继续等待游戏。裸 proton（`dwproton.conf` 预设）和 wine 只等直接进程，替身退出后 runner 会立即返回，Hyps 随之提前收尾（游玩计时停止、overlay 清理等）而游戏仍在运行。使用这些 runner 时不要配置 `endfield.surrogate.exit_after`。
 
 ## 方式二：挂起官方启动器
 

@@ -235,21 +235,20 @@ init_check_runner() {
     fi
 }
 
-# 用法: init_check_runner_file <runners/*.conf>
 # 与 lib/config.sh 一致：runner.exe 可以省略，此时由 runner.protonpath 推导为 <proton>/proton
-init_check_runner_file() {
-    local file="$1"
-    local name="${file##*/}"
-    name="${name%.conf}"
+# 在子 shell 合并单份预设，以便模板可以引用同一预设中的其他键
+_init_probe_runner_file() (
+    config_parse_to_temp "$1" || return 1
+    config_check_placement runner TEMP_CONFIG_SOURCE || return 1
+    config_merge TEMP_CONFIG TEMP_CONFIG_SOURCE TEMP_CONFIG_KIND
 
-    config_parse_to_temp "$file"
-    if ! config_check_placement runner TEMP_CONFIG_SOURCE; then
-        init_check_add runner fail "$name" "存在放置位置不合法的配置项"
-        return 0
-    fi
-
-    local exe="${TEMP_CONFIG[runner.exe]:-}"
-    local proton="${TEMP_CONFIG[runner.protonpath]:-}"
+    local exe proton deferred
+    #shellcheck disable=SC2034 # 预设诊断只需要值和上下文状态
+    local source
+    _config_resolve runner.exe exe source '' deferred || [[ $? -eq 3 ]] || return 1
+    [[ "$deferred" != true ]] || return 3
+    _config_resolve runner.protonpath proton source '' deferred || [[ $? -eq 3 ]] || return 1
+    [[ "$deferred" != true ]] || return 3
     local proton_dir=""
     local -a problems=()
 
@@ -286,10 +285,24 @@ init_check_runner_file() {
         else
             detail="$proton（直接使用 proton）"
         fi
-        init_check_add runner ok "$name" "$detail"
+        printf '%s\n' "$detail"
     else
-        init_check_add runner warn "$name" "$(_init_join '；' "${problems[@]}")"
+        _init_join '；' "${problems[@]}"
+        return 2
     fi
+)
+
+# 用法: init_check_runner_file <runners/*.conf>
+init_check_runner_file() {
+    local name="${1##*/}" detail status=0
+    name="${name%.conf}"
+    detail="$(_init_probe_runner_file "$1")" || status=$?
+    case "$status" in
+        0) init_check_add runner ok "$name" "$detail" ;;
+        2) init_check_add runner warn "$name" "$detail" ;;
+        3) init_check_add runner info "$name" "需要游戏上下文才能解析预设" ;;
+        *) init_check_add runner fail "$name" "配置错误" ;;
+    esac
 }
 
 _init_nvidia_version() {

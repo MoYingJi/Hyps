@@ -3,6 +3,9 @@
 [[ -n "${__UTILS_ARRAY_SH_LOADED:-}" ]] && return 0
 __UTILS_ARRAY_SH_LOADED=1
 
+#shellcheck source=quoted_string.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/quoted_string.sh"
+
 # 本文件部分使用 LLM 生成
 
 # 识别数组语法的起始，合法性由 parse_array 完整检查
@@ -19,8 +22,8 @@ parse_array() {
     string="${string#"${string%%[![:space:]]*}"}"
     string="${string%"${string##*[![:space:]]}"}"
     case "$string" in
-        \[*\]) _parse_flat_array "${string:1:-1}" "$2" comma ;;
-        \(*\)) _parse_flat_array "${string:1:-1}" "$2" space ;;
+        \[*\]) _parse_flat_array "${string:1:-1}" "$2" comma "${@:3}" ;;
+        \(*\)) _parse_flat_array "${string:1:-1}" "$2" space "${@:3}" ;;
         *) return 1 ;;
     esac
 }
@@ -84,37 +87,25 @@ parse_bash_array() {
     _parse_flat_array "${bash_array:1:-1}" "$2" space
 }
 
-# 只解析一维字符串数组，不执行变量替换、命令替换或 shell 表达式
+# 只解析一维字符串数组，只有调用方显式提供回调时才展开模板
 # 完整解析成功后才替换输出，允许方括号数组的末尾逗号
 _parse_flat_array() {
     local _arr_text="$1" _arr_mode="$3"
     local -n _arr_out="$2"
     local -a _arr_result=()
-    local _arr_elem="" _arr_quote="" _arr_state=start _arr_char _arr_trimmed
-    local _arr_i
+    local _arr_elem="" _arr_state=start _arr_char _arr_trimmed _arr_suffix _arr_rest
+    local _arr_i _arr_status
     for ((_arr_i = 0; _arr_i < ${#_arr_text}; _arr_i++)); do
         _arr_char="${_arr_text:_arr_i:1}"
-        if [[ -n "$_arr_quote" ]]; then
-            # ---------- 引号内部 ----------
-            # 仅在双引号内支持反斜杠转义
-            if [[ "$_arr_quote" == '"' && "$_arr_char" == \\ ]]; then
-                ((_arr_i += 1))
-                [[ "$_arr_i" -lt ${#_arr_text} ]] || return 1
-                _arr_elem+="${_arr_text:_arr_i:1}"
-            elif [[ "$_arr_char" == "$_arr_quote" ]]; then
-                _arr_quote=""
-                _arr_state=closed
-            else
-                _arr_elem+="$_arr_char"
-            fi
-            continue
-        fi
-        # ---------- 引号外部 ----------
         case "$_arr_char" in
             '"' | "'")
                 [[ "$_arr_state" == start ]] || return 1
-                _arr_quote="$_arr_char"
-                _arr_state=quoted
+                _arr_rest="${_arr_text:_arr_i}"
+                _arr_status=0
+                read_quoted_string "$_arr_rest" _arr_elem _arr_suffix "${@:4}" || _arr_status=$?
+                [[ "$_arr_status" -eq 0 ]] || return "$_arr_status"
+                ((_arr_i += ${#_arr_rest} - ${#_arr_suffix} - 1))
+                _arr_state=closed
                 ;;
             ',')
                 if [[ "$_arr_mode" == space ]]; then
@@ -152,7 +143,6 @@ _parse_flat_array() {
                 ;;
         esac
     done
-    [[ -z "$_arr_quote" ]] || return 1
     # 处理最后一个元素
     if [[ "$_arr_state" != start ]]; then
         _arr_trimmed="$_arr_elem"
@@ -160,4 +150,16 @@ _parse_flat_array() {
         _arr_result+=("$_arr_trimmed")
     fi
     _arr_out=("${_arr_result[@]}")
+}
+
+# 用可重新解析的一维数组表示保留元素边界
+format_array() {
+    local -n _fmt_array_out="$1"
+    shift
+    local _fmt_array_result="" _fmt_array_elem
+    for _fmt_array_elem; do
+        format_quoted_string _fmt_array_elem "$_fmt_array_elem"
+        _fmt_array_result+="${_fmt_array_result:+, }$_fmt_array_elem"
+    done
+    _fmt_array_out="[$_fmt_array_result]"
 }

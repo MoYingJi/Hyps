@@ -118,6 +118,9 @@ command_config_show() {
         [[ "$rc" -eq 0 || "$rc" -eq 3 ]] || return "$rc"
         value_style=green
         [[ "$rc" -ne 3 ]] || value_style=bright_black
+        if [[ "$value" == *[$'\n\t\r\b\f']* ]]; then
+            format_quoted_string value "$value"
+        fi
         printf '%s = %s\t%s\n' "$(style_quote bright_blue "$key")" \
             "$(style_quote "$value_style" "$value")" "$(style_quote bright_black "# $origin")"
     done < <(printf '%s\n' "${!keys[@]}" | LC_ALL=C sort)

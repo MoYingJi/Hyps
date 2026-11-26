@@ -3,11 +3,6 @@
 #shellcheck source=../libs.sh
 source "$SCRIPT_DIR/libs.sh"
 
-time_record_default_dir() {
-    local -n result="$1"
-    result="$DATA_DIR/time"
-}
-
 # 未声明日常刷新时间时留空，表示不显示日常，可由 features.time_record.today.reset 覆盖
 #shellcheck disable=SC2034
 time_record_default_reset() {
@@ -20,7 +15,7 @@ time_record_validate_reset() {
 }
 
 config_declare features.time_record.enabled bool --default true --description "记录游玩时间"
-config_declare features.time_record.dir path --in global --default-fn time_record_default_dir --description "游玩记录目录"
+config_declare features.time_record.dir path --in global --default '"${path.data}/time"' --description "游玩记录目录"
 config_declare features.time_record.min_sec uint --default 60 --when features.time_record.enabled \
     --description "单次游玩记录的最短秒数"
 config_declare features.time_record.today.reset string --in game-instance --default-fn time_record_default_reset \

@@ -62,7 +62,7 @@ _config_normalize() {
                 # 相对路径固定以项目根目录为基准，不受命令当前目录影响
                 [[ "$_cfg_type_value" == /* ]] ||
                     _cfg_type_value="$PROJECT_ROOT/$_cfg_type_value"
-                _cfg_type_value="$(realpath -m -- "$_cfg_type_value")" ||
+                IFS= read -r -d '' _cfg_type_value < <(realpath -zm -- "$_cfg_type_value") ||
                     die 1 config "无法解析配置项 '$_cfg_type_key' 的路径"
             fi
             ;;

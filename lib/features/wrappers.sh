@@ -8,12 +8,6 @@ source "$SCRIPT_DIR/config/environment.sh"
 #shellcheck source=../launch/plan.sh
 source "$SCRIPT_DIR/launch/plan.sh"
 
-wrapper_default_inhibit_why() {
-    [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 3
-    local -n result="$1"
-    result="Hyps Game $CONFIG_GAME_NAME"
-}
-
 wrapper_default_systemd_unit() {
     [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 3
     local -n result="$1"
@@ -43,7 +37,7 @@ config_declare gamemode.ld_preload.libs array --default '[libgamemode.so, libgam
 config_declare inhibit.enabled bool --default false
 config_declare inhibit.exe string --default systemd-inhibit --when inhibit.enabled
 config_declare inhibit.what string --default idle:sleep --when inhibit.enabled
-config_declare inhibit.why string --default-fn wrapper_default_inhibit_why --when inhibit.enabled
+config_declare inhibit.why string --default '"Hyps Game ${game.name}"' --when inhibit.enabled
 config_declare inhibit.args args --default '[]' --when inhibit.enabled
 config_declare systemd_run.enabled bool --default false
 config_declare systemd_run.exe string --default systemd-run --when systemd_run.enabled

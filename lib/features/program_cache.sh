@@ -8,15 +8,8 @@ source "$SCRIPT_DIR/config/environment.sh"
 #shellcheck source=../environment.sh
 source "$SCRIPT_DIR/environment.sh"
 
-program_cache_default_path() {
-    [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 3
-    local -n result="$1"
-    #shellcheck disable=SC2034 # 通过 nameref 写回调用方
-    result="$CACHE_DIR/shader/$CONFIG_GAME_NAME"
-}
-
 config_declare cache.shader.enabled bool --default false --description "重定向图形组件的着色器缓存"
-config_declare cache.shader.path path --default-fn program_cache_default_path --when cache.shader.enabled \
+config_declare cache.shader.path path --default '"${path.cache}/shader/${game.name}"' --when cache.shader.enabled \
     --description "着色器缓存根目录"
 config_declare cache.shader.nv_enabled bool --default true --when cache.shader.enabled
 config_declare cache.shader.nv_skip_cleanup bool --default true --when cache.shader.enabled

@@ -25,17 +25,29 @@ _config_value_validate() {
 _config_value_parse() {
     local _cfg_literal="$1"
     local -n _cfg_literal_out="$2" _cfg_literal_kind="$3"
-    local _cfg_literal_origin="$4"
+    local _cfg_literal_origin="$4" _cfg_literal_fn="${5:-}" _cfg_literal_remainder _cfg_literal_status=0
     _cfg_literal="${_cfg_literal#"${_cfg_literal%%[![:space:]]*}"}"
     _cfg_literal="${_cfg_literal%"${_cfg_literal##*[![:space:]]}"}"
     _cfg_literal_kind=scalar
     if [[ "$_cfg_literal" == \"* || "$_cfg_literal" == \'* ]]; then
-        [[ ${#_cfg_literal} -ge 2 && "${_cfg_literal: -1}" == "${_cfg_literal:0:1}" ]] ||
-            die 1 config "$_cfg_literal_origin 引号未闭合"
-        _cfg_literal="${_cfg_literal:1:-1}"
+        read_quoted_string "$_cfg_literal" _cfg_literal _cfg_literal_remainder \
+            "$_cfg_literal_origin" "$_cfg_literal_fn" "${@:6}" scalar || return $?
+        [[ "$_cfg_literal_remainder" != *[![:space:]]* ]] ||
+            die 1 config "$_cfg_literal_origin 结束引号后有多余内容"
     elif array_syntax_started "$_cfg_literal"; then
+        local -a _cfg_literal_elements=()
+        parse_array "$_cfg_literal" _cfg_literal_elements "$_cfg_literal_origin" \
+            "$_cfg_literal_fn" "${@:6}" array || _cfg_literal_status=$?
+        [[ "$_cfg_literal_status" -ne 4 ]] || return 4
+        [[ "$_cfg_literal_status" -eq 0 ]] || die 1 config "$_cfg_literal_origin 数组格式错误：$_cfg_literal"
         _cfg_literal_kind=array
+        format_array _cfg_literal "${_cfg_literal_elements[@]}"
     fi
-    _config_value_validate "$_cfg_literal" "$_cfg_literal_kind" "$_cfg_literal_origin"
     _cfg_literal_out="$_cfg_literal"
+}
+
+# 文件加载时检查引用语法，具体值等配置合并后再读取
+_config_validate_reference() {
+    local -n _cfg_reference_out="$2"
+    _cfg_reference_out=""
 }

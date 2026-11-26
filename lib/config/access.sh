@@ -18,29 +18,96 @@ source "$SCRIPT_DIR/utils/array.sh"
 
 declare -gA _CONFIG_RESOLVING=()
 
+_config_expand_reference() {
+    local _cfg_ref="$1" _cfg_ref_key="$3" _cfg_ref_origin="$4" _cfg_ref_kind="$5"
+    local -n _cfg_ref_out="$2"
+    local _cfg_ref_schema _cfg_ref_target _cfg_ref_source _cfg_ref_status=0
+    local _cfg_ref_layers _cfg_ref_target_layers _cfg_ref_value_kind _cfg_ref_deferred
+    _config_schema_key "$_cfg_ref_key" _cfg_ref_schema
+    _cfg_ref_layers=",${CONFIG_SCHEMA[$_cfg_ref_schema.in]:-global,game-instance},"
+
+    if [[ "$_cfg_ref_kind" == scalar && "${CONFIG_SCHEMA[$_cfg_ref_schema.type]:-}" == args ]]; then
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 的参数模板需要使用数组"
+    fi
+    if [[ "$_cfg_ref" == game.name ]]; then
+        [[ "$_cfg_resolve_view" == effective && "$_cfg_ref_layers" == *',game-instance,'* ]] ||
+            die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 不能引用游戏名"
+        [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 4
+        _cfg_ref_out="$CONFIG_GAME_NAME"
+        return 0
+    fi
+
+    _config_schema_key "$_cfg_ref" _cfg_ref_target
+    _cfg_ref_target_layers="${CONFIG_SCHEMA[$_cfg_ref_target.in]:-}"
+    [[ -n "$_cfg_ref_target_layers" || -n "${_cfg_resolve_values[$_cfg_ref]+exists}" ]] ||
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 使用了未知的模板引用 '\${$_cfg_ref}'"
+    _cfg_ref_target_layers=",${_cfg_ref_target_layers:-global,game-instance},"
+
+    if [[ "$_cfg_resolve_view" == bootstrap && "$_cfg_ref_target_layers" != *',bootstrap,'* ]]; then
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 在引导阶段无法引用 '$_cfg_ref'"
+    fi
+    if [[ "$_cfg_resolve_view" == global && "$_cfg_ref_target_layers" != *',global,'* &&
+          "$_cfg_ref_target_layers" != *',bootstrap,'* ]]; then
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 无法引用只在 runner 或游戏中可用的 '$_cfg_ref'"
+    fi
+
+    _config_resolve "$_cfg_ref" _cfg_ref_out _cfg_ref_source _cfg_ref_value_kind _cfg_ref_deferred || _cfg_ref_status=$?
+    [[ "$_cfg_ref_deferred" != true ]] || return 4
+    [[ "$_cfg_ref_status" -eq 0 ]] ||
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 引用的 '$_cfg_ref' 尚未设置"
+    [[ "$_cfg_ref_value_kind" == scalar ]] ||
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 需要引用标量，'$_cfg_ref' 是数组"
+    [[ "${CONFIG_SCHEMA[$_cfg_ref_target.type]:-string}" != path || -n "$_cfg_ref_out" ]] ||
+        die 1 config "$_cfg_ref_origin 配置项 '$_cfg_ref_key' 引用的路径 '$_cfg_ref' 为空"
+}
+
+_config_resolve_literal() {
+    _config_value_parse "$2" "$4" "$5" "$3 配置项 '$1'" _config_expand_reference "$1" "$3"
+}
+
 # 默认值函数接受输出变量名，可返回 3 表示当前上下文没有默认值
 _config_resolve() {
     local _cfg_resolve_key="$1"
     local -n _cfg_resolve_out="$2" _cfg_resolve_source="$3"
     local _cfg_resolve_value="" _cfg_resolve_origin="" _cfg_resolve_fn _cfg_resolve_rc=0
-    local _cfg_resolve_kind=scalar _cfg_resolve_unused_kind
+    local _cfg_resolve_kind=scalar _cfg_resolve_unused_kind _cfg_resolve_unused_deferred
     local -n _cfg_resolve_kind_out="${4:-_cfg_resolve_unused_kind}"
-    local _cfg_resolve_schema
+    local -n _cfg_resolve_deferred_out="${5:-_cfg_resolve_unused_deferred}"
+    local _cfg_resolve_view="${_cfg_resolve_view:-effective}"
+    local _cfg_resolve_schema _cfg_resolve_layers
+    local -n _cfg_resolve_values=CONFIG _cfg_resolve_sources=CONFIG_SOURCE _cfg_resolve_kinds=CONFIG_KIND
+    _cfg_resolve_deferred_out=false
     _config_schema_key "$_cfg_resolve_key" _cfg_resolve_schema
+    _cfg_resolve_layers=",${CONFIG_SCHEMA[$_cfg_resolve_schema.in]:-global,game-instance},"
+
+    if [[ "$_cfg_resolve_layers" == ',bootstrap,' ]]; then
+        _cfg_resolve_view=bootstrap
+    elif [[ "$_cfg_resolve_view" == effective && "$_cfg_resolve_layers" != *',runner,'* &&
+            "$_cfg_resolve_layers" != *',game-instance,'* ]]; then
+        _cfg_resolve_view=global
+    fi
+    if [[ "$_cfg_resolve_view" != effective && "$_CONFIG_GLOBAL_READY" == true ]]; then
+        local -n _cfg_resolve_values=_CONFIG_GLOBAL _cfg_resolve_sources=_CONFIG_GLOBAL_ORIGINS \
+            _cfg_resolve_kinds=_CONFIG_GLOBAL_KIND
+    fi
 
     [[ -z "${_CONFIG_RESOLVING[$_cfg_resolve_key]:-}" ]] ||
-        die 1 config "配置项 '$_cfg_resolve_key' 的默认值存在循环依赖"
+        die 1 config "${_cfg_resolve_sources[$_cfg_resolve_key]:-默认值} 配置项 '$_cfg_resolve_key' 存在循环依赖"
     _CONFIG_RESOLVING["$_cfg_resolve_key"]=1
 
-    if [[ -n "${CONFIG[$_cfg_resolve_key]+exists}" ]]; then
-        _cfg_resolve_value="${CONFIG[$_cfg_resolve_key]}"
-        _cfg_resolve_origin="${CONFIG_SOURCE[$_cfg_resolve_key]:-运行时}"
-        _cfg_resolve_kind="${CONFIG_KIND[$_cfg_resolve_key]}"
+    if [[ -n "${_cfg_resolve_values[$_cfg_resolve_key]+exists}" ]]; then
+        _cfg_resolve_value="${_cfg_resolve_values[$_cfg_resolve_key]}"
+        _cfg_resolve_origin="${_cfg_resolve_sources[$_cfg_resolve_key]:-运行时}"
+        _cfg_resolve_kind="${_cfg_resolve_kinds[$_cfg_resolve_key]}"
+        if [[ "$_cfg_resolve_kind" == literal ]]; then
+            _config_resolve_literal "$_cfg_resolve_key" "$_cfg_resolve_value" "$_cfg_resolve_origin" \
+                _cfg_resolve_value _cfg_resolve_kind || _cfg_resolve_rc=$?
+        fi
     elif [[ -n "${CONFIG_SCHEMA[$_cfg_resolve_schema.default]+exists}" ]]; then
         _cfg_resolve_value="${CONFIG_SCHEMA[$_cfg_resolve_schema.default]}"
         _cfg_resolve_origin="默认值"
-        _config_value_parse "$_cfg_resolve_value" _cfg_resolve_value _cfg_resolve_kind \
-            "$_cfg_resolve_origin 配置项 '$_cfg_resolve_key'"
+        _config_resolve_literal "$_cfg_resolve_key" "$_cfg_resolve_value" "$_cfg_resolve_origin" \
+            _cfg_resolve_value _cfg_resolve_kind || _cfg_resolve_rc=$?
     elif [[ -n "${CONFIG_SCHEMA[$_cfg_resolve_schema.default-fn]:-}" ]]; then
         _cfg_resolve_fn="${CONFIG_SCHEMA[$_cfg_resolve_schema.default-fn]}"
         declare -F "$_cfg_resolve_fn" >/dev/null ||
@@ -54,8 +121,14 @@ _config_resolve() {
         _cfg_resolve_rc=3
     fi
 
-    if [[ "$_cfg_resolve_rc" -eq 3 ]]; then
+    if [[ "$_cfg_resolve_rc" -ne 0 ]]; then
         unset '_CONFIG_RESOLVING[$_cfg_resolve_key]'
+        # 依赖只读游戏名的值在无游戏上下文时延迟展开
+        if [[ "$_cfg_resolve_rc" -eq 4 ]]; then
+            _cfg_resolve_deferred_out=true
+            _cfg_resolve_rc=3
+        fi
+        [[ "$_cfg_resolve_rc" -eq 3 ]] || return "$_cfg_resolve_rc"
         _cfg_resolve_out=""
         _cfg_resolve_source="未设置"
         _cfg_resolve_kind_out=""
@@ -163,6 +236,7 @@ config_has() {
 #shellcheck disable=SC2034
 config_set() {
     [[ $# -ge 2 && $# -le 4 ]] || die 1 config "config_set 用法为 <配置键> <值> [来源] [scalar|array]"
+    [[ "$1" != game.name ]] || die 1 config "'game.name' 是只读的模板引用"
     _config_value_validate "$2" "${4:-scalar}" "${3:-运行时} 配置项 '$1'"
     CONFIG["$1"]="$2"
     CONFIG_SOURCE["$1"]="${3:-运行时}"
@@ -218,10 +292,8 @@ config_require() {
     esac
 }
 
-# 目录变量保留环境变量优先的约定，计算结果仍经过 schema 规范化
-config_bind_path() {
-    local key="$1"
-    local -n _cfg_bind_out="$2"
-    [[ -z "$_cfg_bind_out" ]] || config_set "$key" "$_cfg_bind_out" "环境变量 $2"
-    config_read "$key" "$2"
+# 在解析路径引用之前保留环境变量优先的约定
+config_capture_path_override() {
+    local -n _cfg_path_override="$2"
+    [[ -z "$_cfg_path_override" ]] || config_set "$1" "$_cfg_path_override" "环境变量 $2"
 }

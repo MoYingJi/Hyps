@@ -39,17 +39,6 @@ _config_default_runtime_dir() {
     fi
 }
 
-_config_default_prefix() {
-    [[ -n "${CONFIG_GAME_NAME:-}" ]] || return 3
-    local -n result="$1"
-    result="$DATA_DIR/prefixes/$CONFIG_GAME_NAME"
-}
-
-_config_default_overlay_dir() {
-    local -n result="$1"
-    result="$DATA_DIR/overlays"
-}
-
 config_declare path.config path --in bootstrap --default-fn _config_default_config_dir --description "配置目录"
 config_declare path.cache path --in global --default-fn _config_default_cache_dir --description "缓存目录"
 config_declare path.data path --in global --default-fn _config_default_data_dir --description "数据目录"
@@ -66,13 +55,13 @@ config_declare runner.prefix_var string --in runner,game-instance --default WINE
 config_declare game.exe path --in game-instance --description "游戏主程序"
 config_declare game.install_dir path --in game-instance --description "游戏安装目录"
 config_declare game.cwd path --in game-instance --description "游戏工作目录"
-config_declare game.prefix path --in game-instance --default-fn _config_default_prefix --description "游戏 Wine 前缀"
+config_declare game.prefix path --in game-instance --default '"${path.data}/prefixes/${game.name}"' --description "游戏 Wine 前缀"
 config_declare game.args args --in game-instance --default '[]' --description "游戏启动参数"
 config_declare game.umu_id string --in global,runner,game-instance --description "UMU 游戏标识"
 
 config_declare overlay.enabled bool --default false --description "启用游戏文件系统 overlay"
 config_declare overlay.backend enum --choices fuse,kernel --default fuse --when overlay.enabled
-config_declare overlay.dir path --default-fn _config_default_overlay_dir --when overlay.enabled
+config_declare overlay.dir path --default '"${path.data}/overlays"' --when overlay.enabled
 config_declare overlay.lower path --in game-instance --when overlay.enabled
 config_declare overlay.upper path --in game-instance --when overlay.enabled
 config_declare overlay.work path --in game-instance --when overlay.enabled

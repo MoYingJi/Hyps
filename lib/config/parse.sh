@@ -35,7 +35,7 @@ config_parse_file() {
     local pending_value=""
     local pending_type=""
     local pending_line=0
-    local stripped_line
+    local stripped_line value_closed
     local current_section=""
 
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -65,33 +65,28 @@ config_parse_file() {
             key="${key%"${key##*[![:space:]]}"}"
             value="${value#"${value%%[![:space:]]*}"}"
             value="${value%"${value##*[![:space:]]}"}"
-            _strip_trailing_comment value
             # 如果有节前缀，添加到键名中
             [[ -z "$current_section" ]] || key="${current_section}.${key}"
             [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] ||
                 die 1 config "$file:$line_no 配置键 '$key' 无效"
 
-            # 检查值是否为未闭合的数组开始
-            if [[ "$value" == "["* ]] && [[ "$value" != *"]" ]]; then
-                # 进入多行模式（方括号数组）
+            case "$value" in
+                '['*) pending_type=square ;;
+                '('*) pending_type=paren ;;
+                *) pending_type=scalar ;;
+            esac
+            _config_scan_value_line value value_closed "$pending_type" "$file:$line_no 配置项 '$key'" || return $?
+
+            if [[ "$pending_type" != scalar && "$value_closed" != true ]]; then
                 pending_key="$key"
                 pending_value="$value"
-                pending_type="square"
-                pending_line="$line_no"
-            elif [[ "$value" == "("* ]] && [[ "$value" != *")" ]]; then
-                # 进入多行模式（圆括号数组）
-                pending_key="$key"
-                pending_value="$value"
-                pending_type="paren"
                 pending_line="$line_no"
             else
-                # 单行值，直接存储
-                _config_store_value "$target_map" "$key" "$value" "$source_map" "$file:$line_no" "$kind_map"
+                _config_store_value "$target_map" "$key" "$value" "$source_map" "$file:$line_no" "$kind_map" || return $?
             fi
         elif [[ -n "$pending_key" ]]; then
-            # 多行模式：继续累积值
             stripped_line="$line"
-            _strip_trailing_comment stripped_line
+            _config_scan_value_line stripped_line value_closed "$pending_type" "$file:$line_no 配置项 '$pending_key'" || return $?
 
             if [[ "$pending_type" == "square" ]]; then
                 if [[ "$pending_value" == "[" || "$pending_value" == *"," || "$stripped_line" == "]" ]]; then
@@ -104,10 +99,9 @@ config_parse_file() {
             fi
 
             # 检查是否已闭合
-            if [[ "$pending_type" == "square" && "$pending_value" == *"]" ]] || \
-               [[ "$pending_type" == "paren" && "$pending_value" == *")" ]]; then
+            if [[ "$value_closed" == true ]]; then
                 # 闭合，存储
-                _config_store_value "$target_map" "$pending_key" "$pending_value" "$source_map" "$file:$pending_line" "$kind_map"
+                _config_store_value "$target_map" "$pending_key" "$pending_value" "$source_map" "$file:$pending_line" "$kind_map" || return $?
                 pending_key=""
                 pending_value=""
                 pending_type=""
@@ -123,47 +117,40 @@ config_parse_file() {
     return 0
 }
 
-_strip_trailing_comment() {
-    local -n str_ref="$1"
-    local str="$str_ref"
+# 用相同的引号规则识别行尾注释和数组结束符
+_config_scan_value_line() {
+    local -n _cfg_line="$1" _cfg_line_closed="$2"
+    local _cfg_line_type="$3" _cfg_line_origin="$4"
+    local _cfg_line_rest="$_cfg_line" _cfg_line_ignored
+    _cfg_line_closed=false
 
-    # 无 # 则不可能有注释，直接返回
-    [[ $str == *'#'* ]] || return 0
-
-    # 只跳到引号、反斜杠与 # 处，其余字符不影响引号状态
-    local rest="$str" plain c pos=0 comment_pos=-1
-    local in_single=0 in_double=0
-
-    while [[ -n $rest ]]; do
-        plain="${rest%%[\'\"\\#]*}"
-        pos=$((pos + ${#plain}))
-        rest="${rest:${#plain}}"
-        [[ -n $rest ]] || break
-
-        c="${rest:0:1}"
-        rest="${rest:1}"
-        pos=$((pos + 1))
-
-        # 双引号内的反斜杠转义下一个字符
-        if (( in_double )) && [[ $c == "\\" ]]; then
-            [[ -n $rest ]] || break
-            rest="${rest:1}"
-            pos=$((pos + 1))
-        elif [[ $c == "'" ]] && (( ! in_double )); then
-            in_single=$((1 - in_single))
-        elif [[ $c == '"' ]] && (( ! in_single )); then
-            in_double=$((1 - in_double))
-        elif [[ $c == '#' ]] && (( ! in_single && ! in_double )); then
-            comment_pos=$((pos - 1))
-            break
+    if [[ "$_cfg_line_type" == scalar ]]; then
+        if [[ "$_cfg_line_rest" == '"'* || "$_cfg_line_rest" == "'"* ]]; then
+            read_quoted_string "$_cfg_line_rest" _cfg_line_ignored _cfg_line_rest "$_cfg_line_origin" || return $?
+        else
+            _cfg_line="${_cfg_line%%#*}"
+            return 0
         fi
+    fi
+
+    while [[ -n "$_cfg_line_rest" ]]; do
+        case "$_cfg_line_rest" in
+            '#'*)
+                _cfg_line="${_cfg_line:0:${#_cfg_line}-${#_cfg_line_rest}}"
+                break
+                ;;
+            '"'* | "'"*)
+                read_quoted_string "$_cfg_line_rest" _cfg_line_ignored _cfg_line_rest "$_cfg_line_origin" || return $?
+                continue
+                ;;
+            ']'* | ')'*)
+                _cfg_line_closed=true
+                ;;
+        esac
+        _cfg_line_rest="${_cfg_line_rest:1}"
     done
 
-    if (( comment_pos != -1 )); then
-        str="${str:0:comment_pos}"
-        str="${str%"${str##*[![:space:]]}"}"
-    fi
-    str_ref="$str"
+    _cfg_line="${_cfg_line%"${_cfg_line##*[![:space:]]}"}"
 }
 
 _config_store_value() {
@@ -172,14 +159,16 @@ _config_store_value() {
     local value="$3"
     local source_map="${4:-}"
     local origin="${5:-}"
-    local kind
+    #shellcheck disable=SC2034 # 此处校验文件语法并保留原字面量
+    local parsed_value kind
     local -n kinds_ref="$6"
-    _config_value_parse "$value" value kind "$origin 配置项 '$key'"
+    [[ "$key" != game.name ]] || die 1 config "$origin 'game.name' 是只读的模板引用"
+    _config_value_parse "$value" parsed_value kind "$origin 配置项 '$key'" _config_validate_reference || return $?
 
     #shellcheck disable=SC2034
     map_ref["$key"]="$value"
     #shellcheck disable=SC2034
-    kinds_ref["$key"]="$kind"
+    kinds_ref["$key"]=literal
     if [[ -n "$source_map" ]]; then
         local -n origins_ref="$source_map"
         #shellcheck disable=SC2034

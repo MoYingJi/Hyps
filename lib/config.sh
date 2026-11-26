@@ -21,6 +21,7 @@ source "$SCRIPT_DIR/config/core.sh"
 
 declare -gA _CONFIG_BOOTSTRAP_SOURCE=() _CONFIG_GLOBAL_SOURCE=()
 _CONFIG_BOOTSTRAP_LAYERS=bootstrap
+CONFIG_GAME_NAME=""
 
 load_global_config() {
     local bootstrap_file="$PROJECT_ROOT/config.conf" global_file legacy_file
@@ -28,10 +29,12 @@ load_global_config() {
     local -A bootstrap_config=() bootstrap_kind=() global_config=() global_kind=()
     _CONFIG_BOOTSTRAP_SOURCE=() _CONFIG_GLOBAL_SOURCE=()
     _CONFIG_BOOTSTRAP_LAYERS=bootstrap
+    _CONFIG_GLOBAL_READY=false
 
     config_parse_file "$bootstrap_file" bootstrap_config _CONFIG_BOOTSTRAP_SOURCE bootstrap_kind || return 1
     config_merge bootstrap_config _CONFIG_BOOTSTRAP_SOURCE bootstrap_kind
-    config_bind_path path.config CONFIG_DIR || return 1
+    config_capture_path_override path.config CONFIG_DIR
+    config_read path.config CONFIG_DIR || return 1
 
     global_file="$CONFIG_DIR/config.conf"
     if [[ "$global_file" -ef "$bootstrap_file" ]]; then
@@ -48,11 +51,25 @@ load_global_config() {
     fi
 
     config_merge global_config _CONFIG_GLOBAL_SOURCE global_kind
-    config_bind_path path.cache CACHE_DIR || return 1
-    config_bind_path path.data DATA_DIR || return 1
-    config_bind_path path.state STATE_DIR || return 1
-    config_bind_path path.temp TEMP_DIR || return 1
-    config_bind_path path.runtime RUNTIME_DIR
+    local path_key
+    local -A path_vars=([path.cache]=CACHE_DIR [path.data]=DATA_DIR [path.state]=STATE_DIR
+        [path.temp]=TEMP_DIR [path.runtime]=RUNTIME_DIR)
+    for path_key in "${!path_vars[@]}"; do
+        config_capture_path_override "$path_key" "${path_vars[$path_key]}"
+    done
+    for path_key in "${!path_vars[@]}"; do
+        config_read "$path_key" "${path_vars[$path_key]}" || return 1
+    done
+
+    # 后续加载游戏和 runner 时，全局键的引用仍在全局配置中解析
+    local key
+    _CONFIG_GLOBAL=() _CONFIG_GLOBAL_ORIGINS=() _CONFIG_GLOBAL_KIND=()
+    for key in "${!CONFIG[@]}"; do
+        _CONFIG_GLOBAL["$key"]="${CONFIG[$key]}"
+        _CONFIG_GLOBAL_ORIGINS["$key"]="${CONFIG_SOURCE[$key]}"
+        _CONFIG_GLOBAL_KIND["$key"]="${CONFIG_KIND[$key]}"
+    done
+    _CONFIG_GLOBAL_READY=true
 }
 
 _config_check_global_placement() {
@@ -66,7 +83,7 @@ load_game_config() {
     CONFIG_GAME_NAME="$game_name"
 
     local game_config_file
-    local runner_name runner_file
+    local runner_name runner_file runner_source status=0
     #shellcheck disable=SC2034 # 通过 nameref 接收解析结果
     local -A instance_config=() instance_source=() instance_kind=()
 
@@ -78,11 +95,9 @@ load_game_config() {
     config_parse_file "$game_config_file" instance_config instance_source instance_kind || return 1
     config_check_placement game-instance instance_source || return 1
 
-    if config_has runner.name instance_config; then
-        runner_name="${instance_config[runner.name]}"
-    else
-        config_read runner.name runner_name
-    fi
+    config_merge instance_config instance_source instance_kind
+    _config_resolve runner.name runner_name runner_source || status=$?
+    [[ "$status" -eq 0 || "$status" -eq 3 ]] || return "$status"
 
     # 配置覆盖顺序为 全局配置 < runner 配置 < 游戏配置
     # 空名称不加载预设，允许直接配置 runner.exe / runner.protonpath
@@ -92,8 +107,12 @@ load_game_config() {
         config_parse_to_temp "$runner_file" || return 1
         config_check_placement runner TEMP_CONFIG_SOURCE || return 1
         config_merge TEMP_CONFIG TEMP_CONFIG_SOURCE TEMP_CONFIG_KIND
+        config_merge instance_config instance_source instance_kind
     fi
-    config_merge instance_config instance_source instance_kind
+    # runner 的选择只依赖这一步已经加载的值
+    if [[ "$status" -eq 0 ]]; then
+        config_set runner.name "$runner_name" "$runner_source"
+    fi
 }
 
 # 查询只合并配置，启动和需要游戏路径的操作显式执行检查

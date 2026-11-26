@@ -209,8 +209,10 @@ overlay 需要知道游戏安装根。内置游戏会自动识别；其他游戏
 ```bash
 _Hyps time list  # 列出所有游戏的 启动次数、总游戏时长、最后一次启动时间
 _Hyps time today # 列出所有游戏的 最后一次启动时间 和 今天游戏日常范围内的启动状态
-_Hyps time report <GAME_NAME> # 查看该游戏的详细报告
+_Hyps time report <GAME_NAME> # 每日刷新、今日状态与时长、下次刷新倒计时、最近 12 周热力图
 ```
+
+`time report` 的每日刷新时间来自游戏声明或 `features.time_record.today.reset`，未设置时按本地 00:00 统计且不显示日常相关项。热力图每格一个游戏日，按当天时长分 5 档；有颜色时用方块深浅区分，重定向到文件时退回字符密度。
 
 ### 游戏版本
 

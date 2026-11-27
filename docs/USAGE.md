@@ -143,6 +143,12 @@ features.dll_inject.dlls = ["${game.install_dir}/mods/loader.dll"]
 
 DLL 按数组顺序依次注入，必须与游戏同位数；任一 DLL 失败会终止本次启动。默认等待游戏退出并透传退出码。`no_wait` 注入后立即退出、不等待游戏，只在 `umu-run` 这类跟随 prefix 生命周期的 runner 下安全；wine 和裸 proton 下会导致 Hyps 提前收尾。注入在线游戏可能触发反作弊，请自行评估风险。
 
+`features.dll_inject.exe_name` 可自定义注入器进程名，例如改成 `launcher.exe`。留空时仍是 `dll-injector.exe`。自定义名必须显式带 `.exe` 后缀，缺后缀会报配置错误，不会自动补。设置后 Hyps 会在项目统一的别名目录 `$XDG_CACHE_HOME/hypsc/bin/app/` 下生成一个该名字的注入器副本，并以它启动游戏，所以游戏看到的父进程名也随之改变。该目录由 Hyps 按需重建并供所有换名类功能共用，不要手动放文件。改名只影响文件名和父进程名，不改变数字签名，也挡不住按完整镜像路径或签名校验的检查。
+
+```ini
+features.dll_inject.exe_name = "launcher.exe"
+```
+
 ### 游戏版本
 
 ```bash

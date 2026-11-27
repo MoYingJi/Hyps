@@ -15,6 +15,8 @@ source "$SCRIPT_DIR/utils/string.sh"
 source "$SCRIPT_DIR/utils/command.sh"
 #shellcheck source=../utils/cache.sh
 source "$SCRIPT_DIR/utils/cache.sh"
+#shellcheck source=../utils/exe_alias.sh
+source "$SCRIPT_DIR/utils/exe_alias.sh"
 #shellcheck source=../utils/toolspec_build.sh
 source "$SCRIPT_DIR/utils/toolspec_build.sh"
 #shellcheck source=../utils/wine.sh
@@ -43,12 +45,16 @@ declare -ga DLL_INJECTOR_ADDED_DLLS=()   # dll_injector_add 登记的 DLL
 declare -g DLL_INJECTOR_NO_WAIT=0
 declare -g DLL_INJECTOR_SKIPPED=0        # load_config 时未启用
 declare -g DLL_INJECTOR_FINALIZED=0      # prepare 收尾已完成
+declare -g DLL_INJECTOR_LAUNCH_EXE=""    # handler 实际使用的注入器路径
 
 config_declare features.dll_inject.enabled bool --default false --description "启用 DLL 注入"
 config_declare features.dll_inject.dlls array --default '[]' --when features.dll_inject.enabled \
     --description "要注入的 DLL 路径，按顺序注入"
 config_declare features.dll_inject.no_wait bool --default false --when features.dll_inject.enabled \
     --description "注入后不等待游戏，仅 umu-run 等跟随 prefix 生命周期的 runner 下安全"
+config_declare features.dll_inject.exe_name string --default "" --when features.dll_inject.enabled \
+    --validate exe_alias_name_is_valid \
+    --description "注入器进程名，留空用 dll-injector.exe；自定义名须带 .exe，会放到统一的 bin/${EXE_ALIAS_DIRNAME}/ 别名目录并以它启动"
 
 # 展开开头的 ~ 并转绝对路径，不要求存在
 dll_injector_resolve_path() {
@@ -122,6 +128,8 @@ feat_dll_inject_finalize() {
         dll_injector_verify_output \
         dll_injector_compile
 
+    dll_injector_prepare_launch_exe
+
     DLL_INJECTOR_FINALIZED=1
     log_info dll-injector "启用 DLL 注入，共 ${#DLL_INJECTOR_DLLS[@]} 个 DLL"
 }
@@ -135,8 +143,9 @@ feat_dll_inject_handler() {
     local game_exe
     game_exe="$(launch_plan_get_game_exe)"
 
-    # argv[0] 是注入器本体的 Unix 路径，由 runner 或脚本模式负责转换
-    local -a argv=("$(dll_injector_exe_path)")
+    # argv[0] 是注入器（或其别名）本体的 Unix 路径，由 runner 或脚本模式负责转换
+    [[ -n "$DLL_INJECTOR_LAUNCH_EXE" ]] || dll_injector_prepare_launch_exe
+    local -a argv=("$DLL_INJECTOR_LAUNCH_EXE")
     isy "$DLL_INJECTOR_NO_WAIT" && argv+=(--no-wait)
     local dll
     for dll in "${DLL_INJECTOR_DLLS[@]}"; do
@@ -149,6 +158,26 @@ feat_dll_inject_handler() {
 
 dll_injector_exe_path() {
     cache_bin_path "dll-injector.exe"
+}
+
+# 读取自定义进程名，未设置时输出空；配置校验已保证非空时带 .exe 后缀
+dll_injector_exe_name() {
+    local name
+    config_read features.dll_inject.exe_name name
+    [[ -n "$name" ]] || return 0
+    printf '%s\n' "$name"
+}
+
+# 解析并设置 DLL_INJECTOR_LAUNCH_EXE: 有自定义名就放入统一别名目录，否则用本体
+dll_injector_prepare_launch_exe() {
+    local name src
+    name="$(dll_injector_exe_name)"
+    if [[ -n "$name" ]]; then
+        src="$(dll_injector_exe_path)"
+        exe_alias_place "$name" "$src" DLL_INJECTOR_LAUNCH_EXE
+    else
+        DLL_INJECTOR_LAUNCH_EXE="$(dll_injector_exe_path)"
+    fi
 }
 
 dll_injector_all_source() {
